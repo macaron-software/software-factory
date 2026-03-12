@@ -459,3 +459,105 @@ async def remove_project_role(
     """Remove project-specific role (falls back to global role)."""
     service.remove_project_role(user_id, project_id)
     return JSONResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Password reset
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/auth/forgot-password")
+async def forgot_password(request: Request):
+    """Send password reset code to email via AWS SES."""
+    ip = request.client.host if request.client else ""
+    if _check_rate_limit(ip):
+        return JSONResponse(
+            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
+            status_code=429,
+            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    email = body.get("email", "").strip()
+    if not email:
+        return JSONResponse({"error": "Email required"}, status_code=400)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, lambda: service.request_password_reset(email))
+
+    # Always return success (prevent email enumeration)
+    return JSONResponse({"ok": True, "message": "If an account exists, a reset code was sent."})
+
+
+@router.post("/api/auth/verify-reset-code")
+async def verify_reset_code(request: Request):
+    """Verify a reset code is valid (pre-check before setting new password)."""
+    ip = request.client.host if request.client else ""
+    if _check_rate_limit(ip):
+        return JSONResponse(
+            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
+            status_code=429,
+            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    email = body.get("email", "").strip()
+    code = body.get("code", "").strip()
+    if not email or not code:
+        return JSONResponse({"error": "Email and code required"}, status_code=400)
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    valid = await loop.run_in_executor(None, lambda: service.verify_reset_code(email, code))
+
+    if not valid:
+        return JSONResponse(
+            {"error": "Invalid or expired code", "code": "invalid_code"},
+            status_code=400,
+        )
+    return JSONResponse({"ok": True, "valid": True})
+
+
+@router.post("/api/auth/reset-password")
+async def reset_password(request: Request):
+    """Reset password using a valid code."""
+    ip = request.client.host if request.client else ""
+    if _check_rate_limit(ip):
+        return JSONResponse(
+            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
+            status_code=429,
+            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
+        )
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    email = body.get("email", "").strip()
+    code = body.get("code", "").strip()
+    new_password = body.get("new_password", "")
+
+    if not email or not code or not new_password:
+        return JSONResponse(
+            {"error": "Email, code, and new_password required"}, status_code=400
+        )
+
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, lambda: service.reset_password(email, code, new_password)
+        )
+        return JSONResponse({"ok": True, "message": "Password reset successfully."})
+    except service.AuthError as e:
+        return JSONResponse({"error": str(e), "code": e.code}, status_code=400)

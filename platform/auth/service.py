@@ -589,3 +589,139 @@ def cleanup_expired_sessions():
             (datetime.now(timezone.utc).isoformat(),),
         )
         db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Password reset (6-digit code via AWS SES)
+# ---------------------------------------------------------------------------
+
+RESET_CODE_EXPIRY = timedelta(minutes=15)
+RESET_MAX_ATTEMPTS = 5
+
+
+def _generate_reset_code() -> str:
+    """Generate a cryptographically random 6-digit code."""
+    import secrets
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def request_password_reset(email: str) -> bool:
+    """Generate reset code, store in DB, send via SES.
+
+    Returns True if email was sent (or user not found — same response to prevent enumeration).
+    """
+    email = email.strip().lower()
+    user = get_user_by_email(email)
+    if not user:
+        # Don't reveal whether email exists
+        return True
+
+    code = _generate_reset_code()
+    expires = datetime.now(timezone.utc) + RESET_CODE_EXPIRY
+
+    with get_db() as db:
+        # Invalidate previous codes for this email
+        db.execute(
+            "UPDATE password_reset_codes SET used=1 WHERE email=? AND used=0",
+            (email,),
+        )
+        db.execute(
+            "INSERT INTO password_reset_codes (id, email, code_hash, expires_at, attempts, used) "
+            "VALUES (?, ?, ?, ?, 0, 0)",
+            (
+                uuid.uuid4().hex[:16],
+                email,
+                hashlib.sha256(code.encode()).hexdigest(),
+                expires.isoformat(),
+            ),
+        )
+        db.commit()
+
+    # Send email via SES
+    from .ses import send_reset_code
+    return send_reset_code(email, code)
+
+
+def verify_reset_code(email: str, code: str) -> bool:
+    """Verify a reset code is valid (not expired, not used, attempts < max)."""
+    email = email.strip().lower()
+    code_hash = hashlib.sha256(code.strip().encode()).hexdigest()
+
+    with get_db() as db:
+        row = db.execute(
+            "SELECT id, code_hash, expires_at, attempts, used FROM password_reset_codes "
+            "WHERE email=? AND used=0 ORDER BY expires_at DESC LIMIT 1",
+            (email,),
+        ).fetchone()
+
+    if not row:
+        return False
+
+    row_id = row[0] if isinstance(row, tuple) else row["id"]
+    stored_hash = row[1] if isinstance(row, tuple) else row["code_hash"]
+    expires_at = row[2] if isinstance(row, tuple) else row["expires_at"]
+    attempts = row[3] if isinstance(row, tuple) else row["attempts"]
+
+    # Check expiry
+    if isinstance(expires_at, str):
+        exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    else:
+        exp_dt = expires_at
+    if exp_dt.tzinfo is None:
+        exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > exp_dt:
+        return False
+
+    # Increment attempts
+    with get_db() as db:
+        db.execute(
+            "UPDATE password_reset_codes SET attempts=attempts+1 WHERE id=?",
+            (row_id,),
+        )
+        db.commit()
+
+    # Too many attempts — burn the code
+    if attempts >= RESET_MAX_ATTEMPTS:
+        with get_db() as db:
+            db.execute(
+                "UPDATE password_reset_codes SET used=1 WHERE id=?", (row_id,)
+            )
+            db.commit()
+        return False
+
+    return stored_hash == code_hash
+
+
+def reset_password(email: str, code: str, new_password: str) -> bool:
+    """Verify code and set new password. Returns True on success."""
+    if len(new_password) < 8:
+        raise AuthError("Password must be at least 8 characters", "weak_password")
+
+    if not verify_reset_code(email, code):
+        raise AuthError("Invalid or expired code", "invalid_code")
+
+    email = email.strip().lower()
+    code_hash = hashlib.sha256(code.strip().encode()).hexdigest()
+
+    # Mark code as used
+    with get_db() as db:
+        db.execute(
+            "UPDATE password_reset_codes SET used=1 WHERE email=? AND code_hash=? AND used=0",
+            (email, code_hash),
+        )
+        db.commit()
+
+    # Update password
+    pw_hash = _hash_password(new_password)
+    with get_db() as db:
+        db.execute(
+            "UPDATE users SET password_hash=? WHERE email=?", (pw_hash, email)
+        )
+        db.commit()
+
+    # Invalidate all sessions (force re-login)
+    user = get_user_by_email(email)
+    if user:
+        logout(user.id)
+
+    return True

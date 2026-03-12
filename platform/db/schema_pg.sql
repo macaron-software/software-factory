@@ -921,6 +921,16 @@ CREATE TABLE IF NOT EXISTS user_project_roles (
     UNIQUE(user_id, project_id)
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    used INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS wiki_pages (
     slug TEXT PRIMARY KEY,
     title TEXT NOT NULL,

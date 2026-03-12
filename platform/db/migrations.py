@@ -1097,6 +1097,20 @@ def _ensure_darwin_tables(conn) -> None:
 
     conn.commit()
 
+    # Password reset codes table (added 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_codes (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            code_hash TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            attempts INTEGER DEFAULT 0,
+            used INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
 
 def get_db(db_path: Path = DB_PATH):
     """Get a database connection. Returns PostgreSQL adapter."""

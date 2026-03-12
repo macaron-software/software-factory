@@ -226,10 +226,12 @@ PUBLIC_PATHS = {
     "/api/auth/setup",
     "/api/auth/logout",
     "/api/auth/demo",
+    "/api/auth/forgot-password",
+    "/api/auth/verify-reset-code",
+    "/api/auth/reset-password",
     "/api/set-lang",
     "/api/i18n",
     "/api/webhooks",
-    "/api/improvement/project",
     "/api/autoheal/heartbeat",
     "/api/cockpit",
     "/api/notifications/badge",
@@ -246,14 +248,18 @@ PUBLIC_PATHS = {
     "/auth/github",
     "/auth/azure",
     "/.well-known",
-    "/a2a",
-    "/api/cto",
 }
+
+# Internal-only paths matched by suffix (watchdog, health probes)
+PUBLIC_PATH_SUFFIXES = {"/retry"}
 
 
 def is_public_path(path: str) -> bool:
     """Check if a path is public (no auth required)."""
     for pp in PUBLIC_PATHS:
         if path == pp or path.startswith(pp + "/"):
+            return True
+    for suffix in PUBLIC_PATH_SUFFIXES:
+        if path.endswith(suffix):
             return True
     return False
