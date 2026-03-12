@@ -20,6 +20,45 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _auto_create_planning_run(epic_id: str):
+    """Auto-create a lightweight EpicRun when chatting with an epic that has no run.
+
+    This allows API clients to chat with an epic immediately after creating it,
+    without needing to launch a full workflow first.
+    """
+    from ....epics.store import get_epic_run_store, get_epic_store
+    from ....models import EpicRun, EpicStatus
+    from ....sessions.store import SessionDef, get_session_store
+
+    epic_store = get_epic_store()
+    epic_def = epic_store.get(epic_id)
+    if not epic_def:
+        return None
+
+    # Create a session for this planning run
+    sess_store = get_session_store()
+    session = SessionDef(
+        name=f"Epic planning: {epic_def.name}",
+        epic_id=epic_id,
+    )
+    sess_store.create(session)
+
+    # Create a lightweight run (no workflow, just for chat)
+    run = EpicRun(
+        id=epic_id,
+        workflow_id="",
+        workflow_name="planning",
+        session_id=session.id,
+        project_id=epic_def.project_id,
+        status=EpicStatus.RUNNING,
+        brief=epic_def.description or epic_def.goal or epic_def.name,
+    )
+    run_store = get_epic_run_store()
+    run_store.save(run)
+    logger.info("Auto-created planning run for epic %s", epic_id)
+    return run
+
+
 @router.post("/api/epics/{epic_id}/start", responses={200: {"model": OkResponse}})
 @router.post("/api/missions/{epic_id}/start", responses={200: {"model": OkResponse}})
 async def start_mission(epic_id: str):
@@ -149,21 +188,30 @@ async def launch_mission_workflow(request: Request, epic_id: str):
     except Exception:
         pass
 
-    # Use EpicOrchestrator for full phase tracking, build gates, and PM checkpoints
+    # Register project in project store with workspace path so tools_enabled works
+    _proj_id = mission.project_id or epic_id
     try:
-        await _launch_orchestrator(session.id)
-    except Exception as e:
-        logger.error("Failed to launch orchestrator for %s: %s", session.id, e)
-        # Fallback to direct workflow execution (no phase tracking)
-        async def _guarded_workflow():
-            async with get_mission_semaphore():
-                await _run_workflow_background(
-                    wf, session.id, task_desc, mission.project_id or ""
-                )
+        from ....projects.manager import Project, get_project_store
 
-        _wf_task = asyncio.create_task(_guarded_workflow())
-        _active_mission_tasks[session.id] = _wf_task
-        _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
+        _p_store = get_project_store()
+        _existing = _p_store.get(_proj_id)
+        if _existing:
+            _existing.path = str(workspace_root)
+            _p_store.update(_existing)
+        else:
+            _p_store.create(
+                Project(id=_proj_id, name=mission.name, path=str(workspace_root))
+            )
+    except Exception as _e:
+        logger.warning("Could not register project workspace for %s: %s", _proj_id, _e)
+
+    async def _guarded_workflow():
+        async with get_mission_semaphore():
+            await _run_workflow_background(wf, session.id, task_desc, _proj_id)
+
+    _wf_task = asyncio.create_task(_guarded_workflow())
+    _active_mission_tasks[session.id] = _wf_task
+    _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
 
     # If mission config has milestones, also launch the milestone pipeline in parallel
     milestones = (mission.config or {}).get("milestones")
@@ -274,40 +322,13 @@ async def api_mission_start(request: Request):
     epic_id = uuid.uuid4().hex[:8]
 
     # Create workspace directory for agent tools (code, git, docker)
-    import shutil
     import subprocess
 
     from ....config import DATA_DIR
 
     workspace_root = DATA_DIR / "workspaces" / epic_id
-
-    # If project has an existing workspace with source code, copy it
-    _project_ws_used = False
-    if project_id:
-        try:
-            from ....db.migrations import get_db as _ws_db
-            _db = _ws_db()
-            _row = _db.execute("SELECT path FROM projects WHERE id=?", (project_id,)).fetchone()
-            _db.close()
-            if _row:
-                from pathlib import Path as _Path
-                _raw_path = _row["path"] if hasattr(_row, "keys") else _row[0]
-                _proj_path = _Path(_raw_path)
-                if not _proj_path.is_absolute():
-                    # Resolve relative to FACTORY_ROOT (parent of DATA_DIR)
-                    from ....config import FACTORY_ROOT
-                    _proj_path = FACTORY_ROOT / _proj_path
-                if _proj_path.exists() and any(_proj_path.iterdir()):
-                    shutil.copytree(str(_proj_path), str(workspace_root),
-                                    ignore=shutil.ignore_patterns('.git', '__pycache__', 'node_modules', '.build', 'dist', 'build'),
-                                    dirs_exist_ok=True)
-                    _project_ws_used = True
-                    logger.warning("WORKSPACE: copied project %s workspace from %s", project_id, _proj_path)
-        except Exception as _we:
-            logger.warning("WORKSPACE: could not copy project workspace: %s", _we)
-
     workspace_root.mkdir(parents=True, exist_ok=True)
-    # Init git repo
+    # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "agents@macaron.ai"],
@@ -319,15 +340,13 @@ async def api_mission_start(request: Request):
         cwd=str(workspace_root),
         capture_output=True,
     )
-    if not _project_ws_used:
-        readme = workspace_root / "README.md"
-        readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {epic_id}\n")
+    readme = workspace_root / "README.md"
+    readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {epic_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
     gitignore = workspace_root / ".gitignore"
-    if not gitignore.exists():
-        gitignore.write_text(
-            "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
-        )
+    gitignore.write_text(
+        "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
+    )
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit — mission workspace"],
@@ -494,6 +513,9 @@ async def mission_chat_stream(request: Request, epic_id: str):
 
     run_store = get_epic_run_store()
     mission = run_store.get(epic_id)
+    if not mission:
+        # Auto-create a planning run from epic definition
+        mission = _auto_create_planning_run(epic_id)
     if not mission:
         return HTMLResponse("Mission not found", status_code=404)
 
