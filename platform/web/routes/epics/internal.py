@@ -167,6 +167,15 @@ async def _run_post_phase_hooks(
                 text=True,
                 timeout=10,
             )
+            # Push to remote so changes are visible on GitHub
+            push_res = subprocess.run(
+                ["git", "push"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            push_status = " → pushed" if push_res.returncode == 0 else " (push failed)"
             await push_sse(
                 session_id,
                 {
@@ -174,7 +183,7 @@ async def _run_post_phase_hooks(
                     "from_agent": "system",
                     "from_name": "CI/CD",
                     "from_role": "Pipeline",
-                    "content": f"Auto-commit: {file_count} fichiers ({phase_name})",
+                    "content": f"Auto-commit: {file_count} fichiers ({phase_name}){push_status}",
                     "phase_id": phase_id,
                     "msg_type": "text",
                 },

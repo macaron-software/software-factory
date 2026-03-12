@@ -108,6 +108,8 @@ class ExecutionContext:
     capability_grade: str = "executor"
     # Max tool-calling rounds (0 = use global MAX_TOOL_ROUNDS)
     max_rounds: int = 0
+    # Files written by code_write/code_edit during this execution (for auto-commit)
+    code_files_written: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -404,6 +406,122 @@ _MEM_EXTRACT_MIN_MSGS = 4
 # Throttle: don't extract more than once per N seconds for the same session
 _mem_extract_last: dict[str, float] = {}
 _MEM_EXTRACT_COOLDOWN = 120  # 2 minutes
+
+
+async def _auto_commit_and_push(ctx: "ExecutionContext", agent_id: str) -> None:
+    """Auto-commit and push code changes written by an agent during execution.
+
+    Called at the end of AgentExecutor.run() when ctx.code_files_written is non-empty.
+    Commits on an agent branch (never on protected branches) and pushes to origin.
+    """
+    import subprocess
+
+    workspace = ctx.project_path
+    if not workspace:
+        return
+
+    files = list(dict.fromkeys(ctx.code_files_written))  # dedupe, keep order
+    if not files:
+        return
+
+    try:
+        # Stage only the files the agent wrote
+        subprocess.run(
+            ["git", "add", "--"] + files,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+        # Check if there's anything to commit
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if not status.stdout.strip():
+            return
+
+        file_count = len(files)
+        short_files = ", ".join(
+            f.rsplit("/", 1)[-1] for f in files[:3]
+        )
+        if file_count > 3:
+            short_files += f" +{file_count - 3} more"
+
+        commit_msg = (
+            f"feat({agent_id}): auto-commit {file_count} files\n\n"
+            f"Files: {short_files}\n"
+            f"Session: {ctx.session_id[:8]}"
+        )
+
+        # Ensure we're on an agent branch (not main/master)
+        current_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        branch = current_branch.stdout.strip()
+        protected = {"main", "master", "develop", "release", "production", "staging"}
+        if branch in protected:
+            new_branch = f"agent/{agent_id}/{ctx.session_id[:8]}"
+            subprocess.run(
+                ["git", "checkout", "-b", new_branch],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            branch = new_branch
+
+        subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+        # Push to remote
+        push_result = subprocess.run(
+            ["git", "push", "--set-upstream", "origin", branch],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if push_result.returncode == 0:
+            logger.info(
+                "Auto-commit+push: %d files by %s → %s",
+                file_count,
+                agent_id,
+                branch,
+            )
+        else:
+            logger.warning(
+                "Auto-push failed (commit saved locally): %s",
+                push_result.stderr[:200],
+            )
+
+        # Notify via SSE if callback available
+        if ctx.on_tool_call:
+            try:
+                await ctx.on_tool_call(
+                    "_auto_commit",
+                    {"files": files[:5], "branch": branch},
+                    f"Auto-committed {file_count} files → pushed to {branch}",
+                )
+            except Exception:
+                pass
+
+    except Exception as e:
+        logger.warning("Auto-commit+push error: %s", e)
 
 
 async def _extract_session_memory(
@@ -789,6 +907,12 @@ class AgentExecutor:
                             _record_artifact(ctx, tc, result)
                         except Exception:
                             pass
+                        # Track file path for auto-commit at end of run
+                        _written_path = str(
+                            tc.arguments.get("path", tc.arguments.get("file_path", ""))
+                        )
+                        if _written_path:
+                            ctx.code_files_written.append(_written_path)
 
                     # Notify UI via callback
                     if ctx.on_tool_call:
@@ -1087,6 +1211,14 @@ class AgentExecutor:
                 )
             if ctx.epic_run_id:
                 self._stop_heartbeat(ctx.epic_run_id)
+
+            # Auto-commit+push code changes written during this execution
+            if ctx.code_files_written and ctx.project_path:
+                try:
+                    await _auto_commit_and_push(ctx, agent.id)
+                except Exception as _ac_err:
+                    logger.warning("Auto-commit failed: %s", _ac_err)
+
             return result
 
         except Exception as exc:
