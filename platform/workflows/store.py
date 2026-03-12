@@ -1165,7 +1165,48 @@ async def run_workflow(
         phase_task = f"## {phase.name}\n{phase.description}\n\n"
 
         # Inject detected tech stack so agents use correct build commands
-        if _project_path:
+        # Priority: project memory (authoritative) > filesystem detection (fallback)
+        _declared_stack = ""
+        if project_id:
+            try:
+                from ..memory.manager import get_memory_manager
+                _mm = get_memory_manager()
+                _stack_mem = _mm.project_retrieve(project_id, "stack")
+                if _stack_mem:
+                    _declared_stack = _stack_mem
+            except Exception:
+                pass
+
+        if _declared_stack:
+            # Map declared stack to build commands
+            _stack_lower = _declared_stack.lower()
+            if "rust" in _stack_lower:
+                _build_str = "cargo check"
+                _detected_stack = f"Rust ({_declared_stack})"
+            elif "node" in _stack_lower or "typescript" in _stack_lower or "react" in _stack_lower:
+                _build_str = "npm run build"
+                _detected_stack = f"Node.js/TypeScript ({_declared_stack})"
+            elif "python" in _stack_lower:
+                _build_str = "python3 -m py_compile"
+                _detected_stack = f"Python ({_declared_stack})"
+            elif "go" in _stack_lower:
+                _build_str = "go build ./..."
+                _detected_stack = f"Go ({_declared_stack})"
+            elif "swift" in _stack_lower:
+                _build_str = "swift build"
+                _detected_stack = f"Swift ({_declared_stack})"
+            else:
+                _build_str = ""
+                _detected_stack = _declared_stack
+
+            if _build_str:
+                phase_task += (
+                    f"## DECLARED TECH STACK (MANDATORY — do NOT use other languages)\n"
+                    f"Stack: {_detected_stack}\n"
+                    f"Build command: `{_build_str}`\n"
+                    f"RULE: Use ONLY `{_build_str}` to build. Do NOT run npm/pip/go if this is a {_detected_stack} project.\n\n"
+                )
+        elif _project_path:
             _build_cmd = _detect_build_cmd(_project_path)
             if _build_cmd:
                 _stack_map = {
