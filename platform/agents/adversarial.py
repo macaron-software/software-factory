@@ -403,6 +403,9 @@ def check_l0(
     )
     # Check stack mismatch — wrong language for declared project stack
     stack_issues = _check_stack_mismatch(tool_calls, task)
+    if stack_issues:
+        import logging as _log_sm
+        _log_sm.getLogger(__name__).warning("STACK_MISMATCH detected: %s", "; ".join(stack_issues))
     for si in stack_issues:
         issues.append(si)
         score += 7  # severe — wrong language is a hard reject

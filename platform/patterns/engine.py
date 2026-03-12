@@ -872,6 +872,10 @@ async def _execute_node(
             or "tdd" in role_lower
             or "coder" in role_lower
             or "implementer" in role_lower
+            or "lead" in role_lower
+            or "veloppeur" in role_lower
+            or "engineer" in role_lower
+            or "ing" in role_lower
         ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
@@ -1162,7 +1166,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
 
                 guard_result = await run_guard(
                     content=content,
-                    task=task,
+                    task=full_task,
                     agent_role=agent.role or "",
                     agent_name=agent.name,
                     tool_calls=cumulative_tool_calls,

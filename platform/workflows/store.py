@@ -1165,17 +1165,35 @@ async def run_workflow(
         phase_task = f"## {phase.name}\n{phase.description}\n\n"
 
         # Inject detected tech stack so agents use correct build commands
-        # Priority: project memory (authoritative) > filesystem detection (fallback)
+        # Priority: project memory/description (authoritative) > filesystem (fallback)
         _declared_stack = ""
         if project_id:
+            # 1. Search project memory for stack info
             try:
                 from ..memory.manager import get_memory_manager
                 _mm = get_memory_manager()
-                _stack_mem = _mm.project_retrieve(project_id, "stack")
-                if _stack_mem:
-                    _declared_stack = _stack_mem
+                _stack_results = _mm.project_search(project_id, "stack architecture language", limit=3)
+                for _sr in _stack_results:
+                    _sv = _sr.get("value", "")
+                    if any(kw in _sv.lower() for kw in ("rust", "node", "python", "go", "swift", "java", "typescript", "react")):
+                        _declared_stack = _sv[:200]
+                        break
             except Exception:
                 pass
+            # 2. Check project description for stack keywords
+            if not _declared_stack:
+                try:
+                    from ..projects.manager import get_project_store
+                    _proj = get_project_store().get(project_id)
+                    if _proj and _proj.description:
+                        _desc = _proj.description.lower()
+                        for _lang, _label in [("rust", "Rust"), ("typescript", "TypeScript"), ("node", "Node.js"),
+                                              ("react", "React"), ("python", "Python"), ("go ", "Go"), ("swift", "Swift")]:
+                            if _lang in _desc:
+                                _declared_stack = _label
+                                break
+                except Exception:
+                    pass
 
         if _declared_stack:
             # Map declared stack to build commands
@@ -1200,6 +1218,10 @@ async def run_workflow(
                 _detected_stack = _declared_stack
 
             if _build_str:
+                import logging as _stack_log
+                _stack_log.getLogger(__name__).warning(
+                    "STACK_INJECT project=%s stack=%s build=%s", project_id, _detected_stack, _build_str
+                )
                 phase_task += (
                     f"## DECLARED TECH STACK (MANDATORY — do NOT use other languages)\n"
                     f"Stack: {_detected_stack}\n"
