@@ -531,164 +531,81 @@ class GitPostPRReviewTool(BaseTool):
             return f"Error: {e}"
 
 
-class GitCloneTool(BaseTool):
-    name = "git_clone"
-    description = (
-        "Clone a remote git repository into a local directory. "
-        "Params: url (required) — HTTPS or SSH remote URL; "
-        "dest (optional) — local destination path (default: auto-derived from repo name); "
-        "branch (optional) — branch/tag to checkout after clone. "
-        "Returns: local path where the repo was cloned."
-    )
+class GitMergePRTool(BaseTool):
+    name = "git_merge_pr"
+    description = "Merge an approved GitHub Pull Request (squash merge, deletes source branch)"
     category = "git"
-    allowed_roles = []
+    requires_approval = True
 
-    async def execute(self, params: dict, agent=None) -> str:
-        import json as _json
-
-        url = (params.get("url") or "").strip()
-        if not url:
-            return _json.dumps({"error": "url is required"})
-
-        # Determine destination path
-        dest = (params.get("dest") or "").strip()
-        if not dest:
-            repo_name = url.rstrip("/").split("/")[-1]
-            if repo_name.endswith(".git"):
-                repo_name = repo_name[:-4]
-            workspaces_root = os.path.join(
-                os.path.dirname(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                ),
-                "workspace",
-            )
-            os.makedirs(workspaces_root, exist_ok=True)
-            dest = os.path.join(workspaces_root, repo_name)
-
-        if os.path.isdir(os.path.join(dest, ".git")):
-            # Already cloned — pull latest instead
-            try:
-                r = subprocess.run(
-                    ["git", "pull", "--ff-only"],
-                    cwd=dest,
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                )
-                return _json.dumps(
-                    {
-                        "ok": True,
-                        "path": dest,
-                        "action": "pulled",
-                        "output": r.stdout.strip(),
-                    }
-                )
-            except Exception as e:
-                return _json.dumps({"error": f"pull failed: {e}"})
-
-        cmd = ["git", "clone", url, dest]
-        branch = (params.get("branch") or "").strip()
-        if branch:
-            cmd += ["--branch", branch]
-
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        pr = params.get("pr", "")
+        method = params.get("method", "squash")  # squash | merge | rebase
+        cwd = params.get("cwd", ".")
+        if not pr:
+            return "Error: pr number or URL required"
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if r.returncode != 0:
-                return _json.dumps({"error": r.stderr.strip() or "clone failed"})
-            return _json.dumps(
-                {"ok": True, "path": dest, "action": "cloned", "url": url}
-            )
-        except subprocess.TimeoutExpired:
-            return _json.dumps({"error": "git clone timed out after 300s"})
-        except Exception as e:
-            return _json.dumps({"error": str(e)})
+            pr_ref = str(pr).split("/")[-1] if "github.com" in str(pr) else str(pr)
+            _configure_git_credentials(cwd)
 
-
-class GitCreateBranchTool(BaseTool):
-    name = "git_create_branch"
-    description = (
-        "Create and checkout a named git branch in a workspace. "
-        "If the branch already exists, just checkouts it. "
-        "Params: branch (required) — branch name (e.g. 'feature/sav-parcours'); "
-        "cwd (optional) — workspace path (default: current dir); "
-        "from_branch (optional) — base branch to branch from (default: current HEAD). "
-        "Returns the active branch name."
-    )
-    category = "git"
-    allowed_roles = []
-
-    async def execute(self, params: dict, agent=None) -> str:
-        import json as _json
-
-        branch = (params.get("branch") or "").strip()
-        if not branch:
-            return _json.dumps({"error": "branch is required"})
-
-        cwd = (params.get("cwd") or "").strip() or os.getcwd()
-
-        # Ensure we're in a git repo
-        try:
-            r = subprocess.run(
-                ["git", "rev-parse", "--git-dir"],
-                cwd=cwd,
+            # Check PR status first — only merge if checks pass
+            check_r = subprocess.run(
+                ["gh", "pr", "view", pr_ref, "--json", "state,mergeable,reviewDecision"],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                cwd=cwd,
+                timeout=30,
             )
-            if r.returncode != 0:
-                return _json.dumps({"error": "not a git repository"})
-        except Exception as e:
-            return _json.dumps({"error": str(e)})
+            if check_r.returncode == 0:
+                import json as _json
 
-        # Check if branch already exists
-        existing = subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+                try:
+                    pr_info = _json.loads(check_r.stdout)
+                    if pr_info.get("state") != "OPEN":
+                        return f"PR #{pr_ref} is {pr_info.get('state', 'unknown')}, cannot merge"
+                    if pr_info.get("mergeable") == "CONFLICTING":
+                        return f"PR #{pr_ref} has merge conflicts — resolve before merging"
+                except (ValueError, KeyError):
+                    pass  # Non-blocking — proceed with merge attempt
 
-        try:
-            if existing.returncode == 0:
-                # Branch exists — checkout
-                r = subprocess.run(
-                    ["git", "checkout", branch],
-                    cwd=cwd,
-                    capture_output=True,
-                    text=True,
-                    timeout=15,
-                )
-                action = "checked_out"
-            else:
-                # Create from base branch or current HEAD
-                from_branch = (params.get("from_branch") or "").strip()
-                cmd = ["git", "checkout", "-b", branch]
-                if from_branch:
-                    cmd.append(from_branch)
-                r = subprocess.run(
-                    cmd, cwd=cwd, capture_output=True, text=True, timeout=15
-                )
-                action = "created"
-
-            if r.returncode != 0:
-                return _json.dumps(
-                    {"error": r.stderr.strip() or "branch operation failed"}
-                )
-
-            current = _current_branch(cwd)
-            return _json.dumps(
-                {"ok": True, "branch": current, "action": action, "cwd": cwd}
+            method_flag = f"--{method}" if method in ("squash", "rebase") else "--merge"
+            r = subprocess.run(
+                [
+                    "gh", "pr", "merge", pr_ref,
+                    method_flag,
+                    "--delete-branch",
+                    "--admin",  # bypass branch protection if admin
+                ],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
             )
+            if r.returncode == 0:
+                # Notify
+                try:
+                    from ..services.notifications import emit_notification
+
+                    agent_name = getattr(agent, "id", "agent") if agent else "agent"
+                    emit_notification(
+                        f"PR #{pr_ref} Merged",
+                        type="pr",
+                        message=f"Agent {agent_name} merged PR #{pr_ref} ({method})",
+                        severity="info",
+                        source="git",
+                    )
+                except Exception:
+                    pass
+                return f"PR #{pr_ref} merged successfully ({method}), branch deleted"
+            return f"Error merging PR #{pr_ref}: {r.stderr.strip()[:300]}"
+        except FileNotFoundError:
+            return "Error: gh CLI not installed"
         except Exception as e:
-            return _json.dumps({"error": str(e)})
+            return f"Error: {e}"
 
 
 def register_git_tools(registry):
     """Register all git tools."""
     registry.register(GitInitTool())
-    registry.register(GitCloneTool())
-    registry.register(GitCreateBranchTool())
     registry.register(GitStatusTool())
     registry.register(GitDiffTool())
     registry.register(GitLogTool())
@@ -697,3 +614,4 @@ def register_git_tools(registry):
     registry.register(GitCreatePRTool())
     registry.register(GitGetPRDiffTool())
     registry.register(GitPostPRReviewTool())
+    registry.register(GitMergePRTool())

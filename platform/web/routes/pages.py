@@ -18,6 +18,17 @@ from .helpers import (
     _templates,
 )
 
+# Prevent asyncio task GC — store references until tasks complete
+_bg_tasks: set[asyncio.Task] = set()
+
+
+def _keep_task(t: asyncio.Task) -> asyncio.Task:
+    """Store task reference to prevent GC, auto-discard on completion."""
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+    return t
+
+
 log = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -1348,8 +1359,11 @@ async def api_improvement_start(project_id: str):
 
     # Pause auto-resume during AC cycle — give 100% LLM budget to AC
     import os as _os_ac
+
     _os_ac.environ["PLATFORM_AUTO_RESUME_ENABLED"] = "0"
-    logger.warning("AC cycle: auto-resume PAUSED for project %s cycle %d", project_id, cycle_num)
+    logger.warning(
+        "AC cycle: auto-resume PAUSED for project %s cycle %d", project_id, cycle_num
+    )
 
     # Ingest previous cycle artifacts into project memory BEFORE workspace reset
     # so agents can recall previous findings, failures, and corrections next cycle.
@@ -1494,8 +1508,12 @@ async def api_improvement_start(project_id: str):
             )
             created_builder = await asyncio.to_thread(sess_store.create, builder_sess)
             builder_sess_id = created_builder.id
-            asyncio.create_task(
-                _run_workflow_background(builder_wf, builder_sess_id, brief, project_id)
+            _keep_task(
+                asyncio.create_task(
+                    _run_workflow_background(
+                        builder_wf, builder_sess_id, brief, project_id
+                    )
+                )
             )
 
         # ── Session [SUPERVISE] — ac-supervision-cycle with AC supervisors (read-only) ──
@@ -1528,9 +1546,11 @@ async def api_improvement_start(project_id: str):
             supervisor_sess_id = created_supervisor.id
             # Small delay so builder starts first, supervisors observe
             await asyncio.sleep(1)
-            asyncio.create_task(
-                _run_workflow_background(
-                    supervisor_wf, supervisor_sess_id, brief, project_id
+            _keep_task(
+                asyncio.create_task(
+                    _run_workflow_background(
+                        supervisor_wf, supervisor_sess_id, brief, project_id
+                    )
                 )
             )
 
@@ -2900,6 +2920,120 @@ async def toolbox_page(request: Request, tab: str = "skills"):
     )
 
 
+@router.get("/bricks", response_class=HTMLResponse)
+async def bricks_page(request: Request, project_id: str = ""):
+    """Bricks — infrastructure modulaire par projet."""
+    from ...tools.bricks import get_brick_registry
+    from ...tools.brick_loader import load_project_brick_config
+
+    registry = get_brick_registry()
+    all_bricks = registry.list_bricks()
+
+    # Build brick cards: show all bricks, highlight active ones for the project
+    project_config: dict = {}
+    if project_id:
+        project_config = load_project_brick_config(project_id)
+
+    bricks_data = []
+    for b in all_bricks:
+        active = b.id in project_config
+        cfg = project_config.get(b.id, {})
+        skill = b.skill()
+        bricks_data.append({
+            "id": b.id,
+            "version": b.version,
+            "capabilities": b.capabilities,
+            "active": active,
+            "config": cfg,
+            "skill_name": skill.name if skill else None,
+            "skill_tools": skill.tools if skill else [],
+            "skill_patterns": [{"name": p.name, "description": p.description} for p in (skill.patterns if skill else [])],
+            "tool_schemas_count": len(b.tool_schemas()),
+            "has_skill": skill is not None,
+        })
+
+    # Get available projects for the selector
+    projects = []
+    try:
+        from ...projects.manager import get_project_store
+        projects = [{"id": p.id, "name": p.name} for p in get_project_store().list()]
+    except Exception:
+        pass
+
+    return _templates(request).TemplateResponse(
+        "bricks.html",
+        {
+            "request": request,
+            "page_title": "Tool Bricks",
+            "bricks": bricks_data,
+            "project_id": project_id,
+            "projects": projects,
+            "total": len(all_bricks),
+            "active_count": sum(1 for b in bricks_data if b["active"]),
+        },
+    )
+
+
+@router.get("/api/bricks", response_class=JSONResponse)
+async def api_bricks_list(project_id: str = ""):
+    """Return all bricks with their active status for a project."""
+    from ...tools.bricks import get_brick_registry
+    from ...tools.brick_loader import load_project_brick_config
+
+    registry = get_brick_registry()
+    project_config = load_project_brick_config(project_id) if project_id else {}
+
+    result = []
+    for b in registry.list_bricks():
+        skill = b.skill()
+        result.append({
+            "id": b.id,
+            "version": b.version,
+            "capabilities": b.capabilities,
+            "active": b.id in project_config,
+            "tool_schemas_count": len(b.tool_schemas()),
+            "has_skill": skill is not None,
+            "skill_name": skill.name if skill else None,
+            "skill_patterns": len(skill.patterns) if skill else 0,
+        })
+    return JSONResponse({"bricks": result, "project_id": project_id})
+
+
+@router.get("/api/bricks/skill-ac")
+async def api_bricks_skill_ac():
+    """Run Skill AC (Layer 2 quality + Layer 3 trigger routing) on all registered bricks."""
+    from ...ac.skill_eval import run_all_skills_ac, skill_ac_summary
+    results = run_all_skills_ac()
+    summary = skill_ac_summary(results)
+    return JSONResponse({"summary": summary, "results": {k: v.to_dict() for k, v in results.items()}})
+
+
+@router.get("/api/bricks/{project_id}/health")
+async def api_bricks_health(project_id: str):
+    """Run health checks for all bricks declared in a project."""
+    from ...tools.brick_loader import health_check_project_bricks
+    results = await health_check_project_bricks(project_id)
+    all_ok = all(r["ok"] for r in results.values())
+    return JSONResponse({"ok": all_ok, "project_id": project_id, "bricks": results})
+
+
+@router.get("/api/bricks/{project_id}/skills")
+async def api_bricks_skills(project_id: str):
+    """Return the combined brick skills prompt for a project."""
+    from ...tools.brick_loader import get_project_brick_skills_prompt
+    prompt = get_project_brick_skills_prompt(project_id)
+    return JSONResponse({"project_id": project_id, "skills_prompt": prompt, "length": len(prompt)})
+
+
+@router.get("/api/bricks/ac")
+async def api_bricks_ac(project_id: str = ""):
+    """Run AC (Acceptance Criteria) checks on all registered bricks."""
+    from ...ac.brick_eval import run_all_bricks_ac, ac_summary
+    results = run_all_bricks_ac(project_id=project_id or None, sandbox=True)
+    summary = ac_summary(results)
+    return JSONResponse(summary)
+
+
 @router.get("/design-system", response_class=HTMLResponse)
 async def design_system_page(request: Request):
     """Design System — tokens, colors, icons, atoms, molecules, patterns."""
@@ -2959,12 +3093,14 @@ async def launch_strategic_committee(request: Request):
     # Auto-start workflow — agents debate autonomously
     from .workflows import _run_workflow_background
 
-    asyncio.create_task(
-        _run_workflow_background(
-            wf,
-            session.id,
-            "Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO sur les projets en cours",
-            "",
+    _keep_task(
+        asyncio.create_task(
+            _run_workflow_background(
+                wf,
+                session.id,
+                "Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO sur les projets en cours",
+                "",
+            )
         )
     )
 
@@ -3733,6 +3869,13 @@ async def product_page(request: Request):
         blocked_by_map = {}
         for r in dep_rows:
             blocked_by_map.setdefault(r["depends_on"], []).append(r["feature_id"])
+        # Persona name lookup
+        persona_names = {}
+        try:
+            persona_rows = _db.execute("SELECT id, name FROM personas").fetchall()
+            persona_names = {r["id"]: r["name"] for r in persona_rows}
+        except Exception:
+            pass
     finally:
         _db.close()
 
@@ -3768,6 +3911,8 @@ async def product_page(request: Request):
                     "assigned_to": f.assigned_to,
                     "acceptance_criteria": f.acceptance_criteria or "",
                     "description": f.description or "",
+                    "user_story": f.user_story or "",
+                    "persona_id": persona_names.get(f.persona_id, f.persona_id) if f.persona_id else "",
                     "deps": deps_map.get(f.id, []),
                     "depended_by": blocked_by_map.get(f.id, []),
                     "stories": [

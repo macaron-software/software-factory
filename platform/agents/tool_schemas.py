@@ -484,6 +484,29 @@ def _core_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_merge_pr",
+                "description": "Merge an approved GitHub Pull Request. Squash-merges by default and deletes the source branch.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or GitHub URL",
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": ["squash", "merge", "rebase"],
+                            "description": "Merge method (default: squash)",
+                        },
+                        "cwd": {"type": "string", "description": "Working directory"},
+                    },
+                    "required": ["pr"],
+                },
+            },
+        },
     ]
 
 
@@ -2788,6 +2811,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_commit",
         "git_push",
         "git_create_pr",
+        "git_merge_pr",
         # GitHub
         "github_issues",
         "github_prs",
@@ -3094,6 +3118,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_status",
         "git_get_pr_diff",
         "git_post_pr_review",
+        "git_merge_pr",
         "github_prs",
         "github_issues",
         "memory_search",

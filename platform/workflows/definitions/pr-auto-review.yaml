@@ -1,6 +1,6 @@
 id: pr-auto-review
-name: Automated PR Review
-description: 'Automated code review on a GitHub Pull Request by the code-reviewer agent. Fetches diff, analyzes, posts structured feedback.'
+name: Automated PR Review & Merge
+description: 'Automated code review on a GitHub Pull Request. If approved, auto-merges to base branch.'
 icon: eye
 is_builtin: true
 phases:
@@ -16,7 +16,10 @@ phases:
       Steps:
       1. Use git_get_pr_diff with pr="{{ pr_ref }}" to fetch the diff
       2. Analyze: correctness, security, performance, test coverage
-      3. Use git_post_pr_review with pr="{{ pr_ref }}", event="COMMENT", body="<your review>"
+      3. Decision:
+         - If NO blocking issues found: use git_post_pr_review with event="APPROVE"
+         - If blocking issues found: use git_post_pr_review with event="REQUEST_CHANGES"
+      4. If you APPROVED the PR, immediately call git_merge_pr with pr="{{ pr_ref }}" to merge it.
       PR URL: {{ pr_url }}
       PR title: {{ pr_title }}
       Workspace: {{ cwd }}

@@ -503,6 +503,29 @@ def _core_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_merge_pr",
+                "description": "Merge an approved GitHub Pull Request. Squash-merges by default and deletes the source branch.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or GitHub URL",
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": ["squash", "merge", "rebase"],
+                            "description": "Merge method (default: squash)",
+                        },
+                        "cwd": {"type": "string", "description": "Working directory"},
+                    },
+                    "required": ["pr"],
+                },
+            },
+        },
     ]
 
 

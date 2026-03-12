@@ -71,6 +71,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_commit",
         "git_push",
         "git_create_pr",
+        "git_merge_pr",
         # GitHub
         "github_issues",
         "github_prs",
@@ -279,6 +280,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_clone",
         "git_create_branch",
         "git_create_pr",
+        "git_merge_pr",
         "list_files",
         "docker_deploy",
         "docker_stop",
@@ -370,6 +372,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_status",
         "git_get_pr_diff",
         "git_post_pr_review",
+        "git_merge_pr",
         "github_prs",
         "github_issues",
         "memory_search",

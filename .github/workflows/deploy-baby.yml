@@ -2,7 +2,8 @@ name: Deploy → SF-Baby
 
 # Deploys SF-Baby instance on OVH VPS (same server as main SF demo)
 # Baby containers: baby-ui (8093), baby-factory (8094)
-# Uses same SSH key + OVH_IP as deploy-demo.yml
+# Pipeline: backup → rsync → restart → health check → smoke test → cleanup
+# Rollback: on any failure after backup, restore previous slots + restart
 
 on:
   push:
@@ -46,6 +47,23 @@ jobs:
             ServerAliveCountMax 5
           EOF
 
+      - name: Backup current slots
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/software-factory
+          echo "Backing up current baby slots..."
+          for SLOT in baby-ui baby-factory; do
+            if [ -d "slots/${SLOT}" ]; then
+              rm -rf "slots/${SLOT}.bak"
+              cp -a "slots/${SLOT}" "slots/${SLOT}.bak"
+              echo "  ${SLOT} backed up"
+            fi
+          done
+          echo "Backup complete"
+          ENDSSH
+
       - name: Rsync platform to OVH
         if: steps.skip.outputs.skipped != 'true'
         run: |
@@ -72,7 +90,8 @@ jobs:
           rsync -az projects/baby.yaml \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/projects/baby.yaml
 
-      - name: Restart baby containers
+      - name: Restart and health check
+        id: health
         if: steps.skip.outputs.skipped != 'true'
         run: |
           ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
@@ -96,7 +115,11 @@ jobs:
             echo "  [${i}/30] baby-ui health=${HTTP}"
             if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
           done
-          [ "$OK" = "1" ] && echo "baby-ui healthy ✓" || { echo "ABORT: baby-ui unhealthy"; exit 1; }
+          if [ "$OK" != "1" ]; then
+            echo "ABORT: baby-ui unhealthy"
+            exit 1
+          fi
+          echo "baby-ui healthy ✓"
 
           # Health check baby-factory (max 60s)
           echo "Waiting for baby-factory..."
@@ -108,6 +131,89 @@ jobs:
             if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
           done
           [ "$OK" = "1" ] && echo "baby-factory healthy ✓" || echo "WARNING: baby-factory unhealthy (non-fatal)"
+          ENDSSH
+
+      - name: E2E smoke tests
+        id: e2e
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/software-factory
+
+          echo "Running E2E smoke tests against baby-ui..."
+          # API smoke tests — verify critical endpoints respond correctly
+          FAIL=0
+
+          # 1. Health endpoint
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/api/health 2>/dev/null || echo 000)
+          [ "$HTTP" = "200" ] && echo "  ✓ /api/health ($HTTP)" || { echo "  ✗ /api/health ($HTTP)"; FAIL=1; }
+
+          # 2. Auth endpoint exists
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" -X POST http://localhost:8093/api/auth/login -H 'Content-Type: application/json' -d '{}' 2>/dev/null || echo 000)
+          [ "$HTTP" = "422" ] || [ "$HTTP" = "400" ] || [ "$HTTP" = "401" ] && echo "  ✓ /api/auth/login ($HTTP)" || { echo "  ✗ /api/auth/login ($HTTP)"; FAIL=1; }
+
+          # 3. Missions API
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/api/missions 2>/dev/null || echo 000)
+          [ "$HTTP" = "200" ] && echo "  ✓ /api/missions ($HTTP)" || { echo "  ✗ /api/missions ($HTTP)"; FAIL=1; }
+
+          # 4. Agents API
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/api/agents 2>/dev/null || echo 000)
+          [ "$HTTP" = "200" ] && echo "  ✓ /api/agents ($HTTP)" || { echo "  ✗ /api/agents ($HTTP)"; FAIL=1; }
+
+          # 5. Login page renders
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/login 2>/dev/null || echo 000)
+          [ "$HTTP" = "200" ] && echo "  ✓ /login ($HTTP)" || { echo "  ✗ /login ($HTTP)"; FAIL=1; }
+
+          # 6. Static assets
+          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/static/css/main.css 2>/dev/null || echo 000)
+          [ "$HTTP" = "200" ] && echo "  ✓ /static/css/main.css ($HTTP)" || { echo "  ✗ /static/css/main.css ($HTTP)"; FAIL=1; }
+
+          if [ "$FAIL" = "1" ]; then
+            echo "E2E SMOKE TESTS FAILED — triggering rollback"
+            exit 1
+          fi
+          echo "E2E smoke tests passed ✓"
+          ENDSSH
+
+      - name: Rollback on failure
+        if: failure() && steps.skip.outputs.skipped != 'true'
+        run: |
+          echo "Deploy failed — rolling back to previous version..."
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/software-factory
+
+          ROLLED_BACK=0
+          for SLOT in baby-ui baby-factory; do
+            if [ -d "slots/${SLOT}.bak" ]; then
+              rm -rf "slots/${SLOT}"
+              mv "slots/${SLOT}.bak" "slots/${SLOT}"
+              echo "  ${SLOT} restored from backup"
+              ROLLED_BACK=1
+            fi
+          done
+
+          if [ "$ROLLED_BACK" = "1" ]; then
+            echo "Restarting baby containers with previous version..."
+            docker compose -f docker-compose.yml -f docker-compose-baby.yml \
+              up -d --no-deps --force-recreate baby-ui baby-factory
+
+            # Verify rollback health
+            sleep 10
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/api/health 2>/dev/null || echo 000)
+            echo "Rollback health check: baby-ui=${HTTP}"
+          else
+            echo "No backup found — cannot rollback"
+          fi
+          ENDSSH
+
+      - name: Cleanup backups
+        if: success() && steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          cd /opt/software-factory
+          rm -rf slots/baby-ui.bak slots/baby-factory.bak 2>/dev/null || true
 
           # Update boot script to include baby containers
           BOOT_SCRIPT='/opt/software-factory/start-active-slot.sh'
