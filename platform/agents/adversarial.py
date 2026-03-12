@@ -259,12 +259,12 @@ _FALSE_FALLBACK_PATTERNS = [
 # Stack mismatch detection — backend code in wrong language
 # Maps declared stack keywords to expected/forbidden file extensions
 _STACK_RULES = {
-    # If task mentions these keywords, backend .ts/.js files are wrong
-    "rust_backend": {
-        "keywords": ["rust", "axum", "sqlx", "tonic", "cargo"],
-        "wrong_extensions": [".ts", ".js", ".mjs"],
-        "wrong_in_path": ["src/backend/", "src/domain/", "src/data/"],
-        "message": "STACK_MISMATCH: Backend code written in TypeScript/JavaScript but project stack is Rust",
+    # If task mentions these keywords, .ts/.js/.py files are wrong
+    "rust_project": {
+        "keywords": ["rust", "axum", "sqlx", "tonic", "cargo", "macroquad", "bevy", "ggez"],
+        "wrong_extensions": [".ts", ".js", ".mjs", ".jsx", ".tsx", ".py"],
+        "wrong_in_path": ["src/", "app/", "lib/"],
+        "message": "STACK_MISMATCH: Code written in TypeScript/JavaScript/Python but project stack is Rust — use .rs files only",
     },
     "svelte_frontend": {
         "keywords": ["sveltekit", "svelte"],
