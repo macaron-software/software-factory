@@ -30,10 +30,10 @@ phases:
     - business_analyst
     - scrum_master
 - id: comite-strat
-  pattern_id: human-in-the-loop
+  pattern_id: network
   name: Comité Stratégique — GO/NOGO
   description: 'Le comité de direction évalue: alignement stratégique, ROI, risques, capacité. Décision GO/NOGO/PIVOT.'
-  gate: checkpoint
+  gate: always
   config:
     agents:
     - strat-cpo
@@ -130,10 +130,10 @@ phases:
     - test_automation
     - performance_engineer
 - id: deploy-prod
-  pattern_id: human-in-the-loop
+  pattern_id: network
   name: Déploiement Production — GO/NOGO
   description: 'Revue pré-production: QA sign-off, sécu sign-off, DevOps plan de déploiement. Décision GO/NOGO.'
-  gate: checkpoint
+  gate: always
   config:
     agents:
     - devops

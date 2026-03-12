@@ -76,6 +76,7 @@ class PatternRun:
     success: bool = False
     error: str = ""
     flow_step: str = ""
+    lineage: list[str] = field(default_factory=list)  # ancestry chain for fractal patterns
 
     @property
     def all_tool_calls(self) -> list:

@@ -976,8 +976,8 @@ class EpicOrchestrator:
                             )
 
                 try:
-                    # Phase timeout: 10 minutes max per phase execution
-                    PHASE_TIMEOUT = 600
+                    # Phase timeout: 20 minutes max per phase execution
+                    PHASE_TIMEOUT = 1200
                     MAX_LLM_RETRIES = 2
                     LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
 
