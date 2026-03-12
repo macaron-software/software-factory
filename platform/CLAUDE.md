@@ -1,7 +1,7 @@
 # MACARON AGENT PLATFORM — Technical Reference
 
 ## WHAT
-Multi-agent SAFe platform. ~193 agents, 12 patterns, 19 wf.
+Multi-agent SAFe platform. 207 agents, 26 pattern impls, 49 wf, 139 skills.
 FastAPI+HTMX+SSE. PG16+Redis7. Port 8099(dev)/8090(prod). Dark purple UI.
 
 ## CRITICAL RULES
@@ -28,7 +28,7 @@ python -m pytest tests/test_platform_api.py -v     # API (needs PG)
 
 ## STACK
 Python 3.11 · FastAPI · Jinja2 · HTMX · SSE · PG16 WAL+FTS5 (~35 tables)
-SQLite fb (no PG_DSN) · Redis 7 (rate limit, leader election) · Infisical secrets
+SQLite fb (no PG_DSN) · Redis 7 (rate limit, leader elect) · Infisical secrets
 
 ## QUALITY GATES (17 layers)
 | # | Gate | Block |
@@ -37,8 +37,8 @@ SQLite fb (no PG_DSN) · Redis 7 (rate limit, leader election) · Infisical secr
 | 2 | Veto hierarchy — ABSOLUTE/STRONG/ADVISORY | HARD |
 | 3 | Prompt injection — score 0-10, block@7 | HARD |
 | 4 | Tool ACL — 5 layers (ACL, sandbox, rate, write, git) | HARD |
-| 5 | Adversarial L0 — slop/mock/cheat/hallucination | HARD |
-| 6 | Adversarial L1 — LLM semantic | SOFT |
+| 5 | Adversarial L0 — slop/mock/cheat/halluc/stack | HARD |
+| 6 | Adversarial L1 — LLM semi-formal (arXiv:2603.01896) | SOFT |
 | 7 | AC reward — R∈[-1,+1], 14 dims, 8 critical@60 | HARD |
 | 8 | Convergence — plateau/regression/spike | SOFT |
 | 9 | RBAC — roles×actions×artifacts | HARD |
@@ -82,17 +82,43 @@ Auto-resume: all paused missions re-launched on restart w/ stagger.
 WSJF=(BV+TC+RR)/JD. Feature pull: sorted WSJF → prompt head.
 Limits: MAX_SPRINTS_GATED=20 · MAX_SPRINTS_DEV=20 · override `config.max_iterations`.
 
-## ADVERSARIAL GUARD (agents/adversarial.py)
-L0 deterministic (0ms): SLOP·MOCK·FAKE_BUILD(+7)·HALLUCINATION·LIE·STACK_MISMATCH(+7)·TOO_SHORT·ECHO·REPETITION
+## EPIC ORCHESTRATOR — services/epic_orchestrator.py + web/routes/epics/internal.py
+Phase task assembly via `_build_phase_prompt()` (NOT workflows/store.py).
+Platform detection: `_detect_project_platform(ws, brief)` → rust-native | macos-native | ios-native | android-native | web-node | web-docker | web-static
+Priority: brief keywords → .stack file → filesystem (Cargo.toml, package.json, etc.)
+Stack-specific prompts: build cmd, file structure, QA/deploy/CICD per platform.
+Rust: Cargo.toml + src/*.rs + cargo build/test. Node: package.json + npm. Swift: Package.swift + xcodebuild.
+
+## ADVERSARIAL GUARD — agents/adversarial.py (Swiss Cheese)
+L0 det (0ms): SLOP · MOCK · FAKE_BUILD(+7) · HALLUCINATION · LIE ·
+  STACK_MISMATCH(+7) · CODE_SLOP · ECHO · REPETITION · HARDCODED_SECRET ·
+  FILE_TOO_LARGE(>200L,+4) · GOD_FILE(>3types,+3) · COGNITIVE_COMPLEXITY(>25,+4) ·
+  DEEP_NESTING(>4lvl,+3) · HIGH_COUPLING(>12imp,+2) · LOC_REGRESSION(+6) ·
+  MISSING_UUID_REF · MISSING_TRACEABILITY · FAKE_TESTS · NO_TESTS ·
+  SECURITY_VULN · PII_LEAK · PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE
 L1 LLM semantic: skipped for network/debate/aggregator/HITL
 Score: <5=pass · 5-6=soft · ≥7=reject · HALLUCINATION/SLOP/STACK_MISMATCH/FAKE_BUILD → force reject
-MAX_ADVERSARIAL_RETRIES=0 — rejection = warning only
+MAX_ADVERSARIAL_RETRIES=1 (2 attempts) — exhausted → FAILED, output discarded
 
-## AGENT PROTOCOLS (patterns/engine.py)
+## STACK ENFORCEMENT CHAIN
+1. `_detect_project_platform()` reads brief/memory/filesystem → platform type
+2. `_build_phase_prompt()` injects platform-specific workflow (Cargo.toml vs package.json)
+3. `full_task` includes "STACK OBLIGATOIRE: Rust" → passed to adversarial guard
+4. L0 `_check_stack_mismatch()` rejects wrong-lang files (e.g. .ts in Rust proj → +7)
+5. Exhaustion after 2 attempts → FAILED, bad code never enters workspace
+
+## AGENT PROTOCOLS — patterns/engine.py
 DECOMPOSE (Lead): list_files → deep_search → subtasks. No lang mix.
 EXEC (Dev): list_files → deep_search → memory_search → code_write. Never fake builds.
 QA: build/test mandatory. Android: build→test→lint. Web: browser_screenshot≥1.
 RESEARCH: deep_search + memory_search. Read only.
+Role match: "dev","lead","veloppeur","engineer","coder","tdd","worker","fullstack","backend","frontend"
+
+## PATTERNS — 26 impls (patterns/impls/)
+solo · sequential · parallel · hierarchical · loop · network/debate · router ·
+aggregator · wave · fractal_{worktree,qa,stories,tests} · backprop_merge ·
+human_in_the_loop · tournament · escalation · voting · speculative · red_blue ·
+relay · mob · map_reduce · blackboard · composite
 
 ## ADAPTIVE INTELLIGENCE
 ```
@@ -100,14 +126,14 @@ Thompson     selection.py      Beta(wins+1,losses+1) · cold-start <5 → unifor
 Darwin       darwin.py         team tournament · eliminate bottom-N · mutate top
 Evolution    evolution.py      GA genome=PhaseSpec[] · fitness=success×quality · pop=40 · nightly 02:00
 RL           rl_policy.py      Q-learning · state=(wf,phase,reject%,quality) · ε=0.1
-Skills       skill_health.py   deterministic tools + LLM judge → improve skills
-AC           ac/ (reward+convergence) 14-dim scoring, 8 critical@60, convergence detection
+Skills       skill_health.py   det tools + LLM judge → improve skills
+AC           ac/               reward(14-dim), convergence, experiments, skill_thompson
 ```
 DB: agent_scores · evolution_proposals/runs · rl_experience · ac_cycles · ac_project_state
 
 ## JARVIS (CTO Agent + A2A Server)
 strat-cto = exec CTO. Delegates to RTE/PO/SM/teams.
-RULE: never insert DB records manually — use Jarvis (/api/cto/message).
+RULE: never insert DB manually — use Jarvis (/api/cto/message).
 
 A2A (Linux Foundation v1.0):
   GET /.well-known/agent.json → Agent Card · POST /a2a/tasks → submit
@@ -129,7 +155,6 @@ node-3 (PG+Redis)  10.0.1.6               PG16 + Redis 7
 ```
 nginx: upstream sf_api_ha (node-1:8090+node-2:8090) · proxy_next_upstream http_503
 Deploy: rsync + chown + systemctl restart · CI: .github/workflows/deploy-demo.yml
-OVH demo: Docker blue-green, slots/{blue,green,factory}/, --force-recreate
 
 ## LLM CONFIG
 ```
@@ -137,39 +162,57 @@ Local:  local-mlx / Qwen3.5-mlx (port 8080, ollama-compat)
 OVH:    minimax / MiniMax-M2.5 (native tool_calls, NO mangling)
 Azure:  azure-openai / gpt-5-mini (AZURE_DEPLOY=1)
   routing: reason→gpt-5.2 · code→gpt-5.2-codex · default→gpt-5-mini
-  max_completion_tokens (NOT max_tokens) · rate: 15rpm (Redis or in-memory)
+  max_completion_tokens (NOT max_tokens) · budget ≥16K (reasoning eats budget)
+  rate: 15rpm (Redis or in-mem)
 ```
+GPT-5.x = reasoning models, temp not supported. MiniMax: strips `<think>` auto.
 
-## DB ADAPTER (db/adapter.py)
+## DB ADAPTER — db/adapter.py
 is_postgresql() gates PG features (advisory lock, NOTIFY/LISTEN).
 PgConnectionWrapper from pool · SQLite fb: data/platform.db.
-schema_pg.sql runs first → migrations.py second (incremental ALTER/CREATE).
+schema_pg.sql first → migrations.py second (incremental ALTER/CREATE).
+
+## SECURITY — arXiv:2602.20021 (11 case studies)
+```
+L0 adversarial (det)    → PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE · PII_LEAK · HARDCODED_SECRET
+L1 adversarial (LLM)    → semi-formal review (arXiv:2603.01896)
+Tool guards (pre-exec)  → path/file blocklist, tool budget (MAX_TOOL_CALLS=50)
+Memory sanitize (write) → sanitize_agent_output + URL warning
+A2A validation (pub)    → from_agent identity + scope log
+Audit trail             → admin_audit_log on destructive actions
+Sandbox (Docker/Landlock) → per-agent UID, --network none, mem 512m
+```
 
 ## FILE MAP
 ```
 platform/
 ├── server.py           lifespan, drain, auth middleware
 ├── agents/
-│   ├── executor.py     LLM tool-call loop (max 15 rounds)
+│   ├── executor.py     LLM tool-call loop (max 15 rds)
 │   ├── store.py        CRUD + seed + prune stale builtins
-│   ├── adversarial.py  L0 deterministic + L1 LLM guard
+│   ├── adversarial.py  L0 det + L1 LLM + stack enforcement
 │   ├── tool_runner.py  all tools dispatch
 │   ├── guardrails.py   regex destructive-action block
 │   ├── permissions.py  5-layer tool ACL
 │   ├── selection.py    Thompson Sampling Beta bandit
 │   ├── evolution.py    GA genome=PhaseSpec[]
+│   ├── skill_broker.py stack-aware skill injection
 │   └── rl_policy.py    Q-learning
-├── patterns/engine.py  8 topologies, adversarial, RL hook
-├── services/           mission_orchestrator, auto_resume
+├── patterns/engine.py  26 topologies, adversarial, RL hook
+├── services/           epic_orchestrator, auto_resume
 ├── a2a/                bus, veto, negotiation, jarvis MCP
-├── ac/                 reward, convergence, experiments
-├── security/           prompt_guard, output_validator, audit
+├── ac/                 reward, convergence, experiments, skill_thompson
+├── security/           prompt_guard, output_validator, audit, sanitize
 ├── llm/client.py       multi-provider (azure/minimax/local-mlx)
+├── memory/             manager, project_files, vectors, compactor, inbox
 ├── db/                 adapter(PG+SQLite), schema_pg, migrations
 ├── tools/              code, git, deploy, build, web, memory, MCP bridge
-├── web/routes/         missions, pages, sessions, workflows, agents
-│   templates/(64) · static/ · avatars/
-└── rbac/               roles, actions, artifacts
+├── bricks/             docker, github, sonarqube, rag
+├── metrics/quality.py  KISS scanner (LOC, CC, nesting, coupling)
+├── web/routes/         missions, pages, sessions, workflows, epics/internal
+│   templates/(117) · static/ · avatars/
+├── rbac/               roles, actions, artifacts
+└── skills/definitions/ 139 YAML skill files (tech + domain)
 ```
 
 ## GOTCHAS
@@ -178,6 +221,9 @@ platform/
 - Container path: `/app/macaron_platform/` not `/app/platform/`
 - PG advisory lock: conn-scoped → dedicated conn per mission
 - Leader election: fb=True if Redis down (idempotent → safe)
-- MiniMax M2.5: native tool_calls. M2.1 legacy: role=tool→user
+- MiniMax M2.5: native tool_calls. `<think>` stripped auto
 - `/api/ready` must be in PUBLIC_PATHS (auth bypass)
 - SSE: use `curl --max-time` — urllib blocks indefinitely
+- Epic orch builds phase_task via `_build_phase_prompt()` NOT workflows/store.py
+- Role "Lead Développeur": matched via "lead"+"veloppeur" (accent-safe)
+- Watchdog retry endpoint needs auth — spams 401 if no cookie
