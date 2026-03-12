@@ -978,6 +978,21 @@ async def run_workflow(
                 project_id,
             )
 
+    # Override with EpicRun.workspace_path if available (sandboxed workspace)
+    try:
+        from ..db.migrations import get_db as _gdb_ws
+        _db_ws = _gdb_ws()
+        _ws_row = _db_ws.execute(
+            "SELECT workspace_path FROM epic_runs WHERE session_id=? AND workspace_path IS NOT NULL AND workspace_path != '' LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        _db_ws.close()
+        if _ws_row and _ws_row[0]:
+            _project_path = _ws_row[0]
+            logger.info("run_workflow: using EpicRun workspace_path=%s", _project_path)
+    except Exception as _ws_err:
+        logger.debug("run_workflow: workspace_path lookup failed: %s", _ws_err)
+
     store = get_session_store()
     pattern_store = get_pattern_store()
 
