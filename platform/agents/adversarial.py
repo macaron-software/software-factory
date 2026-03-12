@@ -602,6 +602,30 @@ def check_l0(
             )
             score += 7  # hard reject — must produce code
 
+    # LOC_REGRESSION: detect when code_write replaces an existing file with a tiny stub.
+    # Agents should use code_read BEFORE code_write to understand existing content.
+    # A code_write with <10 lines to a file that was never code_read is suspicious.
+    _read_paths = {
+        str(tc.get("args", {}).get("path", ""))
+        for tc in tool_calls
+        if tc.get("name") in ("code_read", "file_read")
+    }
+    for tc in tool_calls:
+        if tc.get("name") == "code_write":
+            file_path = str(tc.get("args", {}).get("path", ""))
+            new_content = str(tc.get("args", {}).get("content", ""))
+            new_lines = len(new_content.strip().splitlines())
+            # Flag if writing a tiny file (<10 lines) to a source path never read first
+            is_source = any(file_path.endswith(ext) for ext in (".rs", ".py", ".ts", ".js", ".go", ".swift", ".java", ".kt"))
+            if is_source and new_lines < 10 and file_path not in _read_paths:
+                fname = file_path.rsplit("/", 1)[-1] if "/" in file_path else file_path
+                issues.append(
+                    f"LOC_REGRESSION: code_write to {fname} has only {new_lines} lines "
+                    f"and file was never read first. Use code_read before overwriting "
+                    f"existing files to avoid destroying prior work."
+                )
+                score += 6
+
     # Check hallucination — only flag if agent claims action WITHOUT corresponding tool call
     if not has_write_tool:
         for pattern, desc in _HALLUCINATION_PATTERNS:

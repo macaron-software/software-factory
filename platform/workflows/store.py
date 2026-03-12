@@ -1163,6 +1163,25 @@ async def run_workflow(
 
         # Build ceremony-specific task with accumulated context
         phase_task = f"## {phase.name}\n{phase.description}\n\n"
+
+        # Inject detected tech stack so agents use correct build commands
+        if _project_path:
+            _build_cmd = _detect_build_cmd(_project_path)
+            if _build_cmd:
+                _stack_map = {
+                    "cargo": "Rust", "npm": "Node.js/TypeScript", "python3": "Python",
+                    "go": "Go", "swift": "Swift", "mvn": "Java/Maven",
+                    "gradle": "Java/Gradle", "docker": "Docker",
+                }
+                _detected_stack = _stack_map.get(_build_cmd[0], _build_cmd[0])
+                _build_str = " ".join(_build_cmd)
+                phase_task += (
+                    f"## DETECTED TECH STACK (MANDATORY — do NOT use other languages)\n"
+                    f"Language/Framework: {_detected_stack}\n"
+                    f"Build command: `{_build_str}`\n"
+                    f"RULE: Use ONLY `{_build_str}` to build. Do NOT run npm/pip/go if this is a {_detected_stack} project.\n\n"
+                )
+
         if accumulated_context:
             phase_task += "## Previous phases summary:\n"
             for ctx in accumulated_context[-3:]:

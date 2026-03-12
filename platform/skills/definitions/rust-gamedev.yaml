@@ -1,0 +1,77 @@
+id: rust-gamedev
+name: "Rust Game Dev Skill"
+version: "1.0"
+
+description: >
+  Skill for building native macOS/desktop games in Rust using macroquad, ggez, or bevy.
+  Covers common pitfalls: rand crate conflicts, game loop architecture, sprite rendering.
+
+content: |
+  ## Rust Game Development — macroquad/bevy/ggez
+
+  ### Crate Conflicts (CRITICAL)
+  - macroquad RE-EXPORTS `rand` internally — do NOT add `rand` to Cargo.toml when using macroquad
+  - Use `macroquad::rand::gen_range(min, max)` instead of `rand::Rng`
+  - If you need `rand::thread_rng()`, add `rand` with exact version matching macroquad's:
+    check macroquad's Cargo.toml for the rand version it depends on
+  - NEVER have both `use rand::Rng` and `use macroquad::prelude::*` — namespace collision
+
+  ### macroquad Game Loop
+  ```rust
+  use macroquad::prelude::*;
+
+  #[macroquad::main("Game Title")]
+  async fn main() {
+      loop {
+          clear_background(BLACK);
+          let dt = get_frame_time();
+          // update(dt);
+          // draw();
+          next_frame().await
+      }
+  }
+  ```
+  - `#[macroquad::main(...)]` replaces `fn main()` — do NOT write both
+  - `next_frame().await` is MANDATORY at end of game loop
+  - `get_frame_time()` for delta time (seconds as f32)
+
+  ### Module Structure (Recommended for 500+ LOC games)
+  ```
+  src/
+    main.rs         — game loop, state machine (menu/playing/gameover)
+    player.rs       — player struct + update/draw methods
+    enemies.rs      — enemy types + spawning logic
+    physics.rs      — collision detection (AABB or circle)
+    resources.rs    — texture/sound loading (Texture2D, load_texture)
+    constants.rs    — SCREEN_WIDTH, SCREEN_HEIGHT, GRAVITY, etc.
+  ```
+  - Each module: `pub struct X { ... }` + `impl X { pub fn update(&mut self, dt: f32), pub fn draw(&self) }`
+  - Use `pub(crate)` for internal helpers
+
+  ### Collision Detection (Simple AABB)
+  ```rust
+  pub fn collides(a: &Rect, b: &Rect) -> bool {
+      a.x < b.x + b.w && a.x + a.w > b.x &&
+      a.y < b.y + b.h && a.y + a.h > b.y
+  }
+  ```
+
+  ### Common Errors
+  - `cannot find function gen_range` → use `macroquad::rand::gen_range`
+  - `multiple definitions of rand` → remove `rand` from Cargo.toml deps
+  - `no method named draw_texture` → it's a free function: `draw_texture(tex, x, y, WHITE)`
+  - `async fn main` errors → ensure `#[macroquad::main("Title")]` attribute
+  - `screen_width()` returns f32, not u32 — no cast needed for draw calls
+
+  ### Build Commands
+  - Build: `cargo check` (fast, no linking)
+  - Run: `cargo run` (builds + executes)
+  - Release: `cargo build --release` (optimized binary in target/release/)
+  - macOS bundle: use `cargo-bundle` crate for .app packaging
+
+tags:
+  - rust
+  - gamedev
+  - macroquad
+  - native
+  - macos

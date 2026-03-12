@@ -158,14 +158,21 @@ _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write or code_edit. No c
 
 WORKFLOW (FOLLOW THIS ORDER):
 1. list_files → see what exists
-2. build → see current compilation status (THIS IS STEP 2, NOT STEP 5)
-3. IF build fails: code_read the failing file → code_edit to fix each error → build again
-4. IF build passes or no existing code: code_write new files → build
-5. git_commit when build succeeds
+2. code_read EVERY file you plan to modify (MANDATORY — skipping this = REJECTION)
+3. build → see current compilation status (THIS IS STEP 3, NOT STEP 5)
+4. IF build fails: code_read the failing file → code_edit to fix each error → build again
+5. IF build passes or no existing code: code_write new files → build
+6. git_commit when build succeeds
 
 CRITICAL RULE: If build() returns errors, you MUST call code_edit() to fix them.
 Do NOT just read errors and describe them. Call code_edit(path=..., old_str=..., new_str=...).
 Text-only responses = AUTOMATIC REJECTION by adversarial guard.
+
+FILE PRESERVATION (CRITICAL — violating this = REJECTION):
+- ALWAYS code_read a file before modifying it. Writing without reading = REJECTION.
+- For EXISTING files: use code_edit (NOT code_write) to make targeted changes.
+- code_write is for NEW files only. Overwriting an existing file with code_write destroys prior work.
+- NEVER replace a file with a stub (e.g., 3-line placeholder replacing 300 lines of code).
 
 TOOL: code_edit(path="src/File.swift", old_str="the exact broken line", new_str="the fixed line")
 TOOL: code_write(path="src/module.ts", content="full source code here")
@@ -925,6 +932,18 @@ This is BLOCKING: developers cannot start without your design tokens."""
         len(ctx.allowed_tools) if ctx.allowed_tools else -1,
     )
 
+    # Inject tech stack context from skill broker (auto-detect from workspace)
+    if ctx.project_path and _proto_name in ("EXEC", "QA", "DECOMPOSE"):
+        try:
+            from ..agents.skill_broker import detect_stack, load_tech_skills
+            detected = detect_stack(project_path=ctx.project_path)
+            if detected:
+                tech_ctx = load_tech_skills(detected, max_chars=2000)
+                if tech_ctx:
+                    full_task += f"\n\n{tech_ctx}"
+        except Exception:
+            pass
+
     # Execute with streaming SSE
     executor = get_executor()
     result = None
@@ -1186,7 +1205,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
             # BUT: HALLUCINATION/SLOP/STACK_MISMATCH keywords always force retry (never soft-pass)
             has_critical_flags = any(
                 "HALLUCINATION" in i or "SLOP" in i or "STACK_MISMATCH" in i
-                or "NO_CODE_WRITE" in i or "FAKE_BUILD" in i
+                or "NO_CODE_WRITE" in i or "FAKE_BUILD" in i or "LOC_REGRESSION" in i
                 for i in guard_result.issues
             )
             if guard_result.score <= 6 and not has_critical_flags:
@@ -1487,6 +1506,25 @@ This is BLOCKING: developers cannot start without your design tokens."""
             "status": "idle",
         },
     )
+
+    # Auto-commit workspace changes after each agent turn (prevents data loss from overwrites)
+    if edit_count > 0 and run.project_path:
+        try:
+            import subprocess
+            ws = run.project_path
+            # Stage all changes and commit with agent attribution
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=ws, capture_output=True, timeout=10,
+            )
+            subprocess.run(
+                ["git", "commit", "-m",
+                 f"auto: {agent.id} ({run.phase_id or 'unknown'}) — {edit_count} edits",
+                 "--allow-empty-message", "--no-verify"],
+                cwd=ws, capture_output=True, timeout=10,
+            )
+        except Exception:
+            pass  # non-blocking — don't fail the agent turn
 
     # Store key insights in project memory + notify frontend
     if run.project_id and content and not result.error:

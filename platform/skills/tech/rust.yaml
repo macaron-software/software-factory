@@ -51,3 +51,11 @@ content: |
   - Integration: `axum_test::TestServer` or `reqwest` against real server
   - Mock HTTP: `wiremock` crate
   - Snapshot: `insta` crate
+
+  ## Game Dev (macroquad/bevy)
+  - macroquad re-exports `rand` — do NOT add `rand` to Cargo.toml
+  - Use `macroquad::rand::gen_range(min, max)` instead of `rand::Rng`
+  - Game loop: `#[macroquad::main("Title")] async fn main() { loop { next_frame().await } }`
+  - draw_texture, draw_rectangle, draw_text are FREE FUNCTIONS (not methods)
+  - `get_frame_time()` returns delta as f32 seconds
+  - Build: `cargo check` (fast) then `cargo run` to test visually

@@ -20,7 +20,8 @@ _TECH_SKILLS_DIR = Path(__file__).parent.parent / "skills" / "tech"
 _RULES: dict[str, dict] = {
     "rust": {
         "files": ["Cargo.toml"],
-        "keywords": ["axum", "actix-web", "tokio", "cargo", "rustc", "warp", "tonic"],
+        "keywords": ["axum", "actix-web", "tokio", "cargo", "rustc", "warp", "tonic",
+                     "macroquad", "bevy", "ggez", "wgpu", "winit"],
     },
     "react": {
         "files": ["package.json"],
@@ -84,10 +85,12 @@ _RULES: dict[str, dict] = {
 # Inline hints — fallback when no tech YAML file exists (Option C)
 _INLINE_HINTS: dict[str, str] = {
     "rust": (
-        "Build: `cargo build --release`. Test: `cargo test`. Lint: `cargo clippy -- -D warnings`. "
-        "Fmt: `cargo fmt`. Use `?` operator (never `.unwrap()` in prod). "
-        "Axum: `Router::new().route('/path', get(handler))`. "
-        "Error type: `anyhow::Result` or custom `thiserror`. Tokio runtime required for async."
+        "Build: `cargo check` (fast) / `cargo build --release` (optimized). Test: `cargo test`. "
+        "Lint: `cargo clippy -- -D warnings`. Fmt: `cargo fmt`. "
+        "Use `?` operator (never `.unwrap()` in prod). Error: `anyhow::Result` or `thiserror`. "
+        "GAMEDEV: macroquad re-exports rand — do NOT add `rand` crate to Cargo.toml. "
+        "Use `macroquad::rand::gen_range()`. Game loop: `#[macroquad::main('Title')] async fn main() { loop { next_frame().await } }`. "
+        "draw_texture/draw_rectangle are FREE FUNCTIONS, not methods."
     ),
     "react": (
         "Build: `npm run build`. Test: `npm test -- --run` (vitest) or `npm test` (Jest). "
