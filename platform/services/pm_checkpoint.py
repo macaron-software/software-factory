@@ -383,10 +383,22 @@ async def pm_checkpoint(
             )
 
     # Build passes — use judge score + phase success for decision
+    # WHY: never accept "done" on last phase if quality is too low and sprints remain.
+    # Previous bug: returned "done" unconditionally at 20% quality (last phase = done).
+    MIN_DONE_QUALITY = 0.5
     if is_last_phase:
+        if quality_score >= MIN_DONE_QUALITY or sprint_num >= max_sprints:
+            return PMDecision(
+                action="done",
+                reason=f"Last phase complete — quality {quality_score:.0%}",
+                build_result=build_result,
+                quality_score=quality_score,
+                evidence_summary=evidence_summary,
+            )
+        # Quality too low: retry last phase rather than silently accept poor output
         return PMDecision(
-            action="done",
-            reason=f"Last phase complete — quality {quality_score:.0%}",
+            action="retry",
+            reason=f"Last phase — quality {quality_score:.0%} below {MIN_DONE_QUALITY:.0%} threshold, retrying sprint {sprint_num}/{max_sprints}",
             build_result=build_result,
             quality_score=quality_score,
             evidence_summary=evidence_summary,
