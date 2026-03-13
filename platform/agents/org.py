@@ -1010,6 +1010,31 @@ class OrgStore:
         ]
         all_new = all_new + product_missing
 
+        # ── Team Traceability (art-platform) ────────────────────────────
+        # Source: ADA-NDIS PACMAN run produced 60+ MISSING_TRACEABILITY rejections.
+        # This team maintains # Ref: headers, SPECS.md AC UUIDs, and coverage metrics
+        # across all SF projects. Runs after every PACMAN completion + weekly audit.
+        traceability_team = [
+            Team(
+                id="team-traceability",
+                name="🔗 Team Traceability",
+                art_id="art-platform",
+                description=(
+                    "Maintain end-to-end traceability: # Ref: headers in code files, "
+                    "AC items with UUIDs in SPECS.md, coverage ≥80%, weekly gap reports."
+                ),
+                scrum_master_id="trace-lead",
+                capacity=3,
+                wip_limit=2,
+                members=[
+                    {"agent_id": "trace-lead", "role": "lead"},
+                    {"agent_id": "trace-auditor", "role": "auditor"},
+                    {"agent_id": "trace-writer", "role": "writer"},
+                ],
+            ),
+        ]
+        all_new = all_new + traceability_team
+
         count = 0
         for t in all_new:
             if t.id not in existing:
@@ -1018,7 +1043,7 @@ class OrgStore:
 
         if count:
             logger.info(
-                "[Org] Seeded %d additional teams (Security + Platform + RSE + Knowledge + Data + Mobile + Infra + GTM + Products)",
+                "[Org] Seeded %d additional teams (Security + Platform + RSE + Knowledge + Data + Mobile + Infra + GTM + Products + Traceability)",
                 count,
             )
 
