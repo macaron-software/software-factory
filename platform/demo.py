@@ -193,15 +193,21 @@ DEMO_MISSIONS = [
 
 
 def is_demo_mode() -> bool:
-    """True when SF_DEMO_PASSWORD is set (demo env) OR provider is 'demo'."""
+    """True when SF_DEMO_PASSWORD is set (demo env) OR provider is 'demo'.
+    Controls UI elements like the Skip (Demo) button on login page."""
     if os.environ.get("SF_DEMO_PASSWORD"):
         return True
     return os.environ.get("PLATFORM_LLM_PROVIDER", "").lower() == "demo"
 
 
+def _is_seed_mode() -> bool:
+    """True only when provider is 'demo' (local SQLite mock, no real LLM)."""
+    return os.environ.get("PLATFORM_LLM_PROVIDER", "").lower() == "demo"
+
+
 def seed_demo_data():
     """Seed sample projects, missions, and incidents for demo mode."""
-    if not is_demo_mode():
+    if not _is_seed_mode():
         return
     from .db.migrations import get_db
 
