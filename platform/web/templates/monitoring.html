@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_table, skeleton_chart %}
 
 {% block content %}
 {% set p = request.state.perspective|default('admin') %}
@@ -38,23 +39,23 @@
     </div>
 
     <!-- Row 1: System vitals -->
-    <div class="mon-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem">
+    <div class="mon-grid sk" id="mon-vitals-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-cpu"/></svg> {{ _("cpu") }}</h3>
-            <div class="mon-big" id="monCpu">—</div>
+            <div class="mon-big" id="monCpu"><span class="sk sk-line" style="width:3rem;height:1.6rem;display:inline-block"></span></div>
             <div class="mon-sub" id="monCpuSys">{{ _("system") }}</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monCpuBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-layers"/></svg> {{ _("memory") }}</h3>
-            <div class="mon-big" id="monMem">—</div>
+            <div class="mon-big" id="monMem"><span class="sk sk-line" style="width:3.5rem;height:1.6rem;display:inline-block"></span></div>
             <div class="mon-sub" id="monMemSys">{{ _("system") }}</div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monMemBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-database"/></svg> Disk</h3>
-            <div class="mon-big" id="monDisk">—</div>
-            <div class="mon-sub" id="monDiskSub">—</div>
+            <div class="mon-big" id="monDisk"><span class="sk sk-line" style="width:2.5rem;height:1.6rem;display:inline-block"></span></div>
+            <div class="mon-sub" id="monDiskSub"><span class="sk sk-line" style="width:5rem;height:0.8rem;display:inline-block"></span></div>
             <div class="mon-bar"><div class="mon-bar-fill green" id="monDiskBar" style="width:0%"></div></div>
         </div>
         <div class="mon-card">
@@ -71,7 +72,7 @@
             <div class="mon-row">
                 <div class="mon-col"><div class="label">24h</div><div class="val" id="monMsg24h">0</div></div>
                 <div class="mon-col"><div class="label">{{ _("total") }}</div><div class="val" id="monMsgTotal">0</div></div>
-                <div class="mon-col"><div class="label">{{ _("projects") }}</div><div class="val" id="monProjects">—</div></div>
+                <div class="mon-col"><div class="label">{{ _("projects") }}</div><div class="val" id="monProjects"><span class="sk sk-line" style="width:1.5rem;height:1rem;display:inline-block"></span></div></div>
             </div>
         </div>
     </div>
@@ -123,14 +124,14 @@
             <h3><svg class="icon"><use href="#icon-server"/></svg> LLM Providers</h3>
             <table class="mon-table">
                 <thead><tr><th>{{ _("provider") }}</th><th>{{ _("model") }}</th><th>{{ _("calls") }}</th><th>{{ _("cost") }}</th><th>{{ _("avg_ms") }}</th></tr></thead>
-                <tbody id="monProviders"><tr><td colspan="5" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monProviders"><tr><td colspan="5" style="padding:0">{{ skeleton_table(3, 5) }}</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-user"/></svg> Top Agents (by cost)</h3>
             <table class="mon-table">
                 <thead><tr><th>{{ _("agent") }}</th><th>{{ _("grade") }}</th><th>{{ _("calls") }}</th><th>{{ _("tokens_out") }}</th><th>{{ _("cost") }}</th></tr></thead>
-                <tbody id="monTopAgents"><tr><td colspan="5" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monTopAgents"><tr><td colspan="5" style="padding:0">{{ skeleton_table(3, 5) }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -147,7 +148,7 @@
             </div>
             <table class="mon-table">
                 <thead><tr><th>{{ _("table") }}</th><th style="text-align:right">{{ _("rows") }}</th></tr></thead>
-                <tbody id="monDbTopTables"><tr><td colspan="2" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monDbTopTables"><tr><td colspan="2" style="padding:0">{{ skeleton_table(4, 2) }}</td></tr></tbody>
             </table>
         </div>
         <div class="mon-card">
@@ -220,7 +221,7 @@
             <!-- Container table with CPU/Memory -->
             <table class="mon-table">
                 <thead><tr><th>{{ _("container") }}</th><th>{{ _("status") }}</th><th>CPU</th><th>Memory</th><th>{{ _("net_i_o") }}</th><th>{{ _("pids") }}</th><th>{{ _("image") }}</th></tr></thead>
-                <tbody id="monDockerTable"><tr><td colspan="7" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monDockerTable"><tr><td colspan="7" style="padding:0">{{ skeleton_table(3, 7) }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -235,7 +236,7 @@
             </div>
             <table class="mon-table">
                 <thead><tr><th>{{ _("hash") }}</th><th>{{ _("message") }}</th></tr></thead>
-                <tbody id="monGitCommits"><tr><td colspan="2" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monGitCommits"><tr><td colspan="2" style="padding:0">{{ skeleton_table(3, 2) }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -245,7 +246,7 @@
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-server"/></svg> MCP Servers</h3>
             <div id="monMcpServers" class="mon-mcp-list">
-                <div class="mon-empty">{{ _("loading_ellipsis") }}</div>
+                <div class="sk sk-line" style="width:60%;margin:0.5rem 0"></div><div class="sk sk-line" style="width:45%;margin:0.5rem 0"></div><div class="sk sk-line" style="width:55%;margin:0.5rem 0"></div>
             </div>
         </div>
         <div class="mon-card">
@@ -346,13 +347,13 @@
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-book-open"/></svg> Memory</h3>
-            <div id="monMemory" class="mon-row"><span class="mon-empty">{{ _("loading_ellipsis") }}</span></div>
+            <div id="monMemory" class="mon-row"><span class="sk sk-line" style="width:50%;display:inline-block"></span></div>
         </div>
         <div class="mon-card">
             <h3><svg class="icon"><use href="#icon-activity"/></svg> Mission Phases</h3>
             <table class="mon-table">
                 <thead><tr><th>{{ _("phase") }}</th><th>{{ _("status") }}</th><th>{{ _("count") }}</th><th>{{ _("avg_time") }}</th></tr></thead>
-                <tbody id="monPhaseStats"><tr><td colspan="4" class="mon-empty">{{ _("loading_ellipsis") }}</td></tr></tbody>
+                <tbody id="monPhaseStats"><tr><td colspan="4" style="padding:0">{{ skeleton_table(3, 4) }}</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -394,6 +395,13 @@ async function refresh() {
         if (!r.ok) return;
         const d = await r.json();
         const s = d.system || {};
+
+        // Remove skeleton shimmer on first load
+        const vitalsGrid = $('mon-vitals-grid');
+        if (vitalsGrid && vitalsGrid.classList.contains('sk')) {
+            vitalsGrid.classList.remove('sk');
+            vitalsGrid.classList.add('sk-loaded');
+        }
 
         // System
         $('monCpu').textContent = (s.cpu_percent || 0) + '%';
