@@ -33,7 +33,19 @@ system_prompt: |
   - prefers-color-scheme + prefers-reduced-motion media queries.
   - Touch targets min 44x44px. Loading/error/empty states on data components.
 
-skills:
+  NETWORK RESILIENCE (MANDATORY for any data-fetching feature):
+  - Every data component needs 5 states: loading (skeleton+aria-busy), success, empty, error, offline.
+  - Offline detection: window 'online'/'offline' events + HEAD /healthz validation (navigator.onLine unreliable).
+  - Retry: exponential backoff with jitter (500ms * 2^attempt ± 200ms random), max 3 retries, abort after timeout.
+  - SWR/React Query: networkMode='offlineFirst', staleTime, retry, retryDelay config.
+  - Queue mutations offline (Background Sync API or IDB queue), flush on reconnect with toast confirmation.
+  - EMPATHETIC COPY — forbidden: "Error", "HTTP 5xx", "Network Error", "Request failed", "You are offline".
+    Use: "You're offline — changes will sync when you reconnect", "Something went wrong on our end. Try again?",
+         "That's taking longer than expected. Check your connection and try again."
+  - Show NetworkStatusBar (fixed top, auto-hide) when offline.
+  - Retry button on every error state. "Last updated X min ago" badge on stale data.
+
+
   - frontend-design
   - accessibility-audit
   - design-system-implementation
@@ -102,3 +114,9 @@ tags:
   - accessibility
   - performance
 hierarchy_rank: 40
+
+skills:
+  - network-resilience
+  - error-handling-ux
+  - pwa-offline-first
+  - accessibility-audit

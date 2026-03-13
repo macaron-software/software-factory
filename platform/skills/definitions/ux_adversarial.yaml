@@ -51,6 +51,36 @@ checklist:
     tool: "css_computed_check"
     verdict: "VETO — theme rendering failure"
 
+  offline_state_missing:
+    pattern: "useEffect.*fetch|useQuery|axios\\.get|useSWR|URLSession|retrofit\\.create"
+    must_accompany: "offline|isConnected|networkStatus|onLine|NetworkMonitor|ConnectivityManager"
+    verdict: "VETO — data fetch with no offline/network state handling"
+
+  raw_error_in_ui:
+    pattern: "(Error|err\\.message|error\\.toString|statusCode|HTTP [0-9]|status: [0-9]{3})"
+    in_ui_files: true
+    exclusions: ["console.log", "logger", "*.test.*", "*.spec.*"]
+    verdict: "VETO — raw technical error exposed in UI copy"
+
+  missing_retry_on_error:
+    pattern: "ErrorView|ErrorScreen|error.*state|isError.*return|catch.*return.*<"
+    must_accompany: "retry|onRetry|tryAgain|Retry|refetch"
+    verdict: "VETO — error state with no retry action"
+
+  missing_loading_state:
+    pattern: "useQuery|useSWR|LaunchedEffect.*viewModel|fetch.*then"
+    must_accompany: "isLoading|loading|skeleton|Skeleton|ProgressView|CircularProgress|aria-busy"
+    verdict: "WARN — possible missing loading state"
+
+  forbidden_error_copy:
+    patterns:
+      - "You are offline"
+      - "Network Error"
+      - "Request failed"
+      - "HTTP [45][0-9][0-9]"
+      - "Unexpected error"
+    verdict: "VETO — forbidden error copy (non-empathetic)"
+
 output_format: |
   For each check: PASS or FAIL
   For each FAIL: { file, line, violation, fix_required }

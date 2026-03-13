@@ -789,6 +789,8 @@ Pick the pattern that matches the situation:
 - Responsive: not tested on mobile (375px) + tablet (768px) + desktop (1280px)
 - Themes: light / dark / high-contrast not implemented + togglable
 - WCAG AA: no skip-to-content, no focus-visible, no aria landmarks, no keyboard nav
+- Web/mobile with data: missing loading/empty/error/offline/stale states on any data component
+- Error states show raw technical copy (HTTP codes, "Network Error", "Request failed", "You are offline")
 
 ─── TRACEABILITY TEAM ───
 A dedicated traceability team (trace-lead, trace-auditor, trace-writer, trace-monitor) is available.

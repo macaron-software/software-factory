@@ -1,0 +1,255 @@
+id: network_resilience
+name: "Network Resilience & Async Patterns"
+version: "1.0"
+
+description: >
+  Cross-platform knowledge for handling network connectivity changes gracefully.
+  Covers web (Service Worker, online/offline events), iOS (NWPathMonitor),
+  Android (ConnectivityManager), and empathetic UX copy for all error states.
+  Applied by frontend devs, mobile leads, UX reviewers, and adversarial agents.
+
+# ── WEB ─────────────────────────────────────────────────────────────────────
+web:
+  offline_detection:
+    rules:
+      - "Listen to window 'online' / 'offline' events — update a global NetworkStore"
+      - "navigator.onLine is unreliable (captive portal) — validate with HEAD /healthz fetch"
+      - "Use a NetworkStatusBar component: fixed top bar, hides when online"
+      - "Debounce online/offline events 300ms to avoid flicker on unstable connections"
+
+  service_worker:
+    rules:
+      - "Cache GET requests with Stale-While-Revalidate for data APIs"
+      - "Queue POST/PUT/PATCH/DELETE in Background Sync (IDB queue) when offline"
+      - "On reconnect: flush queue in order, show toast 'X changes synced'"
+      - "Cache asset shell (HTML/CSS/JS) with Cache-First for instant offline shell"
+
+  fetch_retry:
+    strategy: "exponential backoff with jitter"
+    rules:
+      - "Max 3 retries: delay = baseMs * 2^attempt + Math.random() * 200"
+      - "AbortSignal.timeout(8000) on every fetch — cancel on component unmount"
+      - "SWR/React Query: networkMode='offlineFirst', retry:3, retryDelay: exponential"
+      - "Circuit breaker: after 5 consecutive failures — stop retrying for 60s"
+    code: |
+      async function fetchWithRetry(url, opts, { retries = 3, baseMs = 500 } = {}) {
+        for (let i = 0; i <= retries; i++) {
+          try {
+            const res = await fetch(url, { signal: AbortSignal.timeout(8000), ...opts });
+            if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
+            return res;
+          } catch (err) {
+            if (i === retries) throw err;
+            const delay = baseMs * 2 ** i + Math.random() * 200;
+            await new Promise(r => setTimeout(r, delay));
+          }
+        }
+      }
+
+  optimistic_ui:
+    rules:
+      - "Apply mutation to local state immediately, rollback on error"
+      - "Show optimistic item with subtle opacity or spinner badge"
+      - "On sync failure: toast 'Retry' button + restore original state"
+
+# ── iOS ──────────────────────────────────────────────────────────────────────
+ios:
+  connectivity:
+    rules:
+      - "Use NWPathMonitor (Network.framework) — NEVER deprecated Reachability"
+      - "Publish state via @Observable NetworkMonitor singleton"
+      - "Inject via .environment(networkMonitor)"
+      - "isExpensive flag (cellular) — warn before large downloads"
+    code: |
+      import Network
+      @Observable final class NetworkMonitor {
+        var isConnected = true
+        var isExpensive = false
+        private let monitor = NWPathMonitor()
+        init() {
+          monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+              self?.isConnected = path.status == .satisfied
+              self?.isExpensive = path.isExpensive
+            }
+          }
+          monitor.start(queue: DispatchQueue(label: "NetworkMonitor"))
+        }
+      }
+
+  retry_pattern:
+    rules:
+      - "URLSessionConfiguration.waitsForConnectivity = true — auto-resumes when online"
+      - "Combine: .retry(3).catch { _ in Just(fallback) }"
+      - "async/await: withRetry(maxAttempts: 3, baseDelay: .milliseconds(500)) utility"
+      - "NSURLErrorNotConnectedToInternet → queue in SwiftData, retry on reconnect"
+
+  offline_queue:
+    rules:
+      - "SwiftData model: PendingOperation(id, type, payload, createdAt, attempts)"
+      - "On NWPathMonitor .satisfied: process queue FIFO"
+      - "Badge on sync icon when queue non-empty"
+
+# ── Android ──────────────────────────────────────────────────────────────────
+android:
+  connectivity:
+    rules:
+      - "Use ConnectivityManager + NetworkCallback (API 21+) — NEVER deprecated NetworkInfo"
+      - "Expose NetworkStatusRepository as StateFlow<NetworkStatus> via Hilt @Singleton"
+      - "Metered (NET_CAPABILITY_NOT_METERED absent) — warn before large operations"
+    code: |
+      @Singleton class NetworkStatusRepository @Inject constructor(
+        @ApplicationContext ctx: Context
+      ) {
+        private val cm = ctx.getSystemService(ConnectivityManager::class.java)
+        val status: StateFlow<NetworkStatus> = callbackFlow {
+          val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(n: Network) { trySend(NetworkStatus.Available) }
+            override fun onLost(n: Network) { trySend(NetworkStatus.Lost) }
+          }
+          cm.registerDefaultNetworkCallback(cb)
+          awaitClose { cm.unregisterNetworkCallback(cb) }
+        }.stateIn(CoroutineScope(Dispatchers.IO), SharingStarted.Eagerly, NetworkStatus.Unknown)
+      }
+
+  retry_pattern:
+    rules:
+      - "OkHttp RetryInterceptor: exponential backoff 500ms * 2^attempt, max 3"
+      - "Coroutines: retryWhen { cause, attempt -> attempt < 3 && delay(500 * 2.0.pow(attempt)) }"
+      - "Ktor: install(HttpRequestRetry) { retryOnServerErrors(3); exponentialDelay() }"
+
+  offline_queue:
+    rules:
+      - "WorkManager OneTimeWorkRequest with Constraints(networkType = CONNECTED)"
+      - "Room: PendingOperation(id, type, payload, createdAt, attempts, status)"
+      - "ProcessLifecycleOwner: flush queue on foreground + network available"
+
+# ── EMPATHETIC UX COPY ───────────────────────────────────────────────────────
+empathetic_copy:
+  principles:
+    - "Never say 'Error', '503', 'Network Error' — explain in human terms"
+    - "Acknowledge inconvenience, offer a concrete next step"
+    - "Tone: warm, helpful, never blaming the user"
+    - "Include a retry action when applicable"
+    - "Use present tense: 'We're having trouble' not 'We had trouble'"
+
+  messages:
+    offline: "You're offline — changes will sync when you reconnect"
+    connection_lost: "Looks like you lost connection. We'll keep your work safe."
+    reconnected: "You're back online! Syncing your changes…"
+    slow_connection: "Your connection seems slow. This might take a moment."
+    sync_failed: "Couldn't sync your last change. Tap to try again."
+    server_error: "Something went wrong on our end. We're on it — please try again in a moment."
+    timeout: "That's taking longer than expected. Check your connection and try again."
+    rate_limit: "You've been busy! Please wait a few seconds before trying again."
+    cellular_warning: "You're on mobile data. This might use more data than usual."
+
+  forbidden_phrases:
+    - "Error"
+    - "HTTP 4xx / 5xx codes"
+    - "Network Error"
+    - "Request failed"
+    - "Unexpected error"
+    - "You are offline"
+    - "Please check your internet connection"
+
+# ── REQUIRED STATES ON EVERY DATA COMPONENT ─────────────────────────────────
+required_states:
+  - "loading  — skeleton or spinner, aria-busy=true"
+  - "success  — data rendered"
+  - "empty    — friendly empty state + CTA"
+  - "error    — empathetic message + retry button + ErrorBoundary"
+  - "offline  — offline indicator + cached data if available + 'will sync' message"
+  - "stale    — 'Last updated X min ago' badge when showing cached/stale data"
+
+# ── ADVERSARIAL CHECKS ───────────────────────────────────────────────────────
+adversarial_checks:
+  offline_state_missing:
+    pattern: "useEffect.*fetch|useQuery|axios\\.get|URLSession|retrofit"
+    must_accompany: "offline|isConnected|networkStatus|onLine"
+    verdict: "VETO — data fetch with no offline handling"
+
+  raw_error_in_ui:
+    pattern: "Error [0-9]+|HTTP [0-9]+|Network Error|Request failed|statusCode.*[0-9]{3}"
+    in_ui_files: true
+    verdict: "VETO — raw technical error exposed in UI"
+
+  missing_retry_button:
+    pattern: "ErrorView|ErrorScreen|isError.*return|catch.*return.*<"
+    must_accompany: "retry|onRetry|tryAgain|Retry|refetch"
+    verdict: "VETO — error state with no retry action"
+
+# ── EVAL CASES ───────────────────────────────────────────────────────────────
+eval_cases:
+  - id: web-offline-detection
+    prompt: "Add offline/online network detection to a React app. Show a banner when offline."
+    should_trigger: true
+    checks:
+      - "regex:window.*online|navigator\\.onLine|'offline'|\"offline\""
+      - "regex:NetworkStatusBar|offline.*banner|OfflineBanner|offline-banner"
+      - "not_regex:You are offline|Network Error|Error [0-9]"
+      - "length_min:300"
+    expectations:
+      - "Uses window online/offline events"
+      - "Shows a banner component when offline"
+      - "Banner copy is empathetic (no 'you are offline')"
+
+  - id: ios-nwpathmonitor
+    prompt: "Implement network monitoring in a SwiftUI app with NWPathMonitor."
+    should_trigger: true
+    checks:
+      - "regex:NWPathMonitor|pathUpdateHandler"
+      - "regex:@Observable|@Published"
+      - "regex:isConnected|status.*satisfied|satisfied"
+      - "not_regex:Reachability|SystemConfiguration"
+      - "length_min:200"
+    expectations:
+      - "Uses NWPathMonitor, not deprecated Reachability"
+      - "Exposes state via @Observable or @Published"
+
+  - id: android-connectivity
+    prompt: "Implement a network status repository in Android with ConnectivityManager."
+    should_trigger: true
+    checks:
+      - "regex:ConnectivityManager|NetworkCallback"
+      - "regex:StateFlow|callbackFlow"
+      - "regex:onAvailable|onLost"
+      - "not_regex:NetworkInfo|getActiveNetworkInfo"
+      - "length_min:200"
+    expectations:
+      - "Uses ConnectivityManager NetworkCallback, not deprecated NetworkInfo"
+      - "Returns StateFlow for reactive consumption"
+
+  - id: empathetic-error-copy
+    prompt: "Write error message copy for: offline, server error, timeout, rate limit states."
+    should_trigger: true
+    checks:
+      - "not_regex:Error [0-9]+|HTTP [45][0-9][0-9]|Network Error|Request failed"
+      - "regex:try again|retry|Retry|reconnect|sync"
+      - "length_min:150"
+    expectations:
+      - "No raw HTTP codes or technical error names in user-facing copy"
+      - "Each state has a human-friendly message and an action"
+      - "Tone is warm and accountable"
+
+  - id: fetch-retry-web
+    prompt: "Implement a fetch wrapper with exponential backoff retry for a React app."
+    should_trigger: true
+    checks:
+      - "regex:retry|Retry|backoff|attempt"
+      - "regex:setTimeout|delay|sleep"
+      - "regex:Math\\.random|jitter|random"
+      - "regex:\\*\\*|Math\\.pow|exponential"
+      - "length_min:200"
+    expectations:
+      - "Implements exponential backoff (not fixed delay)"
+      - "Includes jitter to avoid thundering herd"
+
+  - id: negative-no-trigger
+    prompt: "Write a SQL query to find all users who logged in last week."
+    should_trigger: false
+    checks:
+      - "not_regex:NWPathMonitor|ConnectivityManager|navigator\\.onLine"
+      - "regex:SELECT|FROM|WHERE"
+    expectations:
+      - "Produces a SQL query, no network resilience code injected"

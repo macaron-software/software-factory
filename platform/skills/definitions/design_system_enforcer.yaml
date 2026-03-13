@@ -75,3 +75,27 @@ rules:
     - "styles/base.css — reset, typography baseline, skip-link, focus-visible"
     - "styles/components.css — reusable component classes"
     - "lib/theme.ts — theme detection, toggle, persistence (localStorage)"
+
+  network_states:
+    - "Every data-fetching component MUST have 5 explicit states: loading, success, empty, error, offline"
+    - "loading: skeleton placeholder + aria-busy=true on container"
+    - "empty: friendly illustration or icon + CTA ('Add your first item')"
+    - "error: empathetic message + Retry button + ErrorBoundary wrapper"
+    - "offline: 'You're offline — changes will sync when you reconnect' + cached data if available"
+    - "stale: 'Last updated X min ago' badge when showing cached/stale data"
+    - "NetworkStatusBar component: fixed top bar, visible only when offline, auto-dismisses on reconnect"
+
+  empathetic_copy:
+    forbidden:
+      - "Error (alone, technical)"
+      - "Network Error"
+      - "Request failed"
+      - "HTTP 4xx / 5xx codes in visible UI"
+      - "You are offline (blaming)"
+      - "Unexpected error"
+      - "Something went wrong (without context or action)"
+    required_elements:
+      - "Human explanation of what happened"
+      - "Ownership: 'on our end' for server errors, neutral for connectivity"
+      - "Actionable next step: Retry button, or auto-retry with progress"
+      - "Reassurance: data is safe, nothing lost"
