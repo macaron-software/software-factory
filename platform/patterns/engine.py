@@ -1339,14 +1339,49 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     state.output = content
                     # Accumulate tool_calls from retry
                     cumulative_tool_calls.extend(retry_result.tool_calls or [])
-                    # If retry produced empty output, skip guard check — it's a failure
+                    # If retry produced empty output, try ONE more call with a nudge
+                    # (MiniMax M2.5 intermittently returns empty — usually succeeds on 2nd try)
                     if not content or len(content.strip()) < 10:
                         logger.warning(
-                            "ADVERSARIAL RETRY [%s] produced empty output — marking FAILED",
+                            "ADVERSARIAL RETRY [%s] empty output — nudging once more (MiniMax quirk)",
                             agent.name,
                         )
-                        state.status = NodeStatus.FAILED
-                        break
+                        try:
+                            nudge_task = (
+                                "[SYSTEM: Your previous response was empty. "
+                                "You MUST produce output. Use your tools and complete the task.]\n\n"
+                                + retry_task
+                            )
+                            nudge_result = await executor.run(ctx, nudge_task)
+                            nudge_content = nudge_result.content or ""
+                            if "<think>" in nudge_content:
+                                nudge_content = _re.sub(
+                                    r"<think>.*?</think>\s*", "", nudge_content, flags=_re.DOTALL
+                                ).strip()
+                            if nudge_content and len(nudge_content.strip()) >= 10:
+                                result = nudge_result
+                                content = nudge_content
+                                state.result = result
+                                state.output = content
+                                cumulative_tool_calls.extend(nudge_result.tool_calls or [])
+                                logger.warning(
+                                    "ADVERSARIAL RETRY [%s] nudge succeeded (%d chars)",
+                                    agent.name, len(content),
+                                )
+                            else:
+                                logger.warning(
+                                    "ADVERSARIAL RETRY [%s] nudge also empty — marking FAILED",
+                                    agent.name,
+                                )
+                                state.status = NodeStatus.FAILED
+                                break
+                        except Exception as nudge_err:
+                            logger.warning(
+                                "ADVERSARIAL RETRY [%s] nudge failed: %s — marking FAILED",
+                                agent.name, nudge_err,
+                            )
+                            state.status = NodeStatus.FAILED
+                            break
                     logger.info(
                         "ADVERSARIAL RETRY [%s] attempt=%d — re-running agent",
                         agent.name,
