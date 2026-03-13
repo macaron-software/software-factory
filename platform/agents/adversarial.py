@@ -517,8 +517,14 @@ def check_l0(
             (".py", ".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".less")
         )
         if is_code_file:
+            # Token/variable definition files legitimately contain hex colors
+            _fn = file_path.lower().rsplit("/", 1)[-1] if "/" in file_path else file_path.lower()
+            is_token_file = any(k in _fn for k in ("token", "variable", "theme", "palette"))
             slop_hits = 0
             for pattern, desc in _CODE_SLOP_PATTERNS:
+                # Skip hex-color check in token definition files
+                if is_token_file and "hardcoded hex" in desc:
+                    continue
                 if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
                     issues.append(f"CODE_SLOP: {desc} in {file_path}")
                     score += 2
