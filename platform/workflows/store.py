@@ -645,9 +645,12 @@ _PHASE_TEMPLATES = [
     {"id": "story-from-legacy", "name": "Story Generation from Legacy", "pattern": "relay",
      "team_roles": ["architect", "product", "qa"], "gate": "no_veto"},
     {"id": "traceability-check", "name": "Traceability Validation", "pattern": "voting",
-     "team_roles": ["traceability", "traceability", "traceability", "qa"], "gate": "all_approved",
+     "team_roles": ["trace-lead", "trace-auditor", "trace-monitor"], "gate": "all_approved",
      "feedback": ["tools"],
-     "description": "Run legacy_scan + traceability_coverage + traceability_validate. All voters must approve ≥80% coverage."},
+     "description": "trace-lead: verify every AC-xxxxxx from specs is resolved in code/tests. "
+                    "trace-auditor: run traceability_coverage tool — VETO if coverage < 80%. "
+                    "trace-monitor: check SPECS.md / README updated and # Ref: headers present. "
+                    "Output: TRACEABILITY_REPORT.md. All 3 must approve to pass gate."},
     {"id": "migration-sprint", "name": "Migration Sprint", "pattern": "hierarchical",
      "team_roles": ["tech-lead", "developer", "qa"], "gate": "all_approved"},
     {"id": "migration-verify", "name": "Migration Verification", "pattern": "red-blue",
@@ -668,9 +671,9 @@ _PHASE_TEMPLATES = [
                     "map: each story analyzed in parallel. reduce: architect synthesizes into coherent plan. "
                     "Output: FRACTAL_DECOMP.md. Each L2 story then drives its own dev-sprint phase."},
     {"id": "story-sprint", "name": "Story Sprint (post-fractal)", "pattern": "loop",
-     "team_roles": ["developer", "qa"], "gate": "no_veto",
+     "team_roles": ["dev_fullstack", "dev-react", "testeur"], "gate": "no_veto",
      "description": "Single-story TDD sprint. Dev implements L2 story from FRACTAL_DECOMP.md. "
-                    "QA writes and runs tests. Loop until story AC green. "
+                    "testeur writes and runs tests. Loop until story AC green. "
                     "Each story sprint is composed dynamically by PM after fractal-decomp."},
 ]
 
