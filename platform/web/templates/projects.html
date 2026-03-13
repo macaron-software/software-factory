@@ -59,93 +59,14 @@
     <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--accent)"> Mes projets
   </label>
   {% endif %}
-  <span class="pj-count">{{ total }} projet{{ 's' if total != 1 }}</span>
+  <span class="pj-count" id="projects-count">…</span>
 </div>
 </form>
 
-{% macro project_card(proj) %}
-<a href="/projects/{{ proj.info.id }}" class="item-card{% if not proj.has_workspace %} ghost{% endif %}" data-lead="{{ proj.info.lead_agent_id or '' }}" data-id="{{ proj.info.id }}" data-domain="{{ proj.info.client_domain or '' }}">
-    <div class="item-icon">
-        <span class="project-type-dot {{ proj.info.factory_type }}"></span>
-    </div>
-    <div class="item-main">
-        <div class="item-title">{{ proj.info.name }}</div>
-        <div class="item-subtitle">{{ proj.info.factory_type | upper }}{% if proj.info.domains %} · {{ proj.info.domains[:2] | join(', ') }}{% endif %}</div>
-        <div class="item-detail">
-            {% if proj.info.vision %}
-            <p class="item-desc">{{ proj.info.vision[:140] }}{% if proj.info.vision|length > 140 %}…{% endif %}</p>
-            {% elif proj.info.description %}
-            <p class="item-desc">{{ proj.info.description[:140] }}{% if proj.info.description|length > 140 %}…{% endif %}</p>
-            {% endif %}
-            {% if proj.info.values %}
-            <div class="item-tags">
-                {% for v in proj.info.values[:3] %}
-                <span class="item-tag">{{ v }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    <div class="item-meta">
-        {% if not proj.has_workspace %}
-        <span class="ghost-badge">fantôme</span>
-        {% endif %}
-        {% if proj.info.arch_domain %}
-        <span class="item-badge" style="background:rgba(0,101,255,.12);color:#0065ff;border:1px solid rgba(0,101,255,.25);font-weight:600">{{ proj.info.arch_domain | upper }}</span>
-        {% endif %}
-        <span hx-get="/api/dashboard/quality-badge?project_id={{ proj.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
-        {% if proj.info.has_git %}
-        <span class="item-badge" hx-get="/api/projects/{{ proj.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
-        {% endif %}
-        {% if proj.info.lead_agent_id %}
-        <span class="item-badge accent">{{ proj.info.lead_agent_id }}</span>
-        {% endif %}
-    </div>
-</a>
-{% endmacro %}
-
-{% if not projects %}
-<div class="empty-state">
-    {% if q or factory_type %}
-    <p>Aucun résultat{% if q %} pour « {{ q }} »{% endif %}</p>
-    <a href="/projects" class="btn btn-primary">Effacer</a>
-    {% else %}
-    <p>{{ _("no_projects_found") }}</p>
-    {% endif %}
+{% from "partials/skeleton.html" import skeleton_projects_grid %}
+<div id="projects-grid" hx-get="/partial/projects/grid?q={{ q|urlencode }}&type={{ factory_type|urlencode }}&ws={{ has_workspace|urlencode }}" hx-trigger="load" hx-swap="innerHTML">
+  {{ skeleton_projects_grid(8) }}
 </div>
-{% else %}
-
-{% if domain_groups %}
-    {% for group in domain_groups %}
-    <div class="domain-section">
-        <div class="domain-header">
-            <span class="domain-label">{{ group.domain }}</span>
-            <span class="domain-count">{{ group.projects | length }} projet{{ 's' if group.projects | length != 1 }}</span>
-        </div>
-        <div class="item-grid" data-view-grid data-view="card">
-            {% for proj in group.projects %}
-            {{ project_card(proj) }}
-            {% endfor %}
-        </div>
-    </div>
-    {% endfor %}
-{% endif %}
-
-{% if ungrouped %}
-    {% if domain_groups %}
-    <div class="ungrouped-header">
-        <span class="ungrouped-label">Autres projets</span>
-        <span class="domain-count">{{ ungrouped | length }} projet{{ 's' if ungrouped | length != 1 }}</span>
-    </div>
-    {% endif %}
-    <div class="item-grid" data-view-grid data-view="card">
-        {% for proj in ungrouped %}
-        {{ project_card(proj) }}
-        {% endfor %}
-    </div>
-{% endif %}
-
-{% endif %}
 
 <script>
 const pjInp = document.querySelector('.pj-search input');
@@ -169,7 +90,7 @@ document.addEventListener('click', async function(e) {
     const card = e.target.closest('.item-card[data-id]');
     if (!card) return;
     e.preventDefault();
-    const domain = prompt('Domaine client (ex: Finance, Santé, Industrie…)', card.dataset.domain || '');
+    const domain = prompt('Domaine client (ex: Finance, Santé, Retail…)', card.dataset.domain || '');
     if (domain === null) return;
     const res = await fetch('/api/projects/' + card.dataset.id, {
         method: 'PATCH',

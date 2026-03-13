@@ -86,44 +86,22 @@ def _auto_git_init(project):
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
-    """Projects list with search + type filter + pagination."""
-    from ...projects.manager import get_project_store
-
+    """Projects list — shell with skeleton; grid loaded via HTMX."""
     q = request.query_params.get("q", "").strip()
     factory_type = request.query_params.get("type", "").strip()
     has_workspace = request.query_params.get("ws", "").strip()
-    try:
-        page = max(1, int(request.query_params.get("page", 1)))
-    except ValueError:
-        page = 1
-    per_page = 24
-    offset = (page - 1) * per_page
-
-    store = get_project_store()
-    projects, total = store.search(
-        q=q,
-        factory_type=factory_type,
-        has_workspace=has_workspace,
-        limit=per_page,
-        offset=offset,
-    )
-    total_pages = max(1, (total + per_page - 1) // per_page)
 
     return _templates(request).TemplateResponse(
         "projects.html",
         {
             "request": request,
             "page_title": "Projects",
-            "projects": [
-                {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
-                for p in projects
-            ],
             "q": q,
             "factory_type": factory_type,
             "has_workspace": has_workspace,
-            "page": page,
-            "total": total,
-            "total_pages": total_pages,
+            "total": 0,
+            "page": 1,
+            "total_pages": 1,
         },
     )
 

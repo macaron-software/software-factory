@@ -34,61 +34,14 @@
   <button type="submit" class="sf-btn {% if status=='completed' %}active{% endif %}" name="status" value="completed">Terminé</button>
   <button type="submit" class="sf-btn {% if status=='failed' %}active{% endif %}" name="status" value="failed">Échoué</button>
   <button type="submit" class="sf-btn {% if status=='planning' %}active{% endif %}" name="status" value="planning">Planning</button>
-  <span class="sessions-count">{{ total }} session{{ 's' if total != 1 }}</span>
+  <span class="sessions-count" id="sessions-count">…</span>
 </div>
 </form>
 
-<div class="item-grid" data-view-grid data-view="card">
-    {% for s in sessions %}
-    <a href="/sessions/{{ s.session.id }}" class="item-card">
-        <div class="item-icon">
-            <span class="status-dot {% if s.session.status == 'active' %}active{% elif s.session.status == 'completed' %}done{% else %}idle{% endif %}"></span>
-        </div>
-        <div class="item-main">
-            <div class="item-title">{{ s.session.name }}</div>
-            <div class="item-subtitle">{{ s.session.status }}{% if s.project_name %} · {{ s.project_name }}{% endif %}</div>
-            <div class="item-detail">
-                {% if s.session.goal %}
-                <p class="item-desc">{{ s.session.goal[:140] }}{% if s.session.goal|length > 140 %}…{% endif %}</p>
-                {% endif %}
-                <div class="item-tags">
-                    {% if s.pattern_name %}
-                    <span class="item-tag">{{ s.pattern_name }}</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="item-meta">
-            <span class="item-badge">{{ s.message_count }} msg</span>
-            <span class="item-badge muted">{{ s.session.created_at | ts }}</span>
-        </div>
-    </a>
-    {% else %}
-    <div class="empty-state">
-        {% if q or status %}
-        <p>Aucun résultat pour « {{ q or status }} »</p>
-        <a href="/sessions" class="btn btn-primary">Effacer</a>
-        {% else %}
-        <p>{{ _("no_sessions_yet") }}</p>
-        <a href="/sessions/new" class="btn btn-primary">{{ _("start") }}</a>
-        {% endif %}
-    </div>
-    {% endfor %}
+{% from "partials/skeleton.html" import skeleton_sessions %}
+<div id="sessions-grid" hx-get="/partial/sessions/grid?q={{ q|urlencode }}&status={{ status|urlencode }}&page={{ page }}" hx-trigger="load" hx-swap="innerHTML">
+  {{ skeleton_sessions(6) }}
 </div>
-
-{% if total_pages > 1 %}
-<div class="spager">
-  {% set base = "/sessions?q=" ~ q ~ "&status=" ~ status ~ "&page=" %}
-  {% if page > 1 %}<a href="{{ base }}{{ page-1 }}">‹</a>{% endif %}
-  {% for p in range(1, total_pages+1) %}
-    {% if p == page %}<span class="current">{{ p }}</span>
-    {% elif p == 1 or p == total_pages or (p >= page-2 and p <= page+2) %}<a href="{{ base }}{{ p }}">{{ p }}</a>
-    {% elif p == page-3 or p == page+3 %}<span class="ellipsis">…</span>
-    {% endif %}
-  {% endfor %}
-  {% if page < total_pages %}<a href="{{ base }}{{ page+1 }}">›</a>{% endif %}
-</div>
-{% endif %}
 
 <script>
 // Auto-submit search on input (debounced)

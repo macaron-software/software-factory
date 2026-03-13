@@ -20,17 +20,12 @@ logger = logging.getLogger(__name__)
 
 @router.get("/agents", response_class=HTMLResponse)
 async def agents_page(request: Request):
-    """Agent builder — list all agents."""
-    from ...agents.store import get_agent_store
-
-    store = get_agent_store()
-    agents = store.list_all()
+    """Agent builder — shell with skeleton; grid loaded via HTMX."""
     return _templates(request).TemplateResponse(
         "agents.html",
         {
             "request": request,
             "page_title": "Agents",
-            "agents": agents,
         },
     )
 
@@ -177,15 +172,11 @@ async def agent_save(request: Request, agent_id: str = ""):
 
 
 @router.delete("/api/agents/{agent_id}")
-async def agent_delete(agent_id: str, force: bool = False):
-    """Delete an agent. Use ?force=true to delete builtins."""
+async def agent_delete(agent_id: str):
+    """Delete an agent."""
     from ...agents.store import get_agent_store
 
-    store = get_agent_store()
-    if force:
-        store.force_delete(agent_id)
-    else:
-        store.delete(agent_id)
+    get_agent_store().delete(agent_id)
     return HTMLResponse("")
 
 
@@ -229,16 +220,12 @@ async def agent_details_json(agent_id: str):
 
 @router.get("/patterns", response_class=HTMLResponse)
 async def patterns_page(request: Request):
-    """Pattern builder — list workflows."""
-    from ...patterns.store import get_pattern_store
-
-    patterns = get_pattern_store().list_all()
+    """Pattern builder — shell with skeleton; grid loaded via HTMX."""
     return _templates(request).TemplateResponse(
         "patterns.html",
         {
             "request": request,
             "page_title": "Patterns",
-            "patterns": patterns,
         },
     )
 

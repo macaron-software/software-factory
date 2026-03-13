@@ -27,65 +27,25 @@ logger = logging.getLogger(__name__)
 
 @router.get("/sessions", response_class=HTMLResponse)
 async def sessions_page(request: Request):
-    """Session list with search + pagination."""
-    from ...sessions.store import get_session_store
-
+    """Session list — shell with skeleton; grid loaded via HTMX."""
     q = request.query_params.get("q", "").strip()
     status = request.query_params.get("status", "").strip()
     try:
         page = max(1, int(request.query_params.get("page", 1)))
     except ValueError:
         page = 1
-    per_page = 20
-    offset = (page - 1) * per_page
 
-    store = get_session_store()
-    sessions_raw, total = store.search(
-        q=q, status=status, limit=per_page, offset=offset
-    )
-
-    patterns_map = {}
-    try:
-        from ...db.migrations import get_db as _gdb
-
-        conn = _gdb()
-        for r in conn.execute("SELECT id, name FROM patterns").fetchall():
-            patterns_map[r["id"]] = r["name"]
-        conn.close()
-    except Exception:
-        pass
-    projects_map = {}
-    try:
-        from ...projects.manager import get_project_store
-
-        for p in get_project_store().list_all():
-            projects_map[p.id] = p.name
-    except Exception:
-        pass
-    sessions = []
-    for s in sessions_raw:
-        sessions.append(
-            {
-                "session": s,
-                "pattern_name": patterns_map.get(s.pattern_id, ""),
-                "project_name": projects_map.get(s.project_id, ""),
-                "message_count": store.count_messages(s.id),
-            }
-        )
-
-    total_pages = max(1, (total + per_page - 1) // per_page)
     return _templates(request).TemplateResponse(
         "sessions.html",
         {
             "request": request,
             "page_title": "Live",
-            "sessions": sessions,
             "q": q,
             "status": status,
             "page": page,
-            "total": total,
-            "total_pages": total_pages,
-            "per_page": per_page,
+            "total": 0,
+            "total_pages": 1,
+            "per_page": 20,
         },
     )
 
@@ -622,6 +582,28 @@ async def session_live_page(request: Request, session_id: str):
                         "trending-up",
                         "Optimisation perf",
                         "Analysez les performances et proposez des optimisations",
+                    ),
+                ],
+                "migration-sharelook": [
+                    (
+                        "refresh-cw",
+                        "Start Migration",
+                        "Launch Angular 16→17 migration starting with module inventory",
+                    ),
+                    (
+                        "check-square",
+                        "Verify Golden Files",
+                        "Compare legacy vs migration golden files to validate ISO 100%",
+                    ),
+                    (
+                        "package",
+                        "Migrer module",
+                        "Migrez le prochain module standalone avec les codemods",
+                    ),
+                    (
+                        "activity",
+                        "Regression Tests",
+                        "Run post-migration regression tests",
                     ),
                 ],
                 "review-cycle": [

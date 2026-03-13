@@ -23,61 +23,28 @@ logger = logging.getLogger(__name__)
 @router.get("/epics", response_class=HTMLResponse)
 @router.get("/missions", response_class=HTMLResponse)
 async def missions_page(request: Request):
-    """List all missions with filters."""
-    from ....epics.store import get_epic_store
+    """List all missions — shell with skeleton; grid loaded via HTMX."""
     from ....projects.manager import get_project_store
 
-    epic_store = get_epic_store()
     project_store = get_project_store()
 
     filter_status = request.query_params.get("status")
     filter_project = request.query_params.get("project")
     show_new = request.query_params.get("action") == "new"
 
-    all_missions = epic_store.list_missions()
     all_projects = project_store.list_all()
     project_ids = [p.id for p in all_projects]
-    project_names = {p.id: p.name for p in all_projects}
-
-    # Apply filters
-    filtered = all_missions
-    if filter_status:
-        filtered = [m for m in filtered if m.status == filter_status]
-    if filter_project:
-        filtered = [m for m in filtered if m.project_id == filter_project]
-
-    # Enrich with stats
-    mission_cards = []
-    for m in filtered:
-        stats = epic_store.mission_stats(m.id)
-        sprints = epic_store.list_sprints(m.id)
-        current = next(
-            (s.number for s in sprints if s.status == "active"), len(sprints)
-        )
-        total_t = stats.get("total", 0)
-        done_t = stats.get("done", 0)
-        mission_cards.append(
-            {
-                "mission": m,
-                "project_name": project_names.get(m.project_id, m.project_id),
-                "sprint_count": len(sprints),
-                "current_sprint": current,
-                "total_tasks": total_t,
-                "done_tasks": done_t,
-                "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
-            }
-        )
 
     from ....workflows.store import get_workflow_store
 
     all_workflows = get_workflow_store().list_all()
 
+    # Grid loaded via HTMX deferred skeleton
     return _templates(request).TemplateResponse(
         "missions.html",
         {
             "request": request,
             "page_title": "PI Board",
-            "epics": mission_cards,
             "project_ids": project_ids,
             "filter_status": filter_status,
             "filter_project": filter_project,
