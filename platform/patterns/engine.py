@@ -1835,6 +1835,26 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     project_context = ""
     vision = ""
     project_path = ""
+
+    # ── Compute context tier early (before memory loads) ──────────
+    from ..llm.context_tiers import (
+        ContextTier, select_tier, build_tiered_skills,
+        TierBudget, tier_savings_estimate,
+    )
+
+    role_lower_tier = (agent.role or "").lower()
+    _ORG_ROLES = ("lead", "architect", "manager", "product", "chef", "cto", "cpo", "dsi", "rte")
+    cap_grade = "organizer" if any(r in role_lower_tier for r in _ORG_ROLES) else "executor"
+    _REVIEW_ROLES = ("qa", "test", "review", "securite", "security", "audit")
+    task_type = "review" if any(r in role_lower_tier for r in _REVIEW_ROLES) else "execute"
+
+    tier = select_tier(
+        hierarchy_rank=agent.hierarchy_rank,
+        capability_grade=cap_grade,
+        task_type=task_type,
+    )
+    tier_budget = TierBudget.for_tier(tier)
+
     if run.project_id:
         try:
             proj_store = get_project_store()
@@ -1842,69 +1862,73 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             if project:
                 vision = project.vision[:3000] if project.vision else ""
                 project_path = getattr(project, "path", "") or ""
-                mem = get_memory_manager()
-                # Load role-relevant categories first, then recent entries
-                role_lower = (agent.role or "").lower()
-                _ROLE_CATS = {
-                    "archi": ["architecture", "infrastructure"],
-                    "dev": ["development", "architecture"],
-                    "lead": ["development", "architecture", "quality"],
-                    "qa": ["quality", "development"],
-                    "test": ["quality", "development"],
-                    "secu": ["security", "architecture"],
-                    "devops": ["infrastructure", "security"],
-                    "product": ["product", "design"],
-                    "ux": ["design", "product"],
-                    "po": ["product", "development"],
-                }
-                # Pick categories matching agent role
-                cats = []
-                for key, val in _ROLE_CATS.items():
-                    if key in role_lower:
-                        cats = val
-                        break
-                entries = []
-                seen_ids = set()
-                # Role-specific entries first
-                for cat in cats:
-                    for e in mem.project_get(run.project_id, category=cat, limit=5):
+                # Skip memory loading at L0 (routing — no context needed)
+                if tier != ContextTier.L0 and tier_budget.memory_chars > 0:
+                    mem = get_memory_manager()
+                    # Load role-relevant categories first, then recent entries
+                    role_lower = (agent.role or "").lower()
+                    _ROLE_CATS = {
+                        "archi": ["architecture", "infrastructure"],
+                        "dev": ["development", "architecture"],
+                        "lead": ["development", "architecture", "quality"],
+                        "qa": ["quality", "development"],
+                        "test": ["quality", "development"],
+                        "secu": ["security", "architecture"],
+                        "devops": ["infrastructure", "security"],
+                        "product": ["product", "design"],
+                        "ux": ["design", "product"],
+                        "po": ["product", "development"],
+                    }
+                    # Pick categories matching agent role
+                    cats = []
+                    for key, val in _ROLE_CATS.items():
+                        if key in role_lower:
+                            cats = val
+                            break
+                    entries = []
+                    seen_ids = set()
+                    # Role-specific entries first
+                    for cat in cats:
+                        for e in mem.project_get(run.project_id, category=cat, limit=5):
+                            eid = e.get("id")
+                            if eid not in seen_ids:
+                                entries.append(e)
+                                seen_ids.add(eid)
+                    # Then recent entries from any category
+                    for e in mem.project_get(run.project_id, limit=10):
                         eid = e.get("id")
                         if eid not in seen_ids:
                             entries.append(e)
                             seen_ids.add(eid)
-                # Then recent entries from any category
-                for e in mem.project_get(run.project_id, limit=10):
-                    eid = e.get("id")
-                    if eid not in seen_ids:
-                        entries.append(e)
-                        seen_ids.add(eid)
-                if entries:
-                    project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
-                        for e in entries[:15]
-                    )
+                    if entries:
+                        project_context = "\n".join(
+                            f"[{e['category']}] {e['key']}: {e['value'][:200]}"
+                            for e in entries[:15]
+                        )
         except Exception:
             pass
 
-    # Inject pattern memory (session-level: what other agents decided in THIS session)
-    try:
-        mem = get_memory_manager()
-        pattern_entries = mem.pattern_get(run.session_id, limit=15)
-        if pattern_entries:
-            # Only include entries from OTHER agents (not self)
-            other_entries = [
-                e for e in pattern_entries if e.get("author_agent") != agent.id
-            ]
-            if other_entries:
-                session_mem = "\n".join(
-                    f"[{e.get('type', 'ctx')}] {e['key']}: {e['value'][:200]}"
-                    for e in other_entries[:10]
-                )
-                project_context += (
-                    f"\n\n## Decisions from this session (other agents)\n{session_mem}"
-                )
-    except Exception:
-        pass
+    # Inject pattern memory — skip at L0 (routing), limited at L1
+    if tier != ContextTier.L0:
+        try:
+            mem = get_memory_manager()
+            _sess_limit = 8 if tier == ContextTier.L1 else 15
+            pattern_entries = mem.pattern_get(run.session_id, limit=_sess_limit)
+            if pattern_entries:
+                other_entries = [
+                    e for e in pattern_entries if e.get("author_agent") != agent.id
+                ]
+                if other_entries:
+                    _trunc = 120 if tier == ContextTier.L1 else 200
+                    session_mem = "\n".join(
+                        f"[{e.get('type', 'ctx')}] {e['key']}: {e['value'][:_trunc]}"
+                        for e in other_entries[:10]
+                    )
+                    project_context += (
+                        f"\n\n## Decisions from this session (other agents)\n{session_mem}"
+                    )
+        except Exception:
+            pass
 
     # For missions: prefer workspace_path (actual code) over project registry path
     if run.project_path:
@@ -1914,35 +1938,43 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     if agent.skills:
         try:
             lib = get_skill_library()
-            parts = []
-            for sid in agent.skills[:5]:
+            skill_dicts = []
+            for sid in agent.skills[:10]:
                 skill = lib.get(sid)
                 if skill and skill.get("content"):
-                    parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
-            skills_prompt = "\n\n".join(parts)
+                    skill_dicts.append({
+                        "name": skill["name"],
+                        "content": skill["content"],
+                        "similarity": 0.0,
+                    })
+            skills_prompt = build_tiered_skills(skill_dicts, tier)
         except Exception:
             pass
 
-    # Inject global lessons from past epics (cross-epic learning)
+    # Inject global lessons from past epics — skip at L0 (routing)
     lessons_prompt = ""
-    try:
-        mem = get_memory_manager()
-        lessons = mem.global_get(category="lesson", limit=8) or []
-        lessons += mem.global_get(category="improvement", limit=4) or []
-        if lessons:
-            lesson_lines = []
-            for l in lessons:
-                val = l.get("value", "") if isinstance(l, dict) else str(l)
-                if val:
-                    lesson_lines.append(f"- {val[:150]}")
-            if lesson_lines:
-                lessons_prompt = (
-                    "\n## Lessons from past epics\n"
-                    "Apply these learnings from previous projects:\n"
-                    + "\n".join(lesson_lines[:10])
-                )
-    except Exception:
-        pass
+    if tier != ContextTier.L0:
+        try:
+            mem = get_memory_manager()
+            _lesson_limit = 4 if tier == ContextTier.L1 else 8
+            lessons = mem.global_get(category="lesson", limit=_lesson_limit) or []
+            if tier == ContextTier.L2:
+                lessons += mem.global_get(category="improvement", limit=4) or []
+            if lessons:
+                lesson_lines = []
+                _trunc = 80 if tier == ContextTier.L1 else 150
+                for l in lessons:
+                    val = l.get("value", "") if isinstance(l, dict) else str(l)
+                    if val:
+                        lesson_lines.append(f"- {val[:_trunc]}")
+                if lesson_lines:
+                    lessons_prompt = (
+                        "\n## Lessons from past epics\n"
+                        "Apply these learnings from previous projects:\n"
+                        + "\n".join(lesson_lines[:10])
+                    )
+        except Exception:
+            pass
 
     # Inject SI blueprint for architecture/devops/security agents
     si_prompt = ""
@@ -1997,6 +2029,27 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     if si_prompt:
         project_context += "\n" + si_prompt
 
+    # Apply tier budget to project memory
+    if tier_budget.memory_chars > 0:
+        project_context = project_context[:tier_budget.memory_chars]
+    elif tier == ContextTier.L0:
+        project_context = ""
+
+    # Log tier selection and estimated savings
+    if agent.skills:
+        savings = tier_savings_estimate(len(agent.skills), tier)
+        logger.warning(
+            "CONTEXT_TIER agent=%s tier=%s cap=%s task=%s "
+            "skills=%d saved_tok=%d (%d%%)",
+            agent.id, tier.value, cap_grade, task_type,
+            len(agent.skills), savings["saved_tokens"], savings["savings_pct"],
+        )
+    else:
+        logger.warning(
+            "CONTEXT_TIER agent=%s tier=%s cap=%s task=%s skills=0",
+            agent.id, tier.value, cap_grade, task_type,
+        )
+
     return ExecutionContext(
         agent=agent,
         session_id=run.session_id,
@@ -2008,6 +2061,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         vision=vision,
         tools_enabled=tools_for_agent,
         allowed_tools=allowed_tools,
+        context_tier=tier.value,
     )
 
 
