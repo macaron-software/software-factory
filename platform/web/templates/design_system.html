@@ -72,6 +72,7 @@
         <button class="ds-nav__item" onclick="showDsPanel('graph',this)">Agent Graph</button>
         <button class="ds-nav__item" onclick="showDsPanel('kanban',this)">Kanban</button>
         <button class="ds-nav__item" onclick="showDsPanel('backlog',this)">Backlog</button>
+        <button class="ds-nav__item" onclick="showDsPanel('skeleton',this)">Skeleton</button>
     </nav>
 
     <!-- ═══════════ TOKENS ═══════════ -->
@@ -1140,6 +1141,254 @@ GET /auth/me &rarr; user profile + roles
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-4);background:var(--bg-tertiary);font-size:var(--text-sm);color:var(--text-muted)">
                     <span>10 taches -- 4 types -- 5 agents</span>
                     <span>Tri : WSJF decroissant</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SKELETON LOADING ═══════════ -->
+    <div id="ds-skeleton" class="ds-panel">
+    {% from "partials/skeleton.html" import skeleton_item_grid, skeleton_agents, skeleton_projects_grid, skeleton_sessions, skeleton_missions, skeleton_metrics, skeleton_stat_cards, skeleton_chart, skeleton_kpi_row, skeleton_table, skeleton_strategic, skeleton_projects, skeleton_pipeline, skeleton_feed, skeleton_ck_card, skeleton_hub_cards, skeleton_kanban, skeleton_timeline, skeleton_marketplace, skeleton_teams_table, skeleton_ds_tokens, skeleton_tab_panel, skeleton_block %}
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-loader"/></svg> Skeleton Loading System</h3>
+            <p style="font-size:var(--text-base);color:var(--text-secondary);margin-bottom:1rem">
+                Shimmer placeholders shown while data loads asynchronously.
+                Uses CSS <code>.sk</code> class with <code>skeleton-shimmer</code> animation.
+                HTMX swaps skeleton with real content via <code>hx-trigger="load"</code>.
+                Coverage: 31 templates, 20 macros.
+            </p>
+        </div>
+
+        <!-- CSS Classes -->
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-code"/></svg> CSS Primitives</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk</div>
+                    <div class="ds-showcase__desc">Base shimmer — gradient animation on any element</div>
+                    <div class="ds-showcase__demo"><div class="sk" style="width:100%;height:2rem;border-radius:4px"></div></div>
+                    <div class="ds-showcase__code">&lt;div class="sk"&gt;&lt;/div&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk-line / .sk-line-sm / .sk-line-lg</div>
+                    <div class="ds-showcase__desc">Text line placeholders — 3 sizes</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;align-items:stretch">
+                        <div class="sk sk-line-lg" style="width:80%"></div>
+                        <div class="sk sk-line" style="width:60%"></div>
+                        <div class="sk sk-line-sm" style="width:40%"></div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="sk sk-line"&gt;&lt;/div&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk-circle + .sk-avatar</div>
+                    <div class="ds-showcase__desc">Circular avatar placeholder</div>
+                    <div class="ds-showcase__demo">
+                        <div class="sk sk-circle sk-avatar"></div>
+                        <div class="sk sk-circle" style="width:32px;height:32px"></div>
+                        <div class="sk sk-circle" style="width:24px;height:24px"></div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="sk sk-circle sk-avatar"&gt;&lt;/div&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk-badge</div>
+                    <div class="ds-showcase__desc">Pill/badge placeholder</div>
+                    <div class="ds-showcase__demo">
+                        <div class="sk sk-badge"></div>
+                        <div class="sk sk-badge" style="width:80px"></div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="sk sk-badge"&gt;&lt;/div&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk-card</div>
+                    <div class="ds-showcase__desc">Card container with inner shimmer lines</div>
+                    <div class="ds-showcase__demo" style="flex-direction:column;align-items:stretch">
+                        <div class="sk-card"><div class="sk sk-line" style="width:60%"></div><div class="sk sk-line-sm" style="width:40%"></div></div>
+                    </div>
+                    <div class="ds-showcase__code">&lt;div class="sk-card"&gt;...&lt;/div&gt;</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">.sk-loaded</div>
+                    <div class="ds-showcase__desc">Fade-in transition applied when real data replaces skeleton</div>
+                    <div class="ds-showcase__demo"><div class="sk-loaded" style="font-size:0.75rem;color:var(--green)">Content faded in</div></div>
+                    <div class="ds-showcase__code">el.classList.remove('sk'); el.classList.add('sk-loaded');</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Macro Showcase -->
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-grid"/></svg> Item Grid — skeleton_item_grid(8)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Used by: agents, projects, sessions, patterns. <code>{% raw %}{{ skeleton_item_grid(8) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_item_grid(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-clipboard"/></svg> Missions — skeleton_missions(6)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Epic/mission cards with progress bars. <code>{% raw %}{{ skeleton_missions(6) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_missions(3) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-bar-chart-2"/></svg> Stat Cards — skeleton_stat_cards(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Analytics/ops/monitoring stat cards. <code>{% raw %}{{ skeleton_stat_cards(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_stat_cards(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-trending-up"/></svg> KPI Row — skeleton_kpi_row(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Top-of-page KPI row. <code>{% raw %}{{ skeleton_kpi_row(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_kpi_row(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-bar-chart-2"/></svg> Chart — skeleton_chart()</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Bar chart placeholder. <code>{% raw %}{{ skeleton_chart('160px') }}{% endraw %}</code>
+            </p>
+            {{ skeleton_chart('160px') }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-layout"/></svg> Metrics — skeleton_metrics(5)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Metric value cards (portfolio). <code>{% raw %}{{ skeleton_metrics(5) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_metrics(5) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-list"/></svg> Table — skeleton_table(4, 5)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Generic data table rows. <code>{% raw %}{{ skeleton_table(4, 5) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_table(4, 5) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-award"/></svg> Teams Leaderboard — skeleton_teams_table(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Ranked teams table with avatars. <code>{% raw %}{{ skeleton_teams_table(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_teams_table(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-users"/></svg> Strategic Cards — skeleton_strategic(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Portfolio strategic agent cards. <code>{% raw %}{{ skeleton_strategic(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_strategic(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-zap"/></svg> Pipeline — skeleton_pipeline(5)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Cockpit value stream pipeline. <code>{% raw %}{{ skeleton_pipeline(5) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_pipeline(5) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-shopping-bag"/></svg> Marketplace — skeleton_marketplace(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Marketplace/mercato agent cards. <code>{% raw %}{{ skeleton_marketplace(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_marketplace(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-columns"/></svg> Kanban — skeleton_kanban(3, 2)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Kanban board columns with cards. <code>{% raw %}{{ skeleton_kanban(3, 2) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_kanban(3, 2) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-message-circle"/></svg> Timeline — skeleton_timeline(3)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Chat/message timeline. <code>{% raw %}{{ skeleton_timeline(3) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_timeline(3) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-activity"/></svg> Activity Feed — skeleton_feed(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Cockpit/dashboard activity feed. <code>{% raw %}{{ skeleton_feed(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_feed(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-briefcase"/></svg> Hub Cards — skeleton_hub_cards(4)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Project hub dashboard cards. <code>{% raw %}{{ skeleton_hub_cards(4) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_hub_cards(4) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-briefcase"/></svg> Project List — skeleton_projects(3)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Cockpit project list with progress bars. <code>{% raw %}{{ skeleton_projects(3) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_projects(3) }}
+        </div>
+
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-cpu"/></svg> Dashboard Card — skeleton_ck_card(3)</h3>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:0.75rem">
+                Cockpit-style dashboard card with rows. <code>{% raw %}{{ skeleton_ck_card(3) }}{% endraw %}</code>
+            </p>
+            {{ skeleton_ck_card(3) }}
+        </div>
+
+        <!-- Usage Guide -->
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-book"/></svg> Usage</h3>
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">Import macros</div>
+                    <div class="ds-showcase__code">{% raw %}{% from "partials/skeleton.html" import skeleton_agents, skeleton_table %}{% endraw %}</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">HTMX deferred loading</div>
+                    <div class="ds-showcase__code">{% raw %}&lt;div id="data" hx-get="/partial/agents/grid"
+     hx-trigger="load" hx-swap="innerHTML"&gt;
+  {{ skeleton_agents(8) }}
+&lt;/div&gt;{% endraw %}</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">JS render callback</div>
+                    <div class="ds-showcase__code">function render(data) {
+  const el = document.getElementById('pipeline');
+  el.classList.remove('sk');
+  el.classList.add('sk-loaded');
+  // ... fill with real data
+}</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title">CSS primitives</div>
+                    <div class="ds-showcase__code">.sk           shimmer gradient animation
+.sk-line      text line (0.75rem)
+.sk-line-sm   small line (0.55rem, 60%)
+.sk-line-lg   large line (1rem, 80%)
+.sk-circle    circular (border-radius: 50%)
+.sk-avatar    42x42 circle
+.sk-badge     pill 60x1.2rem
+.sk-card      card container
+.sk-metric    metric value+label
+.sk-loaded    fade-in transition (0.3s)</div>
                 </div>
             </div>
         </div>
