@@ -626,8 +626,9 @@ _PHASE_TEMPLATES = [
     {"id": "story-from-legacy", "name": "Story Generation from Legacy", "pattern": "relay",
      "team_roles": ["architect", "product", "qa"], "gate": "no_veto"},
     {"id": "traceability-check", "name": "Traceability Validation", "pattern": "voting",
-     "team_roles": ["qa", "architect", "critic"], "gate": "all_approved",
-     "feedback": ["tools"]},
+     "team_roles": ["traceability", "traceability", "traceability", "qa"], "gate": "all_approved",
+     "feedback": ["tools"],
+     "description": "Run legacy_scan + traceability_coverage + traceability_validate. All voters must approve ≥80% coverage."},
     {"id": "migration-sprint", "name": "Migration Sprint", "pattern": "hierarchical",
      "team_roles": ["tech-lead", "developer", "qa"], "gate": "all_approved"},
     {"id": "migration-verify", "name": "Migration Verification", "pattern": "red-blue",
@@ -748,6 +749,15 @@ Pick the pattern that matches the situation:
 - Tests not executed or failed
 - Source files < 3 (non-trivial project)
 - Adversarial guard rejected (score >= 7)
+
+─── TRACEABILITY TEAM ───
+A dedicated traceability team (trace-lead, trace-auditor, trace-writer, trace-monitor) is available.
+For ALL projects (not just migrations):
+- After dev phases: compose a "traceability-check" phase (voting, gate=all_approved)
+  Team: ["trace-lead", "trace-auditor", "trace-monitor"] — they run coverage + validate
+- If coverage < 80%: compose a "trace-fix" phase (sequential)
+  Team: ["trace-writer"] — adds # Ref: headers and SPECS.md links
+- For migration projects: ALWAYS include legacy-inventory → story-from-legacy → traceability-check
 """
 
 

@@ -426,6 +426,45 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_ticket",
         "deep_search",
     ],
+    # ── Traceability team — full legacy↔story↔code↔test chain + code read/search ──
+    "traceability": [
+        # Core traceability tools
+        "legacy_scan",
+        "traceability_link",
+        "traceability_coverage",
+        "traceability_validate",
+        # Code read/search (audit + write headers)
+        "code_read",
+        "code_write",
+        "code_edit",
+        "code_search",
+        "list_files",
+        "deep_search",
+        # Build/test (verify trace integrity)
+        "build",
+        "test",
+        "lint",
+        # Memory
+        "memory_search",
+        "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
+        "get_project_context",
+        # Git (read + commit trace updates)
+        "git_status",
+        "git_log",
+        "git_diff",
+        "git_commit",
+        # Backlog (create features/stories)
+        "create_feature",
+        "create_story",
+        # Jira (link to tickets)
+        "jira_search",
+        "jira_create",
+        "jira_update",
+        "jira_add_comment",
+    ],
 }
 
 # Quality tools — available to qa, devops, architecture, cdp roles
@@ -511,6 +550,7 @@ for _trole in ("qa", "dev"):
         ROLE_TOOL_MAP[_trole].extend(
             _TRACEABILITY_TOOLS_FULL if _trole == "dev" else _TRACEABILITY_TOOLS_READONLY
         )
+# Note: "traceability" role already has these tools in its base list — no extension needed
 
 
 def _classify_agent_role(agent) -> str:
@@ -602,6 +642,8 @@ def _classify_agent_role(agent) -> str:
         return "product"
     if any(k in combined for k in ("migration", "etl", "migrat")):
         return "devops"
+    if any(k in combined for k in ("trac", "trace", "traceability", "tracing")):
+        return "traceability"
     if any(
         k in combined for k in ("programme", "projet", "cdp", "scrum", "coach", "pm ")
     ):

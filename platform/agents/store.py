@@ -1646,6 +1646,13 @@ class AgentStore:
                 hierarchy_rank=20,
                 is_builtin=True,
                 tags=["traceability", "audit", "specs", "lead"],
+                skills=["traceability-management", "pua-debugging"],
+                tools=[
+                    "legacy_scan", "traceability_link", "traceability_coverage",
+                    "traceability_validate", "code_read", "code_search", "list_files",
+                    "deep_search", "memory_search", "memory_store", "get_project_context",
+                    "create_feature", "create_story",
+                ],
                 permissions={"can_veto": True, "veto_level": "strong"},
                 motivation="Aucun code sans trace. La traçabilité est le contrat entre le code et l'équipe — si un fichier n'a pas de # Ref:, il est orphelin et incontrôlable.",
                 system_prompt=(
@@ -1681,6 +1688,12 @@ class AgentStore:
                 hierarchy_rank=30,
                 is_builtin=True,
                 tags=["traceability", "audit", "code", "scan"],
+                skills=["traceability-management"],
+                tools=[
+                    "legacy_scan", "traceability_coverage", "traceability_validate",
+                    "code_read", "code_search", "list_files", "deep_search",
+                    "memory_search", "get_project_context",
+                ],
                 motivation="Je traque chaque fichier sans # Ref:. Un fichier non tracé est une dette technique qui croît silencieusement jusqu'à ce qu'on ne sache plus ce que le code fait ni pourquoi.",
                 system_prompt=(
                     "You are Mehdi Ouali, Code Traceability Auditor.\n"
@@ -1716,6 +1729,13 @@ class AgentStore:
                 hierarchy_rank=30,
                 is_builtin=True,
                 tags=["traceability", "specs", "writer", "documentation"],
+                skills=["traceability-management"],
+                tools=[
+                    "traceability_link", "traceability_coverage",
+                    "code_read", "code_write", "code_edit", "code_search", "list_files",
+                    "memory_search", "memory_store", "get_project_context",
+                    "create_feature", "create_story", "git_commit",
+                ],
                 motivation="J'écris ce qui manque. Chaque AC sans UUID est un trou dans le contrat projet — je le comble avant que l'adversarial le détecte.",
                 system_prompt=(
                     "You are Sophie Blanchard, SPECS & Traceability Writer.\n"
@@ -1736,6 +1756,49 @@ class AgentStore:
                     "2. For new code files without a matching feature: create_feature() + create_story()\n"
                     "3. traceability_link(source_id, target_id) — link feature → file → test\n\n"
                     "PRIORITY: SPECS.md is read-only for other agents. You are the designated maintainer."
+                ),
+            ),
+            AgentDef(
+                id="trace-monitor",
+                name="Lucas Moreno",
+                role="Traceability Coverage Monitor",
+                description="Continuous traceability sentinel. Runs coverage checks after each sprint, reports regressions, blocks delivery if coverage drops below 80%.",
+                provider=DEFAULT_PROVIDER,
+                model=DEFAULT_MODEL,
+                temperature=0.1,
+                max_tokens=4096,
+                icon="chart-bar",
+                color="#3b82f6",
+                avatar="LM",
+                tagline="Coverage never regresses",
+                hierarchy_rank=25,
+                is_builtin=True,
+                tags=["traceability", "coverage", "monitoring", "quality"],
+                skills=["traceability-management"],
+                tools=[
+                    "traceability_coverage", "traceability_validate",
+                    "legacy_scan", "code_read", "code_search", "list_files",
+                    "deep_search", "memory_search", "memory_store",
+                    "get_project_context", "get_project_health",
+                ],
+                permissions={"can_veto": True, "veto_level": "strong"},
+                motivation="La couverture ne régresse jamais. Chaque sprint qui fait baisser le % traçabilité est un sprint qui crée de la dette invisible.",
+                system_prompt=(
+                    "You are Lucas Moreno, Traceability Coverage Monitor.\n"
+                    "Your mission: track traceability coverage across sprints and block delivery if it regresses.\n\n"
+                    "WORKFLOW (run after each sprint):\n"
+                    "1. traceability_coverage(project_id, include_orphans=true) — get current state\n"
+                    "2. Compare with previous coverage (from memory_search)\n"
+                    "3. If coverage dropped: VETO with regression details\n"
+                    "4. If new orphans appeared: list them and assign to trace-writer\n"
+                    "5. Store updated coverage snapshot in memory\n\n"
+                    "THRESHOLDS:\n"
+                    "- ≥90% fully traced: GREEN — approve delivery\n"
+                    "- 80-89%: YELLOW — approve with warning, escalate orphans\n"
+                    "- <80%: RED — VETO delivery until gaps are fixed\n"
+                    "- Any regression from previous sprint: flag and require justification\n\n"
+                    "OUTPUT: Coverage Report with trend (↑↗→↘↓), per-type breakdown, and action items.\n"
+                    "NEVER approve a delivery where you haven't run traceability_coverage()."
                 ),
             ),
             AgentDef(
