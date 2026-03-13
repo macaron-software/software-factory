@@ -17,6 +17,63 @@ from .tool_schemas import (
 if TYPE_CHECKING:
     from .executor import ExecutionContext
 
+# ─── PUA Persistence Methodology ─────────────────────────────────────────────
+# Source: github.com/tanweai/pua (MIT) — adapted for SF agent context.
+# Core insight: force agents to exhaust all options before giving up/escalating.
+# 3 Iron Rules + 4 pressure levels + 5-step debug + forbidden passive patterns.
+_PUA_DEV_BLOCK = """
+## PUA — Persistence Under Adversity (MANDATORY)
+Source: github.com/tanweai/pua — do NOT give up until ALL options are exhausted.
+
+### 3 Iron Rules
+1. **Exhaust ALL options** — try ≥3 fundamentally different approaches before ESCALATE.
+2. **Act before asking** — use tools (code_read, list_files, deep_search) FIRST; only ask what tools cannot answer.
+3. **Take initiative end-to-end** — fix → verify (run tests / check output) → scan related files for same pattern. Never stop at the surface fix.
+
+### Auto-switch strategy when
+- Same approach failed 2+ consecutive times → MUST switch to fundamentally different method (not just tweak params)
+- About to write "I cannot" / "please handle manually" / "probably an env issue" → FORBIDDEN — verify with tools first
+- File written but no test run → INCOMPLETE — run verification before reporting done
+- No `# Ref:` header in generated file → INCOMPLETE — add traceability before submitting
+
+### 4 Pressure Levels (escalate automatically on consecutive failures)
+| Failures | Level | Mandatory Action |
+|----------|-------|-----------------|
+| 2nd | L1 Mild | Switch to completely different approach |
+| 3rd | L2 Root-cause | Read error word-by-word + deep_search + check environment |
+| 4th | L3 Checklist | (1) re-read task spec, (2) check all logs, (3) invert assumptions, (4) try simplest possible fix, (5) verify env vars, (6) check imports/deps, (7) search for prior working example |
+| 5th+ | L4 Escalate | ESCALATE to orchestrator with full failure log — never silently loop |
+
+### 5-Step Debug (when stuck)
+1. **Smell** — list ALL attempts made, identify the common failure pattern
+2. **Elevate** — read error message word-by-word → deep_search → read source code → verify env → invert assumptions
+3. **Mirror** — Am I repeating the same approach? Did I actually read the file? Did I check the simplest case?
+4. **Execute** — new approach MUST: be fundamentally different, have clear success criteria, produce new diagnostic info on failure
+5. **Retrospective** — what solved it? proactively check related files for same bug pattern
+
+### Forbidden Passive Patterns (automatic L1 trigger)
+- Tweaking the same line/param repeatedly with no new information
+- Writing "Fixed!" without running verification
+- Asking the user what a tool call could discover
+- Stopping after patching surface issue without checking related code
+"""
+
+_PUA_QA_BLOCK = """
+## QA Role Boundaries (CRITICAL)
+You are a REVIEWER / VALIDATOR — NOT an implementer.
+Your job: validate existing code against specs, find bugs, write test verdicts.
+**FORBIDDEN**: code_write to create implementation files, writing business logic, adding features.
+**ALLOWED**: code_write only to create/update TEST files (test_*.py, *.spec.ts, *.test.js).
+
+### QA Persistence (PUA adapted — source: github.com/tanweai/pua MIT)
+1. **Run all tests** — never report "PASS" without actually executing the test suite.
+2. **Verify against specs** — read SPECS.md AC items (look for `[AC:ac-xxx]` tags), confirm each one is implemented AND tested.
+3. **Report with evidence** — every FAIL must cite: file + line + expected vs actual behavior.
+4. **Proactive** — find bugs beyond the obvious: edge cases, missing error handling, security gaps, traceability gaps (no `# Ref:` header).
+5. **Verdict format**: [PASS] or [FAIL: reason] — never "it looks correct" without proof.
+"""
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Roles that benefit from architecture guidelines injection
 _GUIDELINES_ROLES = {
     "dev",
@@ -131,6 +188,16 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
 3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
 4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
 
+        # RLM instruction — mandatory for agents with deep_search access
+        if ctx.allowed_tools is None or "deep_search" in (ctx.allowed_tools or []):
+            parts.append("""
+## Deep Search / RLM (MANDATORY after memory)
+After calling memory_search, if the question involves codebase exploration, technical analysis, specs understanding, or architectural decisions:
+3. ALWAYS call deep_search(query="<your question>") BEFORE synthesizing your answer.
+   deep_search triggers the RLM (Recursive Language Model) engine: it runs iterative parallel sub-agent exploration (grep, file read, structure analysis) and is 10× more thorough than memory_search alone.
+   Use it for: "how does X work?", "where is Y implemented?", "what are the specs for Z?", "analyse l'architecture de...", "que faut-il pour coder..."
+   Skip it only for: simple factual lookups, greetings, or when you already called it this turn.""")
+
         # Role-specific tool instructions
         role_cat = _classify_agent_role(agent)
         if role_cat == "cto":
@@ -146,8 +213,15 @@ RÈGLES FONDAMENTALES :
    → Si le bloc indique des missions SF actives, tu peux appeler platform_missions(project_id="...")
 2. Pour lister les projets SF : appelle platform_agents() ou demande à l'utilisateur d'utiliser @NomProjet
 3. Pour les métriques globales : platform_metrics(), platform_sessions()
-4. INTERDIT : list_files, code_search (ces outils cherchent dans le filesystem local, pas dans la SF)
+4. INTERDIT dans le contexte SF-Platform uniquement : list_files, code_search (cherchent dans le filesystem local, pas dans la SF)
 5. INTERDIT : créer des fichiers locaux, demander des credentials, générer du SQL
+
+POUR LES PROJETS CLIENTS (Veligo, LDP, PSY, Finary, etc.) :
+- Utilise memory_search pour lire la mémoire du projet (specs, architecture, décisions)
+- Utilise jira_search(project="VELIGO") pour consulter les tickets Jira
+- Utilise confluence_read(page_id="...") pour lire la documentation Confluence
+- Utilise code_read / list_files si le projet a un workspace local
+- Utilise deep_search pour une exploration récursive du codebase
 
 ACTIONS QUE TU PEUX EFFECTUER :
 - Créer un projet complet : create_project(name, description, vision, factory_type)
@@ -170,6 +244,7 @@ STEP 2: Read the results and report bugs with create_ticket()
 STEP 3: Call build(command="npm test") for additional unit tests if needed
 
 DO NOT skip run_e2e_tests(). Your validation is REJECTED without it.""")
+            parts.append(_PUA_QA_BLOCK)
         elif role_cat == "security":
             parts.append("""
 ## Security Tools (IMPORTANT)
@@ -223,6 +298,22 @@ RULES:
             "\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team."
         )
 
+    # Traceability requirement for all dev roles
+    role_cat = _classify_agent_role(agent)
+    _dev_roles = {"backend", "frontend", "fullstack", "dev", "mobile", "architect"}
+    if role_cat in _dev_roles:
+        parts.append("""
+## Traceability (MANDATORY)
+Every source file you create with code_write MUST include a traceability header:
+  # Ref: {feature_id} — {feature_name}
+  # Story: {story_id} — {story_title}
+Example: # Ref: feat-a1b2 — User authentication endpoint
+
+This enables full audit trail: feature → code → test.
+If you don't have a feature ID, use the task name (e.g., # Ref: task-auth — Login flow).
+""")
+        parts.append(_PUA_DEV_BLOCK)
+
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
 
@@ -248,33 +339,9 @@ RULES:
             parts.append(
                 f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"
             )
-        elif ctx.project_id:
-            # AgeMem: auto-retrieve role-scoped memory for executor if no context loaded
-            try:
-                from ..memory.manager import get_memory_manager as _get_mm
-                from .tool_schemas import _classify_agent_role as _car
-
-                _role = _car(ctx.agent)
-                _entries = _get_mm().project_get(
-                    ctx.project_id, agent_role=_role or "", limit=5
-                )
-                if _entries:
-                    _snippets = "\n".join(
-                        f"- [{e.get('category', '')}] {e.get('key', '')}: {e.get('value', '')[:200]}"
-                        for e in _entries[:5]
-                    )
-                    parts.append(f"\n## Role Memory (auto-retrieved)\n{_snippets}")
-            except Exception:
-                pass
 
     if ctx.project_path:
-        parts.append(
-            f"\n## Project Workspace (MANDATORY)\n"
-            f"WORKSPACE={ctx.project_path}\n"
-            f"ALL file paths in code_write, code_read, code_edit, list_files MUST start with: {ctx.project_path}/\n"
-            f"Example: {ctx.project_path}/src/main.swift\n"
-            f"NEVER use data/workspaces/ or any other directory."
-        )
+        parts.append(f"\n## Project Path\n{ctx.project_path}")
 
     perms = agent.permissions or {}
     if perms.get("can_delegate"):
