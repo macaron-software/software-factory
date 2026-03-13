@@ -124,6 +124,21 @@ PgConnectionWrapper from pool . SQLite fb: data/platform.db.
 schema_pg.sql(61tbl) first -> migrations.py second (incremental).
 executescript() w/ savepoints. execute() full rollback on err.
 
+## Skeleton Loading — web/static/css/components.css + templates/partials/skeleton.html
+```
+CSS: .sk shimmer gradient 1.5s . .sk-line(3 sizes) . .sk-circle . .sk-badge . .sk-card
+     .sk-metric . .sk-loaded fade-in 0.3s . .sk-grid-{2,3,4,agents}
+Macros (20): skeleton_{item_grid,agents,missions,stat_cards,chart,kpi_row,table,
+  teams_table,strategic,pipeline,marketplace,kanban,timeline,feed,hub_cards,
+  projects,ck_card,tab_panel,ds_tokens,block}
+Deferred: hx-get="/partial/X" hx-trigger="load" hx-swap="innerHTML"
+Partials (api/partials.py): /partial/{portfolio/metrics,agents/grid,projects/grid,
+  sessions/grid,patterns/grid,missions/grid,cockpit/pipeline,cockpit/projects}
+Cache: cache.py TTL get/put/invalidate(prefix*) — agents 60s missions 30s runs 15s wf 120s
+HTTP: Cache-Control immutable versioned(?v=) . 1h unversioned . ETag on partials
+Coverage: 31/88 tpl . DS /design-system -> Skeleton tab
+```
+
 ## LLM — FROZEN
 ```
 local-mlx   Qwen3.5-mlx(:8080)         ollama-compat
@@ -150,3 +165,4 @@ parallel_tool_calls=False . GPT-5.x: reasoning . max_completion_tokens . budget>
 ## Stats
 ~215 agents · 26 patterns · 29 phase tpl · 50 workflows · 57 tool mods · 1091 skills
 4 bricks · 123 tpl · 375py/148KLOC · 61 PG tbl · 17 ops · 5 LLM providers · 15 bg tasks
+20 skeleton macros · 31/88 tpl skeletonized · 8 partial endpoints

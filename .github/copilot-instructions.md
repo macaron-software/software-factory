@@ -38,9 +38,13 @@ platform/                       372py 146KLOC
   security/                     prompt_guard . output_validator . audit . sanitize
   llm/client.py                 5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
   db/                           adapter(PG+SQLite) . schema(61tbl) . migrations . tenant
+  cache.py                      TTL cache (get/put/invalidate) . prefix invalidation (key*)
   tools/(52)                    code git deploy build web sec mem mcp trace ast lint lsp ...
   ops/(17)                      auto_heal . traceability_scheduler . knowledge_scheduler ...
   web/routes/                   missions pages sessions wf agents projects . tpl(117)
+  web/routes/api/partials.py    deferred HTML fragments (/partial/*) for skeleton loading
+  web/static/css/components.css skeleton .sk shimmer + 20 macro variants
+  web/templates/partials/       skeleton.html (20 macros) . agent_cards.html ...
   rbac/ mcps/ modules/(24) bricks/ metrics/
 skills/                         1090 .md
 projects/                       baby.yaml . factory.yaml (per-project config+git_url)
@@ -61,6 +65,19 @@ Auth: POST /api/auth/login -> cookie JWT (15min access + 7d refresh)
 code_write/code_edit -> ctx.code_files_written tracked -> end of run: _auto_commit_and_push()
 branch: agent/{agent_id}/{session_id[:8]} (never main/master/develop)
 post-phase hook (epics/internal.py): git add -A + commit + push after EVERY phase
+
+## Skeleton Loading — UI System
+CSS: .sk shimmer gradient animation . .sk-line .sk-circle .sk-badge .sk-card .sk-loaded(fade-in)
+Macros: partials/skeleton.html — 20 variants (import + call in Jinja2)
+  skeleton_item_grid(n) . skeleton_agents(n) . skeleton_missions(n) . skeleton_stat_cards(n)
+  skeleton_chart(h) . skeleton_kpi_row(n) . skeleton_table(r,c) . skeleton_teams_table(n)
+  skeleton_strategic(n) . skeleton_pipeline(n) . skeleton_marketplace(n) . skeleton_kanban(c,n)
+  skeleton_timeline(n) . skeleton_feed(n) . skeleton_hub_cards(n) . skeleton_projects(n)
+  skeleton_ck_card(n) . skeleton_tab_panel(style) . skeleton_ds_tokens(n) . skeleton_block(n)
+Pattern: hx-get="/partial/X" hx-trigger="load" hx-swap="innerHTML" wrapping skeleton macro
+Coverage: 31/88 templates (all data pages). DS page /design-system -> Skeleton tab.
+Cache: platform/cache.py TTL (agents 60s, missions 30s, runs 15s, wf 120s). Prefix invalidation.
+HTTP: Cache-Control immutable for versioned static (?v=), 1h unversioned.
 
 ## PM v2 — Lego Orchestrator
 Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).

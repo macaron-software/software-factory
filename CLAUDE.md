@@ -34,10 +34,14 @@ platform/  server.py          lifespan drain auth-mw 8-bg-tasks
   security/            prompt_guard output_validator audit sanitize
   llm/client.py        5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
   db/                  adapter(PG+SQLite) schema(61tbl) migrations tenant
+  cache.py             TTL cache get/put/invalidate . prefix invalidation (key*)
   tools/(52)           code git deploy build web sec mem mcp trace ast lint lsp ...
   traceability/        legacy_items + traceability_links CRUD
   ops/(17)             auto_heal traceability_scheduler knowledge_scheduler ...
   web/routes/          missions pages sessions wf agents projects . tpl(117)
+  web/routes/api/partials.py   deferred HTML fragments for skeleton loading
+  web/static/css/      main.css components.css(+skeleton .sk) agents.css ...
+  web/templates/partials/      skeleton.html(20 macros) agent_cards.html ...
   rbac/ mcps/ modules/(24) bricks/ metrics/
 cli/sf.py              sf status | sf ideation | sf missions list
 skills/                1090 .md
@@ -59,6 +63,29 @@ Auth: POST /api/auth/login -> cookie JWT (15min+7d refresh)
 code_write/code_edit -> ctx.code_files_written -> end of run: _auto_commit_and_push()
 branch: agent/{agent_id}/{session_id[:8]} (never main/master/develop)
 post-phase hook (epics/internal.py): git add -A + commit + push after EVERY phase
+
+## Skeleton Loading — UI System
+```
+CSS:   .sk shimmer . .sk-line .sk-line-sm .sk-line-lg . .sk-circle .sk-avatar
+       .sk-badge . .sk-card . .sk-metric . .sk-loaded(fade-in 0.3s)
+       @keyframes skeleton-shimmer { background-position 200%->-200% }
+Macros (partials/skeleton.html — import + call):
+  skeleton_item_grid(n,with_icon) . skeleton_agents(n) . skeleton_missions(n)
+  skeleton_stat_cards(n) . skeleton_chart(h) . skeleton_kpi_row(n)
+  skeleton_table(r,c) . skeleton_teams_table(n) . skeleton_strategic(n)
+  skeleton_pipeline(n) . skeleton_marketplace(n) . skeleton_kanban(cols,cards)
+  skeleton_timeline(n) . skeleton_feed(n) . skeleton_hub_cards(n)
+  skeleton_projects(n) . skeleton_ck_card(lines) . skeleton_tab_panel(style)
+  skeleton_ds_tokens(n) . skeleton_block(lines)
+Deferred: hx-get="/partial/X" hx-trigger="load" hx-swap="innerHTML"
+Partials: /partial/portfolio/metrics . /partial/agents/grid . /partial/projects/grid
+          /partial/sessions/grid . /partial/patterns/grid . /partial/missions/grid
+          /partial/cockpit/pipeline . /partial/cockpit/projects
+Cache: platform/cache.py TTL: agents 60s . missions 30s . runs 15s . wf 120s . projects 60s
+  invalidate("missions:*") — prefix glob . CUD ops auto-invalidate
+HTTP cache: Cache-Control immutable ?v= versioned . 1h unversioned static
+Coverage: 31/88 templates . DS page /design-system -> Skeleton tab (20 live demos)
+```
 
 ## PM v2 -- Lego Orchestrator
 Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).
@@ -124,12 +151,12 @@ DB: legacy_items(uuid,project,category,name,metadata_json) + traceability_links(
 Tools: legacy_scan . traceability_link . traceability_coverage . traceability_validate
 Roles: cdp/arch/product/dev=all4 qa=coverage+validate
 Adversarial: `# Ref: FEAT-xxx` / `// Ref:` enforced (MISSING_TRACEABILITY L0)
-Role: `traceability` in _classify_agent_role() + ROLE_TOOL_MAP['traceability'] (40+ tools)
+Role: `traceability` in _classify_agent_role() + ROLE_TOOL_MAP["traceability"] (40+ tools)
 Team (platform): team-traceability / art-platform:
   trace-lead (Nadia) . trace-auditor (Mehdi) . trace-writer (Sophie) . trace-monitor (Lucas)
   VETO if coverage <80% . trace-writer = only SPECS.md maintainer
 Team (SF-Baby): Trace Lead . QA Traceability . Code Auditor . Trace Reporter
-Phase: traceability-check tpl uses team_roles=['traceability' x3, 'qa']
+Phase: traceability-check tpl uses team_roles=["traceability" x3, "qa"]
 PM v2: auto-inserts traceability-check after dev phases; legacy->story->traceability for migrations
 Scheduler: ops/traceability_scheduler.py -- every 6h (TRACEABILITY_INTERVAL env)
   scans ALL active projects: SAFe hierarchy (epics/features/stories/ACs)
