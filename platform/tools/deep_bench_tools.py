@@ -903,6 +903,131 @@ def _agents_deep_cases() -> list[DeepCase]:
     c.elapsed_ms = int((time.time() - t0) * 1000)
     cases.append(c)
 
+    # 3i. Motivation coverage — what % of agents have motivation defined
+    # Source: motivation field drives PUA personal accountability hooks (pua.py L2+)
+    c = DeepCase("agents-motivation-coverage", "agents",
+                 "≥30% of built-in agents have a non-empty motivation field")
+    t0 = time.time()
+    try:
+        from platform.agents.store import get_agent_store
+
+        store = get_agent_store()
+        agents = store.list_all()
+        total = len(agents)
+        with_motivation = [a for a in agents if getattr(a, "motivation", "")]
+        pct = round(len(with_motivation) / total * 100) if total else 0
+
+        _ck(c, "has agents", total > 0, f"{total} agents")
+        _ck(c, "≥30% have motivation", pct >= 30,
+            f"{len(with_motivation)}/{total} = {pct}%")
+        roles_covered = sorted({a.role for a in with_motivation})[:8]
+        _ck(c, "dev roles covered",
+            any(
+                any(k in r.lower() for k in ("dev", "backend", "frontend", "architect"))
+                for r in roles_covered
+            ),
+            f"roles: {roles_covered}")
+        c.passed = all(ch.passed for ch in c.checks)
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    cases.append(c)
+
+    # 3j. PUA motivation hook — build_retry_prompt injects [PERSONAL ACCOUNTABILITY]
+    # at L2+ when agent_motivation is set, and skips it at L1 or when empty.
+    # Source: pua.py get_pressure_prompt(motivation) — personal accountability pattern.
+    c = DeepCase("agents-pua-motivation-hook", "agents",
+                 "PUA retry prompt injects personal accountability hook at L2+ when motivation set")
+    t0 = time.time()
+    try:
+        from platform.agents.pua import build_retry_prompt
+
+        prompt_l2_with = build_retry_prompt(
+            task="Implement endpoint",
+            feedback="MISSING_TRACEABILITY",
+            consecutive_failures=3,
+            agent_name="Pierre Backend",
+            agent_motivation="Je livre du code propre, toujours tracé.",
+        )
+        _ck(c, "L2+motivation → hook present",
+            "PERSONAL ACCOUNTABILITY" in prompt_l2_with and "toujours tracé" in prompt_l2_with)
+
+        prompt_l2_without = build_retry_prompt(
+            task="Implement endpoint",
+            feedback="MISSING_TRACEABILITY",
+            consecutive_failures=3,
+            agent_name="Pierre Backend",
+            agent_motivation="",
+        )
+        _ck(c, "L2+no_motivation → no hook",
+            "PERSONAL ACCOUNTABILITY" not in prompt_l2_without)
+
+        prompt_l1_with = build_retry_prompt(
+            task="Implement endpoint",
+            feedback="MISSING_TRACEABILITY",
+            consecutive_failures=2,
+            agent_name="Pierre Backend",
+            agent_motivation="Je livre du code propre, toujours tracé.",
+        )
+        _ck(c, "L1+motivation → no hook (L1 stays gentle)",
+            "PERSONAL ACCOUNTABILITY" not in prompt_l1_with)
+
+        c.passed = all(ch.passed for ch in c.checks)
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    cases.append(c)
+
+    # 3k. LLM judge — motivation alignment under pressure
+    # An agent with motivation set should produce outputs that reflect its stated values.
+    # Source: prompt_builder.py injects motivation + pua.py personalizes retry prompts.
+    c = DeepCase("agents-judge-motivation", "agents",
+                 "LLM judges agent output reflects stated motivation under pressure",
+                 needs_llm=True)
+    t0 = time.time()
+    try:
+        from platform.agents.store import get_agent_store
+        from platform.agents.prompt_builder import _build_system_prompt
+        from platform.agents.executor import ExecutionContext
+        from platform.llm.client import LLMClient, LLMMessage
+
+        store = get_agent_store()
+        client = LLMClient()
+
+        agents_with_motivation = [
+            a for a in store.list_all() if getattr(a, "motivation", "")
+        ]
+        if not agents_with_motivation:
+            c.error = "No agents with motivation field — populate AgentDef.motivation"
+            c.passed = False
+        else:
+            agent = agents_with_motivation[0]
+            ctx = ExecutionContext(
+                agent=agent, session_id="deep-bench-motivation",
+                project_id=None, tools_enabled=False,
+                capability_grade="executor",
+            )
+            system_prompt = _build_system_prompt(ctx)
+
+            resp = _arun(client.acompletion([
+                LLMMessage(role="system", content=system_prompt[:800]),
+                LLMMessage(role="user",
+                           content="Your last output was rejected (MISSING_TRACEABILITY). "
+                                   "Describe in 2-3 sentences how you will fix this."),
+            ]))
+            output = resp.content[:500]
+
+            score = _llm_judge(c, output, [
+                "Response acknowledges the failure and commits to a concrete fix",
+                "Response reflects the agent's stated motivation/values (not generic)",
+                "Response mentions traceability, # Ref:, or a specific fix action",
+            ], label="motivation-alignment")
+            c.passed = score >= 0.5
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    cases.append(c)
+
     return cases
 # ===========================================================================
 
