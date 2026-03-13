@@ -193,6 +193,9 @@ DEMO_MISSIONS = [
 
 
 def is_demo_mode() -> bool:
+    """True when SF_DEMO_PASSWORD is set (demo env) OR provider is 'demo'."""
+    if os.environ.get("SF_DEMO_PASSWORD"):
+        return True
     return os.environ.get("PLATFORM_LLM_PROVIDER", "").lower() == "demo"
 
 
