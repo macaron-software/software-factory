@@ -1,8 +1,8 @@
 # SF Platform — Quick Ref
 
 ## WHAT
-Multi-agent SAFe orch. ~218 agents . 26 patterns . 49 wf . 28 phase tpl . 52 tool mods . 1090 skills.
-FastAPI+HTMX+SSE. PG16(61tbl)+Redis7. 372py/146KLOC. Port 8099(dev)/8090(prod). Dark purple UI.
+Multi-agent SAFe orch. ~218 agents . 26 patterns . 50 wf . 28 phase tpl . 52 tool mods . 1091 skills.
+FastAPI+HTMX+SSE. PG16(62tbl)+Redis7. 375py/148KLOC. Port 8099(dev)/8090(prod). Dark purple UI.
 
 ## NEVER
 - `import platform` top-level — shadows stdlib; use `from platform.X import Y`
@@ -12,7 +12,7 @@ FastAPI+HTMX+SSE. PG16(61tbl)+Redis7. 372py/146KLOC. Port 8099(dev)/8090(prod). 
 - emoji . WebSocket — SSE only (`--ws none`) . SVG Feather only
 
 ## Stack
-Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(61tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical . zero build
+Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(62tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical . zero build
 
 ## Run / Test
 ```sh
@@ -24,31 +24,43 @@ pytest tests/test_platform_api.py -v          # API (PG req)
 
 ## Tree
 ```
-platform/                       372py 146KLOC
+platform/                       375py 148KLOC
   server.py                     lifespan . drain . auth mw . 8 bg tasks
   agents/                       exec . store(~215) . adversarial(L0+L1) . tool_runner(134)
                                 selection(Thompson) . evolution(GA) . rl(Q) . darwin . skill_broker
   patterns/engine.py            26 topo: solo seq par loop hier net router aggr wave
                                 hitl mr bb comp tournament escalation voting speculative
                                 red-blue relay mob fractal_{qa,stories,tests,worktree} backprop
-  workflows/                    store(PM v2, 28 tpl) . defs/(49 YAML) . builtins
+  workflows/                    store(PM v2, 28 tpl) . defs/(50 YAML) . builtins
   services/                     epic_orch . auto_resume . pm_checkpoint . evidence . notif
   a2a/                          bus . veto . negotiation . jarvis_mcp . azure_bridge
   ac/                           reward(14d) . convergence . experiments . skill_thompson
   security/                     prompt_guard . output_validator . audit . sanitize
+  auth/                         service(JWT+bcrypt) . middleware(RBAC) . ses(AWS SES pw reset)
   llm/client.py                 5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
-  db/                           adapter(PG+SQLite) . schema(61tbl) . migrations . tenant
+  db/                           adapter(PG+SQLite) . schema(62tbl) . migrations . tenant
   cache.py                      TTL cache (get/put/invalidate) . prefix invalidation (key*)
   tools/(52)                    code git deploy build web sec mem mcp trace ast lint lsp ...
   ops/(17)                      auto_heal . traceability_scheduler . knowledge_scheduler ...
-  web/routes/                   missions pages sessions wf agents projects . tpl(117)
+  web/routes/                   missions pages sessions wf agents projects auth . tpl(123)
   web/routes/api/partials.py    deferred HTML fragments (/partial/*) for skeleton loading
   web/static/css/components.css skeleton .sk shimmer + 20 macro variants
   web/templates/partials/       skeleton.html (20 macros) . agent_cards.html ...
   rbac/ mcps/ modules/(24) bricks/ metrics/
-skills/                         1090 .md
+skills/                         1091 .md
 projects/                       baby.yaml . factory.yaml (per-project config+git_url)
 ```
+
+## Auth
+POST /api/auth/login -> cookie JWT (15min access + 7d refresh) . bcrypt pw hash
+POST /api/auth/forgot-password -> 6-digit code via AWS SES (15min expiry, 5 attempts max)
+POST /api/auth/verify-reset-code -> validate code
+POST /api/auth/reset-password -> set new pw + invalidate all sessions
+OAuth: GitHub (/auth/github) . Microsoft Azure AD (/auth/azure)
+Demo: POST /api/auth/demo (SF_DEMO_PASSWORD env)
+Rate limit: 5 req/60s per IP on all auth endpoints
+DB: users . user_sessions . user_project_roles . password_reset_codes
+Config: AWS_SES_REGION (dflt eu-west-1) . AWS_SES_FROM_EMAIL (dflt noreply@macaron-software.com)
 
 ## Projects (SF-Baby: sf-baby.macaron-software.com)
 | proj | repo | stack |
@@ -59,7 +71,6 @@ projects/                       baby.yaml . factory.yaml (per-project config+git
 
 SAFe CRUD API: POST /api/missions (epic) . POST /api/epics/{id}/features . POST /api/features/{id}/stories
 Memory API: POST /api/memory/project/{id} (key,value,category,source,confidence)
-Auth: POST /api/auth/login -> cookie JWT (15min access + 7d refresh)
 
 ## Auto-Commit+Push (agents/executor.py)
 code_write/code_edit -> ctx.code_files_written tracked -> end of run: _auto_commit_and_push()

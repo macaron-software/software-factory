@@ -1,15 +1,15 @@
 # SF Platform -- Agentic Workflow Engine
 
 ## Stats
-~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 49 wf . 28 phase tpl
-52 tool mods . 134 schemas . 1090 skills . 372py/146KLOC . 61 PG tables
+~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 50 wf . 28 phase tpl
+52 tool mods . 134 schemas . 1091 skills . 375py/148KLOC . 62 PG tables
 
 ## NEVER
 - `import platform` top-level (shadows stdlib) -> `from platform.X import Y`
 - `--reload` (same) . `*_API_KEY=dummy` . change LLM models . emoji . WebSocket
 
 ## Stack
-Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(61tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical/.env
+Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(62tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical/.env
 
 ## Run / Test
 ```sh
@@ -27,24 +27,25 @@ platform/  server.py          lifespan drain auth-mw 8-bg-tasks
   patterns/engine.py   26 topo: solo seq par loop hier net router aggr wave hitl mr bb
                        comp tournament escalation voting speculative red-blue relay mob
                        fractal_{qa,stories,tests,worktree} backprop_merge
-  workflows/           store(PM v2, 28 tpl, 20 catalog) . defs/(49 YAML)
+  workflows/           store(PM v2, 28 tpl, 20 catalog) . defs/(50 YAML)
   services/            epic_orch . auto_resume . pm_checkpoint . evidence . notif
   a2a/                 bus veto negotiation jarvis_mcp azure_bridge
   ac/                  reward(14d) convergence experiments skill_thompson
   security/            prompt_guard output_validator audit sanitize
+  auth/                service(JWT+bcrypt) . middleware(RBAC) . ses(AWS SES pw reset)
   llm/client.py        5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
-  db/                  adapter(PG+SQLite) schema(61tbl) migrations tenant
+  db/                  adapter(PG+SQLite) schema(62tbl) migrations tenant
   cache.py             TTL cache get/put/invalidate . prefix invalidation (key*)
   tools/(52)           code git deploy build web sec mem mcp trace ast lint lsp ...
   traceability/        legacy_items + traceability_links CRUD
   ops/(17)             auto_heal traceability_scheduler knowledge_scheduler ...
-  web/routes/          missions pages sessions wf agents projects . tpl(117)
+  web/routes/          missions pages sessions wf agents projects auth . tpl(123)
   web/routes/api/partials.py   deferred HTML fragments for skeleton loading
   web/static/css/      main.css components.css(+skeleton .sk) agents.css ...
   web/templates/partials/      skeleton.html(20 macros) agent_cards.html ...
   rbac/ mcps/ modules/(24) bricks/ metrics/
 cli/sf.py              sf status | sf ideation | sf missions list
-skills/                1090 .md
+skills/                1091 .md
 projects/              baby.yaml factory.yaml (per-project config+git_url)
 ```
 
@@ -57,7 +58,17 @@ projects/              baby.yaml factory.yaml (per-project config+git_url)
 
 SAFe CRUD: POST /api/missions (epic) . /api/epics/{id}/features . /api/features/{id}/stories
 Memory: POST /api/memory/project/{id} {key,value,category,source,confidence}
-Auth: POST /api/auth/login -> cookie JWT (15min+7d refresh)
+
+## Auth
+JWT+bcrypt. Cookie: access 15min + refresh 7d. Rate limit: 5/60s per IP.
+POST /api/auth/login . /register . /refresh . /logout . /setup . /demo
+POST /api/auth/forgot-password -> 6-digit code via AWS SES (15min TTL, 5 attempts)
+POST /api/auth/verify-reset-code -> validate code
+POST /api/auth/reset-password -> set new pw + invalidate all sessions
+OAuth: GitHub (/auth/github) . Microsoft AD (/auth/azure)
+DB: users . user_sessions . user_project_roles . password_reset_codes
+Config: AWS_SES_REGION(eu-west-1) . AWS_SES_FROM_EMAIL(noreply@macaron-software.com)
+ses.py: boto3 send_email (styled HTML + plain text)
 
 ## Auto-Commit+Push (agents/executor.py)
 code_write/code_edit -> ctx.code_files_written -> end of run: _auto_commit_and_push()
