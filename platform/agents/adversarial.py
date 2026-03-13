@@ -346,10 +346,35 @@ def _count_imports(source: str) -> int:
 
 
 def _check_stack_mismatch(tool_calls: list, task: str) -> list[str]:
-    """Check if code_write tool calls use the wrong language for the declared stack."""
+    """Check if code_write tool calls use the wrong language for the declared stack.
+
+    Only triggers when the task *explicitly* declares a stack (e.g. "STACK: Rust",
+    "projet Rust/axum", "build with Cargo"). Generic protocol instructions that
+    mention multiple stacks as examples (e.g. "Rust: cargo check") are excluded
+    by requiring the keyword appears in the [Your task] section, not in the
+    injected protocol boilerplate.
+    """
     if not tool_calls or not task:
         return []
-    task_lower = task.lower()
+
+    # Extract only the user task section — ignore protocol boilerplate that lists
+    # all stacks as examples (DEPENDENCY MANIFESTS, BUILD VERIFICATION, etc.)
+    task_section = task
+    task_marker = "[Your task]:"
+    if task_marker in task:
+        task_section = task[task.index(task_marker) :]
+        # Also strip protocol sections that follow the task
+        for proto_marker in (
+            "CRITICAL BEHAVIOR RULES",
+            "DEPENDENCY MANIFESTS",
+            "BUILD VERIFICATION",
+            "MANDATORY TOOL USAGE",
+        ):
+            idx = task_section.find(proto_marker)
+            if idx > 0:
+                task_section = task_section[:idx]
+
+    task_lower = task_section.lower()
     issues = []
     for rule in _STACK_RULES.values():
         if not any(kw in task_lower for kw in rule["keywords"]):
