@@ -4,6 +4,14 @@
 Multi-agent SAFe orch. ~218 agents . 26 patterns . 50 wf . 28 phase tpl . 52 tool mods . 1091 skills.
 FastAPI+HTMX+SSE. PG16(62tbl)+Redis7. 375py/148KLOC. Port 8099(dev)/8090(prod). Dark purple UI.
 
+## ALWAYS — Start of Session
+git pull on ALL project repos before any work:
+```sh
+for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron; do
+  (cd ~/\_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
+done
+```
+
 ## NEVER
 - `import platform` top-level — shadows stdlib; use `from platform.X import Y`
 - `--reload` — same shadow

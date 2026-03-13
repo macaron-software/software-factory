@@ -4,6 +4,15 @@
 ~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 50 wf . 28 phase tpl
 52 tool mods . 134 schemas . 1091 skills . 375py/148KLOC . 62 PG tables
 
+## ALWAYS -- Start of Session
+git pull on ALL project repos before any work:
+```sh
+for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron; do
+  (cd ~/_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
+done
+```
+Paths: SF=_SOFTWARE_FACTORY . Baby=_BABY . ADA-NDIS=MVP_ADA . MesAides=_HELP/aides-macaron
+
 ## NEVER
 - `import platform` top-level (shadows stdlib) -> `from platform.X import Y`
 - `--reload` (same) . `*_API_KEY=dummy` . change LLM models . emoji . WebSocket
