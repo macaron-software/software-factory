@@ -1,0 +1,44 @@
+id: traceability-sweep
+name: Traceability Sweep
+description: 'Scheduled traceability maintenance: audit legacy items, fix orphans, update SPECS.md, validate coverage. Runs via traceability_scheduler every 6h on projects below 80% coverage.'
+icon: link
+is_builtin: true
+phases:
+- id: ts-audit
+  pattern_id: parallel
+  name: Traceability Audit
+  description: 'Scan codebase for legacy items, check # Ref: headers, assess coverage. Produce gap report.'
+  gate: Gap report produced with coverage metrics
+  config:
+    agents:
+    - trace-auditor
+    - trace-monitor
+
+- id: ts-fix
+  pattern_id: sequential
+  name: Traceability Fix
+  description: 'Add missing # Ref: headers, create traceability_links for orphans, update SPECS.md AC items with UUIDs.'
+  gate: All orphaned items linked, headers added
+  config:
+    agents:
+    - trace-writer
+
+- id: ts-validate
+  pattern_id: voting
+  name: Traceability Validation
+  description: 'Validate end-to-end traceability: legacy→story→code→test. All voters must approve ≥80% coverage.'
+  gate: all_approved
+  config:
+    agents:
+    - trace-lead
+    - trace-monitor
+    - trace-auditor
+
+- id: ts-memory-sync
+  pattern_id: solo
+  name: Memory Coherence Check
+  description: 'Cross-check traceability data with project memory. Prune stale entries, flag inconsistencies, store updated metrics.'
+  gate: Memory coherent with traceability data
+  config:
+    agents:
+    - trace-lead
