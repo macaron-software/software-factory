@@ -18,18 +18,20 @@ PLATFORM_LLM_PROVIDER / PLATFORM_LLM_MODEL    # override default
 
 ## ARCH — FastAPI + Jinja2 + HTMX + SSE (no WS, zero build step)
 ```
-Web (routes, templates/117)  → HTMX endpoints, Jinja2 HTML
+Web (routes, templates/123)  → HTMX endpoints, Jinja2 HTML
 Sessions (runner.py)         → User↔Agent bridge, SSE events
 Agents (executor.py)         → Tool-call loop (max 15 rds)
 Orchestrator (engine.py)     → 26 pattern impls (solo→fractal→mob)
 Epic Orch (epic_orch.py)     → Mission phases, sprint loop, platform-aware prompts
 A2A (bus.py, veto.py)        → Inter-agent msg + veto hierarchy
-LLM (client.py)              → Multi-provider auto-fallback (azure→minimax→local)
+LLM (client.py)              → 5-provider auto-fallback (azure→minimax→local)
 Memory (manager.py)          → 4-layer: project/global/vector/short-term
 Bricks (bricks/)             → Modular infra: docker, github, sonarqube, rag
-DB (adapter.py)              → PG16 WAL+FTS5 (~35 tables) | SQLite fb
+DB (adapter.py)              → PG16 WAL+FTS5 (61 tables) | SQLite fb
 Security (security/)         → prompt_guard, output_validator, audit, sanitize
 AC (ac/)                     → reward(14-dim), convergence, experiments, skill_thompson
+PUA (pua.py)                 → Pressure escalation L1-L4, 5-step debug, cross-agent pressure
+Traceability (traceability/) → legacy_items, links, coverage, validation + scheduled sweep
 ```
 
 ## EXECUTOR — agents/executor.py
@@ -38,13 +40,21 @@ Dev agents keep tools penultimate rd (non-dev → synthesis at rd N-2)
 Tools: code_read/write/edit/search, build, test, git_*, memory_*, deep_search, list_files
 `_TOOL_SCHEMAS` cached global — restart to refresh
 
+## PUA MOTIVATION — agents/pua.py (source: tanweai/pua, MIT)
+Pressure escalation on adversarial retry: L1=mild → L2=soul → L3=review+5-step → L4=graduation
+Iron Rules + Proactivity injected into ALL agent prompts via prompt_builder.py
+Debug 5-step: Smell → Elevate → Mirror → Execute → Retrospective
+Cross-agent pressure: peer success/failure context from run.nodes
+build_retry_prompt() assembles: feedback + pressure + debug + peer + task + protocol
+
 ## RLM — agents/rlm.py (arXiv:2512.24601)
 WRITE-EXECUTE-OBSERVE-DECIDE loop, 10 iter max, 8K findings cap
 Triggered by `deep_search` — deterministic sub-agents (no LLM)
 
 ## LLM — llm/client.py
-Fallback: azure → azure-ai → minimax → nvidia → local-mlx
+Fallback: azure-oai → azure-ai → minimax → nvidia → local-mlx
 Azure: `max_completion_tokens` (not max_tokens) · MiniMax: auto-strips `<think>`
+Think-strip safety: NEVER produce empty — keep original as fallback
 GPT-5.x: reasoning models, budget ≥16K (reasoning eats from budget)
 Singleton: `get_llm_client()` · Rate: 15rpm (Redis or in-mem)
 
@@ -56,14 +66,13 @@ Singleton: `get_llm_client()` · Rate: 15rpm (Redis or in-mem)
   MISSING_UUID_REF · MISSING_TRACEABILITY · FAKE_TESTS · NO_TESTS ·
   SECURITY_VULN · PII_LEAK · PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE
 **L1 LLM semantic:** semi-formal reasoning (arXiv:2603.01896) — premises→trace→verdict
-**Score:** <5=pass · 5-6=soft · ≥7=reject · HALLUCINATION/SLOP/FAKE_BUILD/STACK_MISMATCH → force reject
-MAX_ADVERSARIAL_RETRIES=1 (2 attempts total) — exhausted → FAILED, output discarded
+**Score:** <5=pass · 5-6=soft · ≥7=reject · HALLUC/SLOP/FAKE_BUILD/STACK_MISMATCH → force reject
+MAX_ADVERSARIAL_RETRIES=1 (2 attempts) — PUA escalation on retry — exhausted → FAILED
 
 ## STACK ENFORCEMENT — epic orch + adversarial
 `_detect_project_platform(ws, brief)` → rust-native | macos-native | ios-native | android-native | web-node | web-docker | web-static
 Priority: brief keywords → .stack file → filesystem (Cargo.toml, package.json, etc.)
-Platform-specific prompts injected: build cmd, file structure, QA/deploy/CICD instructions
-STACK_MISMATCH L0 rejects wrong-lang code (e.g. .ts in Rust project) → score +7
+STACK_MISMATCH L0 rejects wrong-lang code → score +7
 
 ## PATTERNS — patterns/engine.py + impls/ (26)
 solo · sequential · parallel · hierarchical · loop · network/debate · router ·
@@ -73,6 +82,13 @@ relay · mob · map_reduce · blackboard · composite
 Protocols: DECOMPOSE(lead) · EXEC(dev) · QA · REVIEW · RESEARCH · CICD
 Role match: "dev","lead","veloppeur","engineer","coder","tdd","worker","fullstack"
 
+## TRACEABILITY — traceability/ + ops/traceability_scheduler.py
+Dedicated team: trace-lead(Nadia) · trace-auditor(Mehdi) · trace-writer(Sophie) · trace-monitor(Lucas)
+Role: "traceability" in _classify_agent_role → full tool set (legacy_scan, link, coverage, validate)
+Scheduler: every 6h, all active projects, Phase 1=lightweight scan, Phase 2=launch mission if <80%
+Workflow: traceability-sweep.yaml (4 phases: audit→fix→validate→memory-sync)
+PM v2 guidance: auto-insert traceability-check after dev phases, always for migration projects
+
 ## QUALITY — metrics/quality.py (KISS)
 QualityScanner.scan_architecture: LOC(>200) · GOD_FILE(>3types) ·
 COGNITIVE_COMPLEXITY(>25) · DEEP_NESTING(>5lvl) · HIGH_COUPLING(>12imp)
@@ -80,6 +96,11 @@ Det only, no ext deps — indent-tracking + regex
 
 ## BRICKS — bricks/ (modular infra)
 docker.py · github.py · sonarqube.py · rag.py — self-contained, wirable as tools
+
+## SCHEDULED OPS (15 bg tasks from server.py lifespan)
+auto_resume(5min) · evolution(02:00 nightly) · traceability(6h) · auto_heal(60s)
+platform_watchdog · endurance_watchdog · zombie_cleanup · mcp_watchdog
+heal_seed · darwin_seed · simulator_seed · redis_sse · pg_notify
 
 ## CONVENTIONS
 - `@dataclass` + Store singletons (not Pydantic) — `get_agent_store()`, `get_llm_client()`
@@ -91,4 +112,4 @@ docker.py · github.py · sonarqube.py · rag.py — self-contained, wirable as 
 - `from __future__ import annotations` for fwd refs
 
 ## STATS
-207 agents · 26 pattern impls · 49 workflows · 139 skills · 53 tool files · 4 bricks · 117 templates
+~215 agents · 26 patterns · 29 phase tpl · 50 workflows · 57 tool mods · 1091 skills · 4 bricks · 123 templates · 375py/148KLOC · 61 PG tables · 17 ops mods · 5 LLM providers
