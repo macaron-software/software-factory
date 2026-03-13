@@ -545,6 +545,53 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
         return f"Memory store error: {e}"
 
 
+async def _tool_memory_retrieve(args: dict, ctx: ExecutionContext) -> str:
+    """Retrieve a specific memory entry by exact key."""
+    from ..memory.manager import get_memory_manager
+
+    key = args.get("key", "")
+    if not key:
+        return "Error: key is required"
+    if not ctx.project_id:
+        return "Error: no project context"
+    try:
+        mem = get_memory_manager()
+        entry = mem.project_retrieve(ctx.project_id, key)
+        if not entry:
+            return f"No memory entry found for key '{key}'"
+        return (
+            f"[{entry.get('category', '')}] {entry.get('key', '')}: "
+            f"{entry.get('value', '')}\n"
+            f"  confidence={entry.get('confidence', 0)} "
+            f"source={entry.get('source', '')} "
+            f"updated={entry.get('updated_at', '')}"
+        )
+    except Exception as e:
+        return f"Memory retrieve error: {e}"
+
+
+async def _tool_memory_prune(args: dict, ctx: ExecutionContext) -> str:
+    """Delete memory entries by key, category, or age."""
+    from ..memory.manager import get_memory_manager
+
+    if not ctx.project_id:
+        return "Error: no project context"
+    key = args.get("key")
+    category = args.get("category")
+    older_than_days = args.get("older_than_days")
+    if not key and not category and not older_than_days:
+        return "Error: at least one filter required (key, category, or older_than_days)"
+    try:
+        mem = get_memory_manager()
+        deleted = mem.project_prune(
+            ctx.project_id, key=key, category=category,
+            older_than_days=older_than_days,
+        )
+        return f"Pruned {deleted} memory entries from project {ctx.project_id}"
+    except Exception as e:
+        return f"Memory prune error: {e}"
+
+
 async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
     """RLM: Deep recursive search (MIT CSAIL arXiv:2512.24601)."""
     from .rlm import get_project_rlm
@@ -2187,6 +2234,10 @@ async def _execute_tool(
         return await _tool_memory_search(args, ctx)
     if name == "memory_store":
         return await _tool_memory_store(args, ctx)
+    if name == "memory_retrieve":
+        return await _tool_memory_retrieve(args, ctx)
+    if name == "memory_prune":
+        return await _tool_memory_prune(args, ctx)
     if name in ("plan_create", "plan_update", "plan_get"):
         from ..tools.plan_tools import (
             _tool_plan_create,

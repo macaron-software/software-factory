@@ -770,6 +770,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Traceability scheduler failed to start: %s", e)
 
+    # Knowledge scheduler — nightly knowledge maintenance on all projects (04:00 UTC)
+    try:
+        from .ops.knowledge_scheduler import knowledge_scheduler_loop
+
+        if _mode != "ui":
+            asyncio.create_task(knowledge_scheduler_loop())
+            logger.info("Knowledge scheduler started (nightly 04:00 UTC)")
+        else:
+            logger.info("Knowledge scheduler SKIPPED (PLATFORM_MODE=ui)")
+    except Exception as e:
+        logger.warning("Knowledge scheduler failed to start: %s", e)
+
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
         from .epics.store import get_epic_run_store

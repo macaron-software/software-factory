@@ -14,25 +14,11 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Optional
 
 from ..db.migrations import get_db
 
 logger = logging.getLogger(__name__)
-
-
-def _serialize_row(r) -> dict:
-    """Convert a DB row to a JSON-serializable dict (datetime → ISO str, Decimal → float)."""
-    out = {}
-    for k, v in r.items() if hasattr(r, "items") else dict(r).items():
-        if isinstance(v, datetime):
-            out[k] = v.isoformat()
-        elif isinstance(v, Decimal):
-            out[k] = float(v)
-        else:
-            out[k] = v
-    return out
 
 
 def _compute_relevance(
@@ -72,6 +58,69 @@ class MemoryEntry:
     scope_id: str = ""  # session_id, project_id, or "global"
     layer: str = "project"  # session | pattern | project | global
     created_at: str = ""
+
+
+_MEMORY_COMPRESS_THRESHOLD = int(__import__("os").environ.get("MEMORY_COMPRESS_THRESHOLD", "50"))
+_MEMORY_COMPRESS_KEEP = 20  # Keep the N most recent after compression
+
+
+def _maybe_compress_project_memory(project_id: str) -> None:
+    """If project memory exceeds threshold, LLM-summarize oldest entries into one compressed record."""
+    try:
+        conn = get_db()
+        try:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM memory_project WHERE project_id=?", (project_id,)
+            ).fetchone()[0]
+            if count <= _MEMORY_COMPRESS_THRESHOLD:
+                return
+            # Fetch oldest entries (exclude the most recent ones we want to keep)
+            old_rows = conn.execute(
+                "SELECT id, category, key, value FROM memory_project"
+                " WHERE project_id=?"
+                " ORDER BY COALESCE(updated_at, created_at) ASC"
+                f" LIMIT {count - _MEMORY_COMPRESS_KEEP}",
+                (project_id,),
+            ).fetchall()
+            if not old_rows:
+                return
+            old_ids = [r["id"] for r in old_rows]
+            # Build a summary text from old entries
+            snippets = [f"[{r['category']}/{r['key']}] {r['value'][:200]}" for r in old_rows]
+            combined_text = "\n".join(snippets)
+            # LLM summarization (non-blocking, best-effort)
+            try:
+                from ..llm.client import LLMMessage, get_llm_client
+                client = get_llm_client()
+                resp = client.chat(
+                    messages=[
+                        LLMMessage(role="user", content=(
+                            "Résume ces entrées de mémoire projet en un paragraphe dense "
+                            "(max 500 chars), conserve les faits clés:\n\n" + combined_text
+                        ))
+                    ],
+                    max_tokens=200,
+                )
+                summary = resp.content.strip() if resp and resp.content else combined_text[:500]
+            except Exception:
+                summary = combined_text[:500]
+            # Delete old entries and insert compressed summary
+            placeholders = ",".join("?" * len(old_ids))
+            conn.execute(f"DELETE FROM memory_project WHERE id IN ({placeholders})", old_ids)
+            conn.execute(
+                "INSERT INTO memory_project (project_id, category, key, value, confidence, source, relevance_score)"
+                " VALUES (?, 'context', '_compressed_summary', ?, 0.7, 'system', 0.7)",
+                (project_id, summary),
+            )
+            conn.commit()
+            logger.info(
+                "memory: compressed %d old entries for project %s → 1 summary",
+                len(old_ids), project_id,
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.debug("memory: compression skipped: %s", e)
 
 
 class MemoryManager:
@@ -117,7 +166,7 @@ class MemoryManager:
         params.append(limit)
         rows = conn.execute(q, params).fetchall()
         conn.close()
-        return [_serialize_row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     def pattern_search(
         self, session_id: str, query: str, limit: int = 20
@@ -129,7 +178,7 @@ class MemoryManager:
             (session_id, f"%{query}%", f"%{query}%", limit),
         ).fetchall()
         conn.close()
-        return [_serialize_row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     # ── Project Memory (Layer 3) ────────────────────────────────
 
@@ -143,30 +192,6 @@ class MemoryManager:
         confidence: float = 0.5,
         agent_role: str = "",
     ) -> int:
-        # REF: arXiv:2602.20021 — SBD-10/SBD-11: sanitize memory writes to prevent
-        # cross-agent propagation of injection payloads and partial system takeover.
-        try:
-            from ..security.sanitize import sanitize_agent_output as _san
-
-            key = _san(key, f"memory_project:{project_id}")[:200]
-            value = _san(value, f"memory_project:{project_id}")[:8192]
-        except Exception:
-            pass
-        # REF: arXiv:2602.20021 — CS10: warn when storing externally-editable URLs.
-        import re as _re
-
-        _EXT_URL_RE = _re.compile(
-            r"https?://(?:gist\.github|raw\.githubusercontent|pastebin|hastebin|ghostbin|rentry|dpaste|bpaste)\.",
-            _re.I,
-        )
-        if _EXT_URL_RE.search(value):
-            logger.warning(
-                "SECURITY[CS10] project_store key=%r contains external URL — "
-                "indirect injection channel risk (arXiv:2602.20021 CS10). "
-                "project=%s",
-                key,
-                project_id,
-            )
         now = datetime.now(timezone.utc).isoformat()
         relevance = _compute_relevance(confidence, now, 0)
         conn = get_db()
@@ -201,6 +226,8 @@ class MemoryManager:
             conn.commit()
             rid = cur.lastrowid
         conn.close()
+        # Compress if project memory is growing too large
+        _maybe_compress_project_memory(project_id)
         return rid
 
     def project_get(
@@ -237,7 +264,10 @@ class MemoryManager:
         conn.close()
         result = []
         for r in rows:
-            row = _serialize_row(r)
+            row = dict(r)
+            for k, v in row.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
             result.append(row)
         return result
 
@@ -286,7 +316,59 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [_serialize_row(r) for r in rows]
+        return [dict(r) for r in rows]
+
+    def project_retrieve(self, project_id: str, key: str) -> dict | None:
+        """Retrieve a single memory entry by exact key."""
+        conn = get_db()
+        row = conn.execute(
+            "SELECT * FROM memory_project WHERE project_id=? AND key=? LIMIT 1",
+            (project_id, key),
+        ).fetchone()
+        if row:
+            try:
+                conn.execute(
+                    "UPDATE memory_project SET access_count=COALESCE(access_count,0)+1, "
+                    "last_read_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (row["id"],),
+                )
+                conn.commit()
+            except Exception:
+                pass
+        conn.close()
+        return dict(row) if row else None
+
+    def project_prune(
+        self,
+        project_id: str,
+        key: str | None = None,
+        category: str | None = None,
+        older_than_days: int | None = None,
+    ) -> int:
+        """Delete memory entries. Returns count deleted."""
+        conn = get_db()
+        conditions = ["project_id=?"]
+        params: list = [project_id]
+        if key:
+            conditions.append("key=?")
+            params.append(key)
+        if category:
+            conditions.append("category=?")
+            params.append(category)
+        if older_than_days:
+            conditions.append(
+                "updated_at < datetime('now', ? || ' days')"
+            )
+            params.append(f"-{older_than_days}")
+        if len(conditions) < 2:
+            conn.close()
+            return 0  # safety: refuse to delete ALL project memory without filter
+        where = " AND ".join(conditions)
+        cursor = conn.execute(f"DELETE FROM memory_project WHERE {where}", params)
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
 
     # ── Global Memory (Layer 4) ──────────────────────────────────
 
@@ -298,28 +380,6 @@ class MemoryManager:
         project_id: str = "",
         confidence: float = 0.5,
     ) -> int:
-        # REF: arXiv:2602.20021 — SBD-10/SBD-11: sanitize global memory writes.
-        # memory_global is world-readable → a poisoned entry propagates to ALL agents.
-        try:
-            from ..security.sanitize import sanitize_agent_output as _san
-
-            key = _san(key, "memory_global")[:200]
-            value = _san(value, "memory_global")[:8192]
-        except Exception:
-            pass
-        # REF: arXiv:2602.20021 — CS10: warn when storing externally-editable URLs in global memory.
-        import re as _re
-
-        _EXT_URL_RE = _re.compile(
-            r"https?://(?:gist\.github|raw\.githubusercontent|pastebin|hastebin|ghostbin|rentry|dpaste|bpaste)\.",
-            _re.I,
-        )
-        if _EXT_URL_RE.search(value):
-            logger.warning(
-                "SECURITY[CS10] global_store key=%r contains external URL — "
-                "indirect injection channel risk (arXiv:2602.20021 CS10)",
-                key,
-            )
         now = datetime.now(timezone.utc).isoformat()
         conn = get_db()
         existing = conn.execute(
@@ -364,67 +424,7 @@ class MemoryManager:
                 (limit,),
             ).fetchall()
         conn.close()
-        return [_serialize_row(r) for r in rows]
-
-    def project_retrieve(self, project_id: str, key: str) -> dict | None:
-        """Exact key lookup in project memory — explicit LTM retrieval (AgeMem pattern).
-
-        WHY: fuzzy search misses exact keys; agents need deterministic retrieval
-        for decisions stored under a known key (e.g. 'architecture_decision_db').
-        Ref: AgeMem arXiv:2601.01885, 2026-03.
-        """
-        conn = get_db()
-        row = conn.execute(
-            "SELECT * FROM memory_project WHERE project_id=? AND key=? ORDER BY updated_at DESC LIMIT 1",
-            (project_id, key),
-        ).fetchone()
-        conn.close()
-        return dict(row) if row else None
-
-    def project_prune(
-        self,
-        project_id: str,
-        key: str | None = None,
-        category: str | None = None,
-        older_than_days: int | None = None,
-        source: str | None = None,
-    ) -> int:
-        """Remove memory entries — explicit STM/LTM pruning (AgeMem pattern).
-
-        Returns number of rows deleted.
-        WHY: agents should control what to forget; heuristic-only pruning discards
-        rare-but-critical details. Explicit prune lets the agent decide.
-        Ref: AgeMem arXiv:2601.01885, 2026-03.
-        """
-        conn = get_db()
-        conditions = ["project_id=?"]
-        params: list = [project_id]
-        if key:
-            conditions.append("key=?")
-            params.append(key)
-        if category:
-            conditions.append("category=?")
-            params.append(category)
-        if source:
-            conditions.append("source=?")
-            params.append(source)
-        if older_than_days is not None:
-            from ..db.adapter import is_postgresql
-
-            if is_postgresql():
-                conditions.append(
-                    f"updated_at < NOW() - INTERVAL '{older_than_days} days'"
-                )
-            else:
-                conditions.append(
-                    f"updated_at < datetime('now', '-{older_than_days} days')"
-                )
-        where = " AND ".join(conditions)
-        cur = conn.execute(f"DELETE FROM memory_project WHERE {where}", params)
-        deleted = cur.rowcount
-        conn.commit()
-        conn.close()
-        return deleted
+        return [dict(r) for r in rows]
 
     def global_search(self, query: str, limit: int = 20) -> list[dict]:
         from ..db.adapter import is_postgresql
@@ -457,7 +457,7 @@ class MemoryManager:
                 (f"%{query}%", f"%{query}%", limit),
             ).fetchall()
         conn.close()
-        return [_serialize_row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     # ── Vector Search (semantic, embedding-based) ──────────────────
 
