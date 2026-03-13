@@ -520,10 +520,15 @@ def check_l0(
             # Token/variable definition files legitimately contain hex colors
             _fn = file_path.lower().rsplit("/", 1)[-1] if "/" in file_path else file_path.lower()
             is_token_file = any(k in _fn for k in ("token", "variable", "theme", "palette"))
+            # Scripts/tools use emoji in CLI output (✅/❌) — not user-facing UI
+            is_script_file = "/scripts/" in file_path.lower() or "/tools/" in file_path.lower() or _fn.startswith("lint")
             slop_hits = 0
             for pattern, desc in _CODE_SLOP_PATTERNS:
                 # Skip hex-color check in token definition files
                 if is_token_file and "hardcoded hex" in desc:
+                    continue
+                # Skip emoji check in scripts/tools (CLI output, not UI)
+                if is_script_file and "emoji" in desc:
                     continue
                 if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
                     issues.append(f"CODE_SLOP: {desc} in {file_path}")
