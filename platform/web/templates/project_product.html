@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_hub_cards, skeleton_table, skeleton_timeline %}
+
+{% block content %}
+<style>
+/* ── Product View ── */
+.hub{max-width:1400px;margin:0 auto;padding:1.5rem 1rem}
+.hub-header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.hub-title{font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0}
+.hub-type{font-size:.7rem;padding:.15rem .55rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);font-weight:600;text-transform:uppercase}
+.hub-health{display:flex;align-items:center;gap:.5rem;margin-left:auto}
+.hub-health-label{font-size:.75rem;color:var(--text-secondary)}
+.hub-health-bar{width:80px;height:8px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden}
+.hub-health-fill{height:100%;border-radius:4px;background:var(--green);transition:width .4s}
+.hub-health-fill.med{background:var(--yellow)}
+.hub-health-fill.low{background:var(--red)}
+.hub-health-score{font-size:.8rem;font-weight:700;color:var(--text-primary);min-width:2.5rem}
+.hub-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.25rem;overflow-x:auto}
+.hub-tab{padding:.55rem 1.1rem;font-size:.82rem;font-weight:500;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s}
+.hub-tab:hover{color:var(--text-primary)}
+.hub-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.hub-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:99px;font-size:.65rem;font-weight:700;margin-left:.35rem}
+.hub-panel{display:none}.hub-panel.active{display:block}
+.hub-stats{display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.hub-stat{display:flex;flex-direction:column;align-items:center;padding:.45rem .85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);min-width:65px;cursor:default}
+.hub-stat-val{font-size:1.25rem;font-weight:700;color:var(--text-primary);line-height:1.1}
+.hub-stat-lbl{font-size:.6rem;color:var(--text-tertiary);text-transform:uppercase;margin-top:.1rem;letter-spacing:.04em}
+.hub-empty{text-align:center;padding:1.25rem;color:var(--text-tertiary);font-size:.8rem;border:1px dashed var(--border);border-radius:var(--radius);margin-bottom:.5rem}
+.vision-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:.75rem}
+.vision-card-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);margin-bottom:.5rem}
+
+/* ── Persona cards ── */
+.pv-persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.pv-persona-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;transition:border-color .15s}
+.pv-persona-card:hover{border-color:var(--accent)}
+.pv-persona-name{font-size:.88rem;font-weight:700;color:var(--text-primary);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
+.pv-persona-desc{font-size:.78rem;color:var(--text-secondary);line-height:1.45;margin-bottom:.5rem}
+.pv-persona-section{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);margin:.5rem 0 .2rem}
+.pv-persona-list{list-style:none;padding:0;margin:0}
+.pv-persona-list li{font-size:.75rem;color:var(--text-secondary);padding:.15rem 0;padding-left:.7rem;position:relative}
+.pv-persona-list li::before{content:'';position:absolute;left:0;top:.55rem;width:4px;height:4px;border-radius:50%;background:var(--accent)}
+
+/* ── Journey cards ── */
+.pv-journey{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.75rem}
+.pv-journey-title{font-size:.88rem;font-weight:700;color:var(--text-primary);margin-bottom:.2rem}
+.pv-journey-persona{font-size:.7rem;color:var(--accent);margin-bottom:.6rem}
+.pv-journey-steps{display:flex;flex-direction:column;gap:0;margin:.5rem 0;padding-left:.5rem;border-left:2px solid var(--border)}
+.pv-journey-step{display:flex;align-items:flex-start;gap:.5rem;padding:.35rem 0;position:relative}
+.pv-journey-dot{width:18px;height:18px;border-radius:50%;background:var(--bg-tertiary);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:var(--accent);flex-shrink:0;margin-left:-.6rem}
+.pv-journey-step-text{font-size:.78rem;color:var(--text-primary);line-height:1.4}
+.pv-journey-section{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);margin:.6rem 0 .2rem}
+.pv-journey-tag{display:inline-block;font-size:.68rem;padding:.12rem .4rem;border-radius:99px;margin:.1rem .15rem .1rem 0}
+.pv-journey-pain{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171}
+.pv-journey-opp{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ade80}
+
+/* ── Feature table ── */
+.pv-feature-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.pv-feature-table th{text-align:left;padding:.5rem .75rem;font-size:.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--border);background:var(--bg-secondary)}
+.pv-feature-table td{padding:.5rem .75rem;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle}
+.pv-feature-table tbody tr:nth-child(even) td{background:var(--bg-secondary)}
+.pv-feature-table tbody tr:hover td{background:var(--bg-tertiary)}
+.pv-feature-table .sort-header{cursor:pointer;user-select:none}
+.pv-feature-table .sort-header:hover{color:var(--accent)}
+
+/* ── Traceability matrix ── */
+.pv-trace-stats{display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.pv-trace-stat{display:flex;flex-direction:column;align-items:center;padding:.55rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);min-width:100px}
+.pv-trace-stat-val{font-size:1.3rem;font-weight:700;line-height:1.1}
+.pv-trace-stat-lbl{font-size:.62rem;color:var(--text-tertiary);text-transform:uppercase;margin-top:.15rem;letter-spacing:.04em}
+.pv-trace-matrix{width:100%;border-collapse:collapse;font-size:.78rem}
+.pv-trace-matrix th{text-align:left;padding:.5rem .65rem;font-size:.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--border);background:var(--bg-secondary)}
+.pv-trace-matrix td{padding:.45rem .65rem;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle}
+.pv-trace-matrix tbody tr:hover td{background:var(--bg-secondary)}
+.pv-cov-high{color:var(--green);font-weight:700}
+.pv-cov-med{color:var(--yellow);font-weight:700}
+.pv-cov-low{color:var(--red);font-weight:700}
+
+/* ── Memory files ── */
+.pv-memory-file{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;overflow:hidden}
+.pv-memory-file summary{padding:.55rem .85rem;font-size:.8rem;font-weight:600;color:var(--text-primary);cursor:pointer;display:flex;align-items:center;gap:.5rem;list-style:none}
+.pv-memory-file summary::-webkit-details-marker{display:none}
+.pv-memory-file summary::before{content:'';width:0;height:0;border-left:5px solid var(--text-tertiary);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;flex-shrink:0}
+.pv-memory-file[open] summary::before{transform:rotate(90deg)}
+.pv-memory-file-meta{font-size:.65rem;color:var(--text-tertiary);margin-left:auto;flex-shrink:0}
+.pv-memory-file-content{padding:.65rem .85rem;border-top:1px solid var(--border);font-size:.75rem;color:var(--text-secondary);line-height:1.55;white-space:pre-wrap;font-family:monospace;max-height:300px;overflow-y:auto}
+.pv-memory-search{display:flex;gap:.5rem;margin-bottom:1rem}
+.pv-memory-search input{flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.45rem .7rem;font-size:.8rem;color:var(--text-primary);outline:none;font-family:inherit}
+.pv-memory-search input:focus{border-color:var(--accent)}
+.pv-memory-search button{padding:.45rem .85rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:.78rem;cursor:pointer;font-weight:600;flex-shrink:0}
+.pv-memory-search button:hover{opacity:.88}
+
+/* ── Architecture docs ── */
+.pv-arch-doc{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;overflow:hidden}
+.pv-arch-doc summary{padding:.55rem .85rem;font-size:.8rem;font-weight:600;color:var(--text-primary);cursor:pointer;display:flex;align-items:center;gap:.5rem;list-style:none}
+.pv-arch-doc summary::-webkit-details-marker{display:none}
+.pv-arch-doc summary::before{content:'';width:0;height:0;border-left:5px solid var(--text-tertiary);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;flex-shrink:0}
+.pv-arch-doc[open] summary::before{transform:rotate(90deg)}
+.pv-arch-doc-content{padding:.75rem .85rem;border-top:1px solid var(--border);font-size:.78rem;color:var(--text-secondary);line-height:1.6}
+.pv-arch-doc-path{font-size:.65rem;color:var(--text-tertiary);font-family:monospace;margin-left:auto}
+
+/* ── PO card ── */
+.pv-po-card{display:flex;align-items:center;gap:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem;margin-bottom:.75rem}
+.pv-po-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;color:#fff;flex-shrink:0}
+.pv-po-info{flex:1;min-width:0}
+.pv-po-name{font-size:.82rem;font-weight:700;color:var(--text-primary)}
+.pv-po-role{font-size:.68rem;color:var(--text-tertiary)}
+
+/* ── Editable vision ── */
+.pv-vision-text{font-size:.8rem;color:var(--text-secondary);line-height:1.55;white-space:pre-wrap;min-height:40px}
+.pv-vision-edit{width:100%;min-height:80px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .7rem;font-size:.8rem;color:var(--text-primary);outline:none;resize:vertical;font-family:inherit;line-height:1.55}
+.pv-vision-edit:focus{border-color:var(--accent)}
+.pv-btn-sm{padding:.3rem .7rem;font-size:.72rem;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--border);background:none;color:var(--text-secondary);transition:all .15s}
+.pv-btn-sm:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.pv-btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pv-btn-accent:hover{opacity:.88;background:var(--accent);color:#fff}
+</style>
+
+<div class="hub">
+
+  <!-- ═══ Header ═══ -->
+  <div class="hub-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <h1 class="hub-title">{{ project.name }}</h1>
+        <span class="hub-type" style="color:var(--accent);border-color:var(--accent)">Vue Produit</span>
+      </div>
+      <div style="margin-top:.3rem">
+        <a href="/projects/{{ project.id }}/hub" style="font-size:.78rem;color:var(--text-secondary);text-decoration:none;display:inline-flex;align-items:center;gap:.3rem">
+          <svg class="icon icon-xs"><use href="#icon-arrow-left"/></svg> Hub technique
+        </a>
+      </div>
+    </div>
+    <div class="hub-health">
+      <span class="hub-health-label">Sante</span>
+      <div class="hub-health-bar">
+        <div class="hub-health-fill {% if health >= 70 %}{% elif health >= 40 %}med{% else %}low{% endif %}" style="width:{{ health }}%"></div>
+      </div>
+      <span class="hub-health-score">{{ health }}%</span>
+    </div>
+  </div>
+
+  <!-- ═══ Stats ═══ -->
+  <div class="hub-stats">
+    <div class="hub-stat"><span class="hub-stat-val">{{ personas|length }}</span><span class="hub-stat-lbl">Personas</span></div>
+    <div class="hub-stat"><span class="hub-stat-val">{{ journeys|length }}</span><span class="hub-stat-lbl">Parcours</span></div>
+    <div class="hub-stat"><span class="hub-stat-val">{{ features|length }}</span><span class="hub-stat-lbl">Features</span></div>
+    <div class="hub-stat"><span class="hub-stat-val">{{ memory_files|length }}</span><span class="hub-stat-lbl">Memoires</span></div>
+    {% if traceability %}
+    <div class="hub-stat">
+      <span class="hub-stat-val" style="color:var(--green)">{% if traceability.features_total > 0 %}{{ (traceability.features_with_tests / traceability.features_total * 100)|int }}{% else %}0{% endif %}%</span>
+      <span class="hub-stat-lbl">Couverture</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ Tabs ═══ -->
+  <div class="hub-tabs">
+    <div class="hub-tab active" onclick="hubTab(this,'produit')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-package"/></svg>Produit</div>
+    <div class="hub-tab" onclick="hubTab(this,'personas')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-users"/></svg>Personas <span class="hub-tab-badge">{{ personas|length }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'parcours')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-map"/></svg>Parcours <span class="hub-tab-badge">{{ journeys|length }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'features')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-layers"/></svg>Features <span class="hub-tab-badge">{{ features|length }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'architecture')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-cpu"/></svg>Architecture</div>
+    <div class="hub-tab" onclick="hubTab(this,'tracabilite')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-git-branch"/></svg>Tracabilite</div>
+    <div class="hub-tab" onclick="hubTab(this,'memoires')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-database"/></svg>Memoires <span class="hub-tab-badge">{{ memory_files|length }}</span></div>
+  </div>
+
+  <!-- ═══════════════════ TAB 1: PRODUIT ═══════════════════ -->
+  <div class="hub-panel active" id="panel-produit">
+
+    <!-- Vision -->
+    <div class="vision-card" id="pv-vision-card">
+      <div class="vision-card-title" style="display:flex;justify-content:space-between;align-items:center">
+        Vision
+        <button class="pv-btn-sm" onclick="pvToggleVision()">
+          <svg class="icon icon-xs"><use href="#icon-edit-2"/></svg>
+        </button>
+      </div>
+      <div id="pv-vision-display">
+        {% if project.vision %}
+        <div class="pv-vision-text">{{ project.vision }}</div>
+        {% else %}
+        <div class="pv-vision-text" style="color:var(--text-tertiary);font-style:italic">Aucune vision definie</div>
+        {% endif %}
+      </div>
+      <div id="pv-vision-form" style="display:none">
+        <textarea class="pv-vision-edit"
+                  id="pv-vision-input"
+                  placeholder="Vision du produit...">{{ project.vision or '' }}</textarea>
+        <div style="display:flex;gap:.4rem;margin-top:.4rem;justify-content:flex-end">
+          <button class="pv-btn-sm" onclick="pvToggleVision()">Annuler</button>
+          <button class="pv-btn-sm pv-btn-accent"
+                  hx-put="/api/projects/{{ project.id }}/vision"
+                  hx-include="#pv-vision-input"
+                  hx-swap="none"
+                  onclick="pvSaveVision()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Owner -->
+    {% if project.lead_agent_id %}
+    <div class="vision-card">
+      <div class="vision-card-title">Product Owner</div>
+      <div class="pv-po-card" style="margin-bottom:0;border:none;padding:0;background:none">
+        <div class="pv-po-avatar">PO</div>
+        <div class="pv-po-info">
+          <div class="pv-po-name">Agent #{{ project.lead_agent_id }}</div>
+          <div class="pv-po-role">Product Owner</div>
+        </div>
+        <a href="/agents/{{ project.lead_agent_id }}" class="pv-btn-sm" style="text-decoration:none">Voir</a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Product Requirements / OKRs -->
+    <div class="vision-card">
+      <div class="vision-card-title">Product Requirements</div>
+      {% set pr_config = (project.config or {}).get('pr', none) %}
+      {% if pr_config %}
+        {% if pr_config is mapping %}
+          {% for key, val in pr_config.items() %}
+          <div style="margin-bottom:.5rem">
+            <div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:.15rem">{{ key }}</div>
+            <div style="font-size:.78rem;color:var(--text-primary);line-height:1.5">{{ val }}</div>
+          </div>
+          {% endfor %}
+        {% elif pr_config is iterable and pr_config is not string %}
+          <ul style="list-style:none;padding:0;margin:0">
+            {% for item in pr_config %}
+            <li style="font-size:.78rem;color:var(--text-primary);padding:.25rem 0;padding-left:.7rem;position:relative;border-bottom:1px solid var(--border)">
+              <span style="position:absolute;left:0;top:.55rem;width:4px;height:4px;border-radius:50%;background:var(--accent)"></span>
+              {{ item }}
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div style="font-size:.78rem;color:var(--text-primary);line-height:1.5">{{ pr_config }}</div>
+        {% endif %}
+      {% else %}
+      <div class="hub-empty">Aucun PR defini</div>
+      {% endif %}
+    </div>
+
+    <!-- Quick stats -->
+    {% if stats %}
+    <div class="vision-card">
+      <div class="vision-card-title">Indicateurs</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .8rem">
+        {% if stats.total is defined %}<div style="font-size:.72rem;color:var(--text-tertiary)">Epics <span style="color:var(--text-primary);font-weight:600">{{ stats.total }}</span></div>{% endif %}
+        {% if stats.features is defined %}<div style="font-size:.72rem;color:var(--text-tertiary)">Features <span style="color:var(--text-primary);font-weight:600">{{ stats.features }}</span></div>{% endif %}
+        {% if stats.stories is defined %}<div style="font-size:.72rem;color:var(--text-tertiary)">Stories <span style="color:var(--text-primary);font-weight:600">{{ stats.stories }}</span></div>{% endif %}
+        {% if stats.story_points %}<div style="font-size:.72rem;color:var(--text-tertiary)">Points <span style="color:var(--accent);font-weight:600">{{ stats.story_points }}</span></div>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 2: PERSONAS ═══════════════════ -->
+  <div class="hub-panel" id="panel-personas">
+    {% if personas %}
+    <div class="pv-persona-grid">
+      {% for p in personas %}
+      <div class="pv-persona-card">
+        <div class="pv-persona-name">
+          <svg class="icon icon-xs"><use href="#icon-user"/></svg>
+          {{ p.name }}
+        </div>
+        {% if p.description %}
+        <div class="pv-persona-desc">{{ p.description }}</div>
+        {% endif %}
+        {% if p.needs %}
+        <div class="pv-persona-section">Besoins</div>
+        <ul class="pv-persona-list">
+          {% for need in p.needs %}
+          <li>{{ need }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if p.pain_points %}
+        <div class="pv-persona-section">Points de friction</div>
+        <ul class="pv-persona-list">
+          {% for pain in p.pain_points %}
+          <li>{{ pain }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="hub-empty">
+      <div style="margin-bottom:.5rem">Aucune persona definie</div>
+      <button class="pv-btn-sm pv-btn-accent"
+              hx-post="/api/projects/{{ project.id }}/personas/generate"
+              hx-swap="innerHTML"
+              hx-target="#panel-personas">
+        <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Generer les personas
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 3: PARCOURS ═══════════════════ -->
+  <div class="hub-panel" id="panel-parcours">
+    {% if journeys %}
+      {% for j in journeys %}
+      <div class="pv-journey">
+        <div class="pv-journey-title">{{ j.title }}</div>
+        {% if j.persona %}
+        <div class="pv-journey-persona">
+          <svg class="icon icon-xs"><use href="#icon-user"/></svg> {{ j.persona }}
+        </div>
+        {% endif %}
+
+        {% if j.steps %}
+        <div class="pv-journey-steps">
+          {% for step in j.steps %}
+          <div class="pv-journey-step">
+            <div class="pv-journey-dot">{{ loop.index }}</div>
+            <div class="pv-journey-step-text">{{ step }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if j.pain_points %}
+        <div class="pv-journey-section">Points de friction</div>
+        <div>
+          {% for pain in j.pain_points %}
+          <span class="pv-journey-tag pv-journey-pain">{{ pain }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if j.opportunities %}
+        <div class="pv-journey-section">Opportunites</div>
+        <div>
+          {% for opp in j.opportunities %}
+          <span class="pv-journey-tag pv-journey-opp">{{ opp }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="hub-empty">
+      <div style="margin-bottom:.5rem">Aucun parcours utilisateur defini</div>
+      <button class="pv-btn-sm pv-btn-accent"
+              hx-post="/api/projects/{{ project.id }}/journeys/generate"
+              hx-swap="innerHTML"
+              hx-target="#panel-parcours">
+        <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Generer les parcours
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 4: FEATURES ═══════════════════ -->
+  <div class="hub-panel" id="panel-features">
+    {% if features %}
+    <table class="pv-feature-table" id="pv-feat-table">
+      <thead>
+        <tr>
+          <th class="sort-header" onclick="pvSortFeatures('name')">Nom</th>
+          <th>Epic</th>
+          <th class="sort-header" onclick="pvSortFeatures('priority')">Priorite (WSJF)</th>
+          <th>Statut</th>
+          <th class="sort-header" onclick="pvSortFeatures('story_points')">Points</th>
+          <th>Stories</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in features %}
+        <tr data-priority="{{ f.priority or 0 }}" data-name="{{ f.name }}" data-sp="{{ f.story_points or 0 }}">
+          <td style="font-weight:600">{{ f.name }}</td>
+          <td style="font-size:.75rem;color:var(--text-secondary)">{{ f.epic_name or '-' }}</td>
+          <td>
+            {% if f.priority %}
+            <span style="font-weight:700;color:{% if f.priority >= 20 %}var(--red){% elif f.priority >= 10 %}var(--yellow){% else %}var(--text-secondary){% endif %}">{{ f.priority }}</span>
+            {% else %}-{% endif %}
+          </td>
+          <td>
+            {% if f.status %}
+            <span class="badge-status {{ f.status|lower|replace(' ','_') }}">{{ f.status }}</span>
+            {% else %}-{% endif %}
+          </td>
+          <td>{{ f.story_points if f.story_points else '-' }}</td>
+          <td style="font-size:.75rem;color:var(--text-tertiary)">{{ f.stories_count if f.stories_count else 0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="hub-empty">
+      {{ skeleton_table(6) }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 5: ARCHITECTURE ═══════════════════ -->
+  <div class="hub-panel" id="panel-architecture">
+
+    <!-- Architecture docs -->
+    <div class="vision-card-title">Documents d'architecture</div>
+    {% if arch_docs %}
+      {% for doc in arch_docs %}
+      <details class="pv-arch-doc">
+        <summary>
+          <svg class="icon icon-xs"><use href="#icon-file-text"/></svg>
+          {{ doc.label or doc.path }}
+          <span class="pv-arch-doc-path">{{ doc.path }}</span>
+        </summary>
+        <div class="pv-arch-doc-content">{{ doc.content }}</div>
+      </details>
+      {% endfor %}
+    {% else %}
+    <div class="hub-empty">Aucun document d'architecture disponible</div>
+    {% endif %}
+
+    <!-- ADR section -->
+    <div class="vision-card-title" style="margin-top:1.25rem">Architecture Decision Records (ADR)</div>
+    {% set adrs = arch_docs|selectattr('path', 'containing', 'adr')|list if arch_docs else [] %}
+    {% if adrs %}
+      {% for adr in adrs %}
+      <details class="pv-arch-doc">
+        <summary>
+          <svg class="icon icon-xs"><use href="#icon-bookmark"/></svg>
+          {{ adr.label or adr.path }}
+          <span class="pv-arch-doc-path">{{ adr.path }}</span>
+        </summary>
+        <div class="pv-arch-doc-content">{{ adr.content }}</div>
+      </details>
+      {% endfor %}
+    {% else %}
+    <div class="hub-empty">Aucun ADR enregistre</div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 6: TRACABILITE ═══════════════════ -->
+  <div class="hub-panel" id="panel-tracabilite">
+    {% if traceability %}
+
+    <!-- Coverage stats -->
+    <div class="pv-trace-stats">
+      <div class="pv-trace-stat">
+        <span class="pv-trace-stat-val">{{ traceability.features_total }}</span>
+        <span class="pv-trace-stat-lbl">Features</span>
+      </div>
+      <div class="pv-trace-stat">
+        {% set code_pct = (traceability.features_with_code / traceability.features_total * 100)|int if traceability.features_total > 0 else 0 %}
+        <span class="pv-trace-stat-val {% if code_pct >= 80 %}pv-cov-high{% elif code_pct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ code_pct }}%</span>
+        <span class="pv-trace-stat-lbl">Avec code</span>
+      </div>
+      <div class="pv-trace-stat">
+        {% set test_pct = (traceability.features_with_tests / traceability.features_total * 100)|int if traceability.features_total > 0 else 0 %}
+        <span class="pv-trace-stat-val {% if test_pct >= 80 %}pv-cov-high{% elif test_pct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ test_pct }}%</span>
+        <span class="pv-trace-stat-lbl">Avec tests</span>
+      </div>
+    </div>
+
+    <!-- Matrix table -->
+    {% if traceability.matrix %}
+    <table class="pv-trace-matrix">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Stories</th>
+          <th>Fichiers code</th>
+          <th>Tests</th>
+          <th>Couverture</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in traceability.matrix %}
+        <tr>
+          <td style="font-weight:600">{{ row.feature }}</td>
+          <td style="font-size:.75rem">{{ row.stories }}</td>
+          <td style="font-size:.75rem">{{ row.code_files }}</td>
+          <td style="font-size:.75rem">{{ row.tests }}</td>
+          <td>
+            {% set cov = row.coverage or 0 %}
+            <span class="{% if cov >= 80 %}pv-cov-high{% elif cov >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ cov }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="hub-empty">Aucune donnee de tracabilite</div>
+    {% endif %}
+
+    {% else %}
+    <div class="hub-empty">Matrice de tracabilite non disponible</div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════ TAB 7: MEMOIRES ═══════════════════ -->
+  <div class="hub-panel" id="panel-memoires">
+
+    <!-- Search -->
+    <div class="pv-memory-search">
+      <input type="text" id="pv-mem-query" placeholder="Rechercher dans les memoires..."
+             hx-get="/api/memory/search"
+             hx-trigger="keyup changed delay:400ms"
+             hx-target="#pv-mem-results"
+             hx-include="this"
+             name="q">
+      <input type="hidden" name="project_id" value="{{ project.id }}">
+      <button hx-get="/api/memory/search"
+              hx-include="#pv-mem-query, [name=project_id]"
+              hx-target="#pv-mem-results">
+        <svg class="icon icon-xs"><use href="#icon-search"/></svg> Rechercher
+      </button>
+    </div>
+    <div id="pv-mem-results"></div>
+
+    <!-- File list -->
+    {% if memory_files %}
+      {% for mf in memory_files %}
+      <details class="pv-memory-file">
+        <summary>
+          <svg class="icon icon-xs"><use href="#icon-file"/></svg>
+          {{ mf.label or mf.path }}
+          <span class="pv-memory-file-meta">{{ mf.size|filesizeformat if mf.size else '' }}</span>
+        </summary>
+        <div class="pv-memory-file-content">{{ mf.content[:800] }}{% if mf.content|length > 800 %}...{% endif %}</div>
+      </details>
+      {% endfor %}
+    {% else %}
+    <div class="hub-empty" style="margin-top:.5rem">Aucun fichier memoire</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+/* ── Tab switching ── */
+function hubTab(el, name) {
+  document.querySelectorAll('.hub-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.hub-panel').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  var panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+}
+
+/* ── Vision edit toggle ── */
+function pvToggleVision() {
+  var disp = document.getElementById('pv-vision-display');
+  var form = document.getElementById('pv-vision-form');
+  if (form.style.display === 'none') {
+    form.style.display = 'block';
+    disp.style.display = 'none';
+  } else {
+    form.style.display = 'none';
+    disp.style.display = 'block';
+  }
+}
+
+function pvSaveVision() {
+  var val = document.getElementById('pv-vision-input').value;
+  var disp = document.getElementById('pv-vision-display');
+  disp.innerHTML = '<div class="pv-vision-text">' + (val || '<span style="color:var(--text-tertiary);font-style:italic">Aucune vision definie</span>') + '</div>';
+  document.getElementById('pv-vision-form').style.display = 'none';
+  disp.style.display = 'block';
+}
+
+/* ── Feature table sorting ── */
+var _pvSortDir = {};
+function pvSortFeatures(col) {
+  _pvSortDir[col] = !_pvSortDir[col];
+  var table = document.getElementById('pv-feat-table');
+  if (!table) return;
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort(function(a, b) {
+    var va, vb;
+    if (col === 'name') {
+      va = a.getAttribute('data-name') || '';
+      vb = b.getAttribute('data-name') || '';
+      return _pvSortDir[col] ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    if (col === 'priority') {
+      va = parseFloat(a.getAttribute('data-priority')) || 0;
+      vb = parseFloat(b.getAttribute('data-priority')) || 0;
+    }
+    if (col === 'story_points') {
+      va = parseFloat(a.getAttribute('data-sp')) || 0;
+      vb = parseFloat(b.getAttribute('data-sp')) || 0;
+    }
+    return _pvSortDir[col] ? va - vb : vb - va;
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+}
+
+/* ── Auto-open tab from URL param ── */
+(function(){
+  var params = new URLSearchParams(location.search);
+  var tab = params.get('tab');
+  if (tab) {
+    var tabs = document.querySelectorAll('.hub-tab');
+    tabs.forEach(function(t) {
+      if (t.textContent.toLowerCase().indexOf(tab) !== -1 || t.getAttribute('onclick').indexOf("'" + tab + "'") !== -1) {
+        hubTab(t, tab);
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

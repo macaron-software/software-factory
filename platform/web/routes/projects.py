@@ -436,6 +436,128 @@ async def project_hub(request: Request, project_id: str):
     )
 
 
+@router.get("/projects/{project_id}/product", response_class=HTMLResponse)
+async def project_product(request: Request, project_id: str):
+    """Product View — product-centric view with personas, journeys, features, traceability."""
+    from ...projects.manager import get_project_store
+    from ...missions.store import get_mission_store
+    from ...agents.store import get_agent_store
+    from ...memory.project_files import get_project_memory
+
+    ps = get_project_store()
+    project = ps.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    ms = get_mission_store()
+    all_m = ms.list_missions(limit=500)
+    proj_m = [m for m in all_m if m.project_id == project_id]
+
+    # Stats
+    active_count = sum(1 for m in proj_m if m.status == "active")
+    completed_count = sum(1 for m in proj_m if m.status == "completed")
+    blocked_count = sum(1 for m in proj_m if m.status == "blocked")
+    total = len(proj_m) or 1
+    health = max(0, min(100, int(
+        (active_count / total) * 40 + (completed_count / total) * 50
+        - (blocked_count / total) * 30
+        + (20 if project.exists else 0) + (10 if project.has_git else 0)
+    )))
+
+    # Personas
+    config = project.config if isinstance(project.config, dict) else {}
+    personas = config.get("personas", []) or []
+
+    # Journeys
+    journeys = config.get("journeys", []) or []
+
+    # Features from SAFe backlog
+    features = []
+    try:
+        from ...missions.product import get_product_backlog
+        pb = get_product_backlog(project_id)
+        if pb:
+            for feat in pb.features[:50]:
+                features.append({
+                    "name": feat.get("name", feat.get("title", "—")),
+                    "epic_name": feat.get("epic_name", feat.get("epic", "—")),
+                    "priority": feat.get("wsjf", feat.get("priority", 0)),
+                    "status": feat.get("status", "backlog"),
+                    "story_points": feat.get("story_points", 0),
+                    "stories_count": len(feat.get("stories", [])),
+                })
+    except Exception:
+        pass
+
+    # Architecture docs from memory
+    arch_docs = []
+    memory_files = []
+    try:
+        pmem = get_project_memory(project_id, project.path or "")
+        for mf in pmem.files:
+            entry = {"path": mf.path, "label": mf.label, "content": mf.content, "size": mf.size}
+            memory_files.append(entry)
+            low = mf.path.lower()
+            if any(kw in low for kw in ("arch", "adr", "design", "infra", "stack")):
+                arch_docs.append(entry)
+    except Exception:
+        pass
+
+    # Traceability summary
+    feat_total = len(features)
+    feat_with_code = sum(1 for f in features if f.get("status") not in ("backlog", "new"))
+    feat_with_tests = sum(1 for f in features if f.get("stories_count", 0) > 0)
+    traceability = {
+        "features_total": feat_total,
+        "features_with_code": feat_with_code,
+        "features_with_tests": feat_with_tests,
+        "code_pct": round(feat_with_code / max(feat_total, 1) * 100),
+        "test_pct": round(feat_with_tests / max(feat_total, 1) * 100),
+        "matrix": [
+            {
+                "feature": f["name"],
+                "stories": f.get("stories_count", 0),
+                "code_files": "—",
+                "tests": "—",
+                "coverage": f.get("status", "—"),
+            }
+            for f in features[:30]
+        ],
+    }
+
+    # PO agent
+    po_agent = None
+    if project.lead_agent_id:
+        try:
+            po_agent = get_agent_store().get(project.lead_agent_id)
+        except Exception:
+            pass
+
+    return _templates(request).TemplateResponse(
+        "project_product.html",
+        {
+            "request": request,
+            "page_title": f"{project.name} — Produit",
+            "project": project,
+            "personas": personas,
+            "journeys": journeys,
+            "features": features,
+            "arch_docs": arch_docs,
+            "traceability": traceability,
+            "memory_files": memory_files,
+            "po_agent": po_agent,
+            "health": health,
+            "stats": {
+                "total": len(proj_m),
+                "personas": len(personas),
+                "journeys": len(journeys),
+                "features": len(features),
+                "memory_files": len(memory_files),
+            },
+        },
+    )
+
+
 @router.get("/projects/{project_id}/overview", response_class=HTMLResponse)
 async def project_overview(request: Request, project_id: str):
     """Project overview page — created from ideation, shows epic/features/team."""
