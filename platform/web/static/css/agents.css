@@ -1188,7 +1188,7 @@
   position: relative;
   overflow: hidden;
   background: var(--bg-primary);
-  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background: var(--border);
   background-size: 20px 20px;
 }
 

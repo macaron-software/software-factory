@@ -213,6 +213,13 @@ def _get_tool_registry():
         register_rtk_tools(reg)
     except Exception:
         pass
+    # Design System tools (css_computed_check, ds_token_audit) — always loaded
+    try:
+        from ..tools.ds_tools import register_ds_tools
+
+        register_ds_tools(reg)
+    except Exception:
+        pass
     # mflux image generation — guarded by mflux module (macOS Apple Silicon)
     try:
         if _is_module_enabled("mflux"):

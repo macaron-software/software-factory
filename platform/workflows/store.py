@@ -600,13 +600,24 @@ _PHASE_TEMPLATES = [
     {"id": "design-convergence", "name": "Design Convergence", "pattern": "blackboard",
      "team_roles": ["architect", "product", "tech-lead"], "gate": "no_veto"},
     {"id": "design-system", "name": "Design System & Tokens", "pattern": "sequential",
-     "team_roles": ["ux-designer", "frontend-lead", "developer"], "gate": "no_veto",
+     "team_roles": ["ds-lead", "ux-adversarial"], "gate": "all_approved",
      "feedback": ["adversarial"],
      "description": "Generate design tokens (colors, typography, spacing, radii, shadows). "
-                    "Define light/dark/high-contrast themes. Build atomic CSS components. "
-                    "Establish font stack, responsive breakpoints, WCAG AA patterns. "
-                    "Output: tokens.css, base.css, components.css, theme switching JS. "
+                    "Define light/dark/high-contrast themes (WCAG AAA 7:1). Build atomic CSS. "
+                    "Establish font stack, responsive breakpoints (mobile-first), WCAG AA patterns "
+                    "(skip-link, focus-visible, aria landmarks, keyboard nav, command palette Cmd+K). "
+                    "NO emoji, NO gradient backgrounds, NO inline styles, NO hardcoded colors. "
+                    "Output: tokens.css, themes.css, base.css, components.css, lib/theme.ts. "
                     "All subsequent dev phases MUST import and consume these tokens."},
+    {"id": "ux-review", "name": "UX/DS Adversarial Review", "pattern": "loop",
+     "team_roles": ["ux-adversarial", "llm-judge-ux"], "gate": "all_approved",
+     "feedback": ["adversarial", "tools"],
+     "description": "Adversarial UX review + deterministic Playwright CSS verification. "
+                    "ux-adversarial: grep for hardcoded colors, emoji, gradient backgrounds, inline styles, "
+                    "broken keyboard nav, missing ARIA, tab order issues. "
+                    "llm-judge-ux: run css_computed_check on running app, compare computed values to "
+                    "DS token definitions in all 3 themes (dark/light/contrast). "
+                    "Gate: all_approved — both agents must PASS. Loop with dev agents if failures found."},
     {"id": "deploy", "name": "Deploy & Verify", "pattern": "sequential",
      "team_roles": ["infra", "qa"], "gate": "always"},
     {"id": "rework", "name": "Rework Sprint", "pattern": "hierarchical",
@@ -782,12 +793,15 @@ Do NOT skip QA because tools are missing. Fix the environment first.
 ─── DESIGN SYSTEM RULES ───
 For ALL projects with a frontend (web-node, web-docker, web-static, mobile):
 - BEFORE dev-sprint: compose "design-system" phase if not already done.
-  Team: ["ux_designer", "lead_dev"] — they produce tokens.css, base.css, components.css
-- Design system MUST include: light/dark mode, high-contrast mode, responsive breakpoints,
-  WCAG AA patterns (skip-to-content, focus-visible, aria, semantic HTML, keyboard nav).
+  Team: ["ds-lead", "ux-adversarial"] — ds-lead produces tokens.css, themes.css, base.css, components.css, lib/theme.ts.
+- Design system MUST include: light/dark mode, high-contrast mode (WCAG AAA 7:1), responsive (mobile-first),
+  WCAG AA patterns (skip-to-content, focus-visible, aria landmarks, semantic HTML, keyboard nav, Cmd+K palette).
 - NO emoji in UI. NO gradient backgrounds. NO inline styles. NO hardcoded colors.
-- After design-system: compose "ux-review" with adversarial feedback to validate compliance.
+- After design-system: compose "ux-review" phase: team ["ux-adversarial", "llm-judge-ux"].
+  ux-adversarial greps for violations. llm-judge-ux runs css_computed_check on the running app.
 - If dev agents produce code with inline styles or hardcoded colors → loop with feedback.
+- Tool available to all DS agents: css_computed_check (deterministic computed style verification),
+  ds_token_audit (static token completeness check).
 """
 
 

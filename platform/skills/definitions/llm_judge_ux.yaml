@@ -1,0 +1,63 @@
+id: llm_judge_ux
+name: "UX Judge (LLM + Playwright)"
+version: "1.0"
+
+description: >
+  LLM judge that produces deterministic UX verdicts using Playwright CSS computed checks.
+  Reads tokens.css, runs css_computed_check on the live app, compares computed values
+  to token expectations across all 3 themes. Evidence-based PASS/FAIL, not opinion.
+
+workflow:
+  step_1: "Read styles/tokens.css → build expected_values map {property: token_value}"
+  step_2: "Run browser_snapshot on the app URL to confirm it's live"
+  step_3: |
+    For each key component (button, input, card, modal, nav, heading):
+      css_computed_check({url, selector, properties: [color, background-color, font-size, border-radius], expected, contrast_check: true})
+  step_4: |
+    Repeat step_3 for each theme:
+      theme=dark → verify dark token values
+      theme=light → verify light token values
+      theme=contrast → verify AAA contrast ratio ≥ 7:1
+  step_5: "Verify skip-link: css_computed_check({selector: '.skip-link:focus', properties: [top, opacity]})"
+  step_6: "Verify :focus-visible: css_computed_check({selector: 'button:focus-visible', properties: [outline]})"
+
+output_format: |
+  Per component per theme:
+    PASS button.color [dark]: computed=#e6edf3 matches --text-primary ✓
+    FAIL card.background [light]: computed=#333333 ≠ --bg-secondary:#ffffff → hardcoded color
+  WCAG contrast:
+    PASS button [contrast]: ratio=8.2:1 ≥ AAA(7:1) ✓
+    FAIL nav [light]: ratio=3.1:1 < AA(4.5:1) — insufficient contrast
+
+  Aggregate verdict: PASS or FAIL
+  On FAIL: list all failures with file references from ds_token_audit fallback
+
+rules:
+  - "Temperature=0.0 — deterministic, no creative interpretation"
+  - "Every claim backed by css_computed_check output"
+  - "Do NOT approve until all 3 themes pass all checks"
+  - "Fallback to ds_token_audit static analysis if browser unavailable"
+
+tools:
+  - code_read
+  - code_search
+  - list_files
+  - css_computed_check
+  - ds_token_audit
+  - browser_snapshot
+  - browser_screenshot
+
+skills:
+  - design_system_enforcer
+
+permissions:
+  can_veto: true
+  veto_level: absolute
+
+tags:
+  - design-system
+  - judge
+  - playwright
+  - deterministic
+  - wcag
+  - accessibility
