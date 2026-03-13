@@ -1037,6 +1037,18 @@ def create_app() -> FastAPI:
 
     # ── Security: Response headers ──────────────────────────────────────────
     @app.middleware("http")
+    async def cache_headers(request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/static/"):
+            # Versioned static assets: long cache (query string ?v= busts cache)
+            if "v=" in str(request.url.query):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
+
+    @app.middleware("http")
     async def security_headers(request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"

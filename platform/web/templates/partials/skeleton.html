@@ -1,0 +1,119 @@
+{# Skeleton loading macros — include then call: skeleton_agents(n), skeleton_metrics(n), etc. #}
+
+{# ── Agent card grid skeleton ── #}
+{% macro skeleton_agents(count=8) %}
+<div class="sk-grid sk-grid-agents">
+  {% for _ in range(count) %}
+  <div class="sk-card">
+    <div class="sk-row" style="border:none">
+      <div class="sk sk-circle sk-avatar"></div>
+      <div class="sk-text">
+        <div class="sk sk-line" style="width:70%"></div>
+        <div class="sk sk-line-sm" style="width:50%"></div>
+      </div>
+    </div>
+    <div class="sk sk-line" style="width:90%;margin-top:0.4rem"></div>
+    <div class="sk sk-line-sm" style="width:40%"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Metric cards skeleton ── #}
+{% macro skeleton_metrics(count=5) %}
+<div class="sk-grid sk-grid-4">
+  {% for _ in range(count) %}
+  <div class="sk-metric">
+    <div class="sk sk-value"></div>
+    <div class="sk sk-label"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Table rows skeleton ── #}
+{% macro skeleton_table(rows=6, cols=4) %}
+<table style="width:100%">
+  {% for _ in range(rows) %}
+  <tr class="sk-row">
+    {% for c in range(cols) %}
+    <td style="padding:0.5rem"><div class="sk sk-line" style="width:{% if c==0 %}80{% elif c==cols-1 %}40{% else %}60{% endif %}%"></div></td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% endmacro %}
+
+{# ── Strategic agent cards skeleton (portfolio) ── #}
+{% macro skeleton_strategic(count=6) %}
+<div class="portfolio-strategy">
+  {% for _ in range(count) %}
+  <div class="strat-card" style="pointer-events:none">
+    <div class="sk sk-circle" style="width:42px;height:42px;flex-shrink:0"></div>
+    <div class="strat-info">
+      <div class="sk sk-line" style="width:65%"></div>
+      <div class="sk sk-line-sm" style="width:45%"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Project list skeleton (cockpit) ── #}
+{% macro skeleton_projects(count=4) %}
+<div class="proj-list">
+  {% for _ in range(count) %}
+  <div class="proj-item" style="pointer-events:none">
+    <div class="proj-header">
+      <div class="sk sk-line-lg" style="width:40%"></div>
+      <div class="sk sk-badge"></div>
+    </div>
+    <div class="prog-bar"><div class="sk" style="width:100%;height:4px"></div></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Pipeline bar skeleton (cockpit) ── #}
+{% macro skeleton_pipeline(stages=6) %}
+<div class="pipeline-bar">
+  {% for _ in range(stages) %}
+  <div class="pipeline-stage" style="pointer-events:none">
+    <div class="sk sk-circle" style="width:1.6rem;height:1.6rem"></div>
+    <div class="sk sk-line-lg" style="width:2.5rem;margin:0.3rem auto 0"></div>
+    <div class="sk sk-line-sm" style="width:3rem;margin:0.15rem auto 0"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Activity feed skeleton ── #}
+{% macro skeleton_feed(count=5) %}
+<div class="activity-feed">
+  {% for _ in range(count) %}
+  <div class="af-item">
+    <div class="sk sk-circle" style="width:26px;height:26px;flex-shrink:0"></div>
+    <div class="af-body">
+      <div class="sk sk-line" style="width:{% if loop.index is odd %}75{% else %}60{% endif %}%"></div>
+      <div class="sk sk-line-sm" style="width:30%"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Generic content block skeleton ── #}
+{% macro skeleton_block(lines=4) %}
+<div style="padding:0.5rem 0">
+  {% for _ in range(lines) %}
+  <div class="sk sk-line" style="width:{% if loop.first %}95{% elif loop.last %}45{% else %}80{% endif %}%"></div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Wrapper: show skeleton, swap on HTMX load ── #}
+{% macro deferred(url, target_id, skeleton_html) %}
+<div id="{{ target_id }}" hx-get="{{ url }}" hx-trigger="load" hx-swap="innerHTML" hx-target="#{{ target_id }}">
+  {{ skeleton_html }}
+</div>
+{% endmacro %}

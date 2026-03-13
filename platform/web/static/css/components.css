@@ -1125,3 +1125,60 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+/* -- Skeleton Loading ---------------------------------------------------- */
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.sk {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--border) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  pointer-events: none;
+  user-select: none;
+}
+.sk * { visibility: hidden; }
+.sk-line { height: 0.75rem; margin-bottom: 0.5rem; }
+.sk-line-sm { height: 0.55rem; margin-bottom: 0.35rem; width: 60%; }
+.sk-line-lg { height: 1rem; margin-bottom: 0.6rem; width: 80%; }
+.sk-circle { border-radius: 50%; }
+.sk-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  min-height: 80px;
+}
+.sk-card .sk { margin-bottom: 0.5rem; }
+.sk-metric {
+  text-align: center;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.sk-metric .sk-value { height: 2rem; width: 40%; margin: 0 auto 0.4rem; }
+.sk-metric .sk-label { height: 0.6rem; width: 60%; margin: 0 auto; }
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.sk-row:last-child { border-bottom: none; }
+.sk-avatar { width: 42px; height: 42px; flex-shrink: 0; }
+.sk-text { flex: 1; }
+.sk-badge { width: 60px; height: 1.2rem; border-radius: 999px; }
+/* Grid helpers */
+.sk-grid { display: grid; gap: 0.75rem; }
+.sk-grid-2 { grid-template-columns: 1fr 1fr; }
+.sk-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.sk-grid-4 { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.sk-grid-agents { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+/* Fade in when real data arrives */
+.sk-loaded { animation: sk-fadein 0.3s ease-out; }
+@keyframes sk-fadein { from { opacity: 0.6; } to { opacity: 1; } }

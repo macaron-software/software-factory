@@ -169,6 +169,12 @@ class EpicStore:
     def list_missions(
         self, project_id: str = None, limit: int = 50
     ) -> list[MissionDef]:
+        from ..cache import get as cache_get, put as cache_put
+
+        cache_key = f"missions:{project_id or 'all'}:{limit}"
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return cached
         db = get_db()
         try:
             if project_id:
@@ -181,7 +187,9 @@ class EpicStore:
                     "SELECT * FROM epics ORDER BY wsjf_score DESC, created_at DESC LIMIT ?",
                     (limit,),
                 ).fetchall()
-            return [_row_to_mission(r) for r in rows]
+            result = [_row_to_mission(r) for r in rows]
+            cache_put(cache_key, result, ttl=30)
+            return result
         finally:
             db.close()
 
@@ -252,6 +260,8 @@ class EpicStore:
             db.commit()
         finally:
             db.close()
+        from ..cache import invalidate
+        invalidate("missions:all:50")
         return m
 
     def update_mission_status(self, mission_id: str, status: str) -> bool:
@@ -439,9 +449,13 @@ class EpicStore:
             db.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
             cur = db.execute("DELETE FROM epics WHERE id = ?", (mission_id,))
             db.commit()
-            return cur.rowcount > 0
+            deleted = cur.rowcount > 0
         finally:
             db.close()
+        if deleted:
+            from ..cache import invalidate
+            invalidate("missions:all:50")
+        return deleted
 
     def list_children(self, parent_epic_id: str) -> list[MissionDef]:
         """List sub-missions of a parent mission (Epic→Features)."""
@@ -892,6 +906,12 @@ class EpicRunStore:
             db.close()
 
     def list_runs(self, project_id: str = "", limit: int = 20) -> list[EpicRun]:
+        from ..cache import get as cache_get, put as cache_put
+
+        cache_key = f"runs:{project_id or 'all'}:{limit}"
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return cached
         db = get_db()
         try:
             if project_id:
@@ -904,7 +924,9 @@ class EpicRunStore:
                     "SELECT * FROM epic_runs ORDER BY created_at DESC LIMIT ?",
                     (limit,),
                 ).fetchall()
-            return [_row_to_epic_run(r) for r in rows]
+            result = [_row_to_epic_run(r) for r in rows]
+            cache_put(cache_key, result, ttl=15)
+            return result
         finally:
             db.close()
 

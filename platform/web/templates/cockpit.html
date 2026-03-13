@@ -130,7 +130,7 @@
   </div>
 
   <!-- 1. Pipeline Value Stream -->
-  <div class="pipeline-bar" id="pipeline">
+  <div class="pipeline-bar sk" id="pipeline">
     <div class="pipeline-stage">
       <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:var(--purple)"><use href="#icon-zap"/></svg></span>
       <span class="ps-value" id="ps-ideation">—</span>
@@ -214,7 +214,10 @@
         Projets actifs
       </div>
       <div class="proj-list" id="projList">
-        <div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic">Chargement…</div>
+        <div class="sk sk-line-lg" style="width:80%"></div>
+        <div class="sk sk-line" style="width:60%"></div>
+        <div class="sk sk-line-lg" style="width:70%"></div>
+        <div class="sk sk-line" style="width:50%"></div>
       </div>
     </div>
 
@@ -226,7 +229,9 @@
         <div class="live-dot" style="margin-left:auto"></div>
       </div>
       <div class="activity-feed" id="activityFeed">
-        <div class="af-empty">Aucune activité récente</div>
+        <div class="sk-row"><div class="sk sk-circle sk-avatar"></div><div class="sk-text"><div class="sk sk-line" style="width:75%"></div><div class="sk sk-line-sm"></div></div></div>
+        <div class="sk-row"><div class="sk sk-circle sk-avatar"></div><div class="sk-text"><div class="sk sk-line" style="width:60%"></div><div class="sk sk-line-sm"></div></div></div>
+        <div class="sk-row"><div class="sk sk-circle sk-avatar"></div><div class="sk-text"><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line-sm"></div></div></div>
       </div>
     </div>
   </div>
@@ -2363,6 +2368,9 @@
   }
 
   function render(data){
+    // Remove skeleton shimmer on first data
+    const pipe = document.getElementById('pipeline');
+    if (pipe) { pipe.classList.remove('sk'); pipe.classList.add('sk-loaded'); }
     // Pipeline — SAFe
     const p = data.pipeline || {};
     document.getElementById('ps-ideation').textContent = p.ideation_active ?? '—';

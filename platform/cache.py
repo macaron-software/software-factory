@@ -36,13 +36,19 @@ def put(key: str, value: Any, ttl: int = DEFAULT_TTL):
 
 
 def invalidate(*keys: str):
-    """Invalidate one or more cache keys. Pass no args to clear all."""
+    """Invalidate cache keys. Supports prefix match with trailing '*'. No args = clear all."""
     with _lock:
         if not keys:
             _store.clear()
         else:
             for k in keys:
-                _store.pop(k, None)
+                if k.endswith("*"):
+                    prefix = k[:-1]
+                    to_del = [sk for sk in _store if sk.startswith(prefix)]
+                    for sk in to_del:
+                        del _store[sk]
+                else:
+                    _store.pop(k, None)
 
 
 def cached(key: str, ttl: int = DEFAULT_TTL):
