@@ -1290,6 +1290,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     feedback=feedback,
                     consecutive_failures=_adv_attempt + 2,  # +2: first run + current attempt
                     agent_name=agent.name,
+                    agent_motivation=agent.motivation or "",
                     phase_failures=_phase_failures or None,
                     protocol_override=protocol_override or "",
                 )

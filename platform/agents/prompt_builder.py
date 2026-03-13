@@ -133,6 +133,9 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
     if agent.persona:
         parts.append(f"\n## Persona & Character\n{agent.persona}")
 
+    if agent.motivation:
+        parts.append(f"\n## Motivation & Drive\n{agent.motivation}")
+
     parts.append(f"\nYou are {agent.name}, role: {agent.role}.")
     if agent.description:
         parts.append(f"Description: {agent.description}")

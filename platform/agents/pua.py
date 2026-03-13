@@ -98,14 +98,28 @@ def get_pressure_level(consecutive_failures: int) -> int:
     return 4  # 5+
 
 
-def get_pressure_prompt(consecutive_failures: int) -> str:
+def get_pressure_prompt(consecutive_failures: int, agent_motivation: str = "") -> str:
     """Get the pressure escalation prompt for the given failure count.
 
-    Returns empty string for first failure (no pressure needed).
+    When agent_motivation is provided, L2+ prompts reference the agent's own
+    stated goals/values to create personal accountability pressure.
     Source: tanweai/pua (MIT) — adapted for SF Platform.
     """
     level = get_pressure_level(consecutive_failures)
-    return _PRESSURE_PROMPTS.get(level, "")
+    base = _PRESSURE_PROMPTS.get(level, "")
+    if not base:
+        return ""
+
+    # L2+: inject motivation as personal accountability hook
+    if level >= 2 and agent_motivation:
+        motivation_hook = (
+            f"[PERSONAL ACCOUNTABILITY]\n"
+            f"You defined your own motivation as: \"{agent_motivation.strip()}\"\n"
+            f"Does this output reflect that? If not, what would it take to actually live up to it?\n"
+        )
+        return motivation_hook + base
+
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -239,12 +253,14 @@ def build_retry_prompt(
     feedback: str,
     consecutive_failures: int,
     agent_name: str,
+    agent_motivation: str = "",
     phase_failures: dict[str, int] | None = None,
     protocol_override: str = "",
 ) -> str:
     """Build the complete retry task with pressure escalation + debug methodology + peer context.
 
     Called from patterns/engine.py on adversarial rejection.
+    agent_motivation: agent's AgentDef.motivation field — used for personal accountability in L2+.
 
     Source: tanweai/pua (MIT) — pressure escalation + debug methodology + cross-agent transfer.
     """
@@ -253,8 +269,8 @@ def build_retry_prompt(
         f"Issues:\n{feedback}\n",
     ]
 
-    # Pressure escalation (L1-L4)
-    pressure = get_pressure_prompt(consecutive_failures)
+    # Pressure escalation (L1-L4), personalized with agent motivation at L2+
+    pressure = get_pressure_prompt(consecutive_failures, agent_motivation=agent_motivation)
     if pressure:
         parts.append(pressure)
 
