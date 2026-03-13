@@ -660,6 +660,18 @@ _PHASE_TEMPLATES = [
      "team_roles": ["developer", "developer", "infra"], "gate": "no_veto"},
     {"id": "human-review", "name": "Human Review Gate", "pattern": "human-in-the-loop",
      "team_roles": ["product", "architect"], "gate": "all_approved"},
+    {"id": "fractal-decomp", "name": "Fractal Story Decomposition", "pattern": "map_reduce",
+     "team_roles": ["product", "enterprise_architect", "dev_fullstack"], "gate": "no_veto",
+     "feedback": ["tools"],
+     "description": "Decompose epic into fractal hierarchy: L1 features → L2 stories (INVEST) → L3 tasks → L4 subtasks. "
+                    "For each story: acceptance criteria + # Ref: UUID traceability header. "
+                    "map: each story analyzed in parallel. reduce: architect synthesizes into coherent plan. "
+                    "Output: FRACTAL_DECOMP.md. Each L2 story then drives its own dev-sprint phase."},
+    {"id": "story-sprint", "name": "Story Sprint (post-fractal)", "pattern": "loop",
+     "team_roles": ["developer", "qa"], "gate": "no_veto",
+     "description": "Single-story TDD sprint. Dev implements L2 story from FRACTAL_DECOMP.md. "
+                    "QA writes and runs tests. Loop until story AC green. "
+                    "Each story sprint is composed dynamically by PM after fractal-decomp."},
 ]
 
 
@@ -802,6 +814,28 @@ For ALL projects with a frontend (web-node, web-docker, web-static, mobile):
 - If dev agents produce code with inline styles or hardcoded colors → loop with feedback.
 - Tool available to all DS agents: css_computed_check (deterministic computed style verification),
   ds_token_audit (static token completeness check).
+
+─── FRACTAL DECOMPOSITION RULES ───
+An epic is too large for a single dev phase when it has 3+ user stories or multiple distinct modules.
+BEFORE first dev-sprint on a complex epic:
+- Compose a "fractal-decomp" phase (pattern=map_reduce, gate=no_veto):
+  Team: ["product", "enterprise_architect", "dev_fullstack"]
+  Task: "Decompose epic into: L1 features → L2 stories (INVEST) → L3 tasks → L4 subtasks.
+         For each story: acceptance criteria + # Ref: UUID. Output: FRACTAL_DECOMP.md"
+- After fractal-decomp: each L2 story becomes its own mini-sprint (pattern=loop, team=devs).
+  Use 'phase' decision with task referencing the specific story from FRACTAL_DECOMP.md.
+- map: each story analyzed in parallel | reduce: architect synthesizes coherent architecture.
+- Fractal when: e-learning, multi-module app, migration, API with 5+ endpoints.
+- No fractal for: single bug fix, single endpoint, config change.
+
+─── PUA PRESSURE RULES ───
+When loop_count >= 2 on same phase (agent stuck / repeatedly rejected):
+  loop_count=2 → L1: task prefix = "[PRESSURE L1] Switch to a FUNDAMENTALLY DIFFERENT approach. Do NOT retry same strategy."
+  loop_count=3 → L2: task prefix = "[PRESSURE L2] Stop. What is the UNDERLYING root cause? Read files/logs you have NOT touched yet."
+  loop_count=4 → L3: task prefix = "[PRESSURE L3] Execute 7-point checklist BEFORE writing code: re-read error, code_search, check actual file content, verify env, git history, simplest explanation, opposite assumption."
+  loop_count>=5 → L4: task prefix = "[PRESSURE L4 — FINAL] Desperation mode. Try EVERY tool. If still stuck: produce detailed diagnostic report, then decision=skip."
+Include the pressure prefix verbatim at start of 'task' field. Escalate — never loop silently.
+After L4 with no progress: decision=skip + document in findings.
 """
 
 
@@ -1231,7 +1265,21 @@ async def run_workflow(
                 _stack_results = _mm.project_search(project_id, "stack architecture language", limit=3)
                 for _sr in _stack_results:
                     _sv = _sr.get("value", "")
-                    if any(kw in _sv.lower() for kw in ("rust", "node", "python", "go", "swift", "java", "typescript", "react")):
+                    _svl = _sv.lower()
+                    # Check web/common stacks FIRST (more likely),
+                    # then niche stacks — prevents "chose X over Rust" false matches
+                    if any(kw in _svl for kw in ("typescript", "react", "next.js", "nextjs", "node")):
+                        _declared_stack = _sv[:200]
+                        break
+                    if any(kw in _svl for kw in ("python", "django", "fastapi", "flask")):
+                        _declared_stack = _sv[:200]
+                        break
+                    if any(kw in _svl for kw in ("rust", "cargo")):
+                        # Only trust if NO web keywords in same text
+                        if not any(w in _svl for w in ("typescript", "react", "next", "node", "npm")):
+                            _declared_stack = _sv[:200]
+                            break
+                    if any(kw in _svl for kw in ("go ", "swift", "java")):
                         _declared_stack = _sv[:200]
                         break
             except Exception:
@@ -1243,8 +1291,10 @@ async def run_workflow(
                     _proj = get_project_store().get(project_id)
                     if _proj and _proj.description:
                         _desc = _proj.description.lower()
-                        for _lang, _label in [("rust", "Rust"), ("typescript", "TypeScript"), ("node", "Node.js"),
-                                              ("react", "React"), ("python", "Python"), ("go ", "Go"), ("swift", "Swift")]:
+                        # Web stacks first (most common), then niche stacks
+                        for _lang, _label in [("typescript", "TypeScript"), ("react", "React"), ("node", "Node.js"),
+                                              ("python", "Python"), ("go ", "Go"), ("swift", "Swift"),
+                                              ("rust", "Rust")]:
                             if _lang in _desc:
                                 _declared_stack = _label
                                 break
