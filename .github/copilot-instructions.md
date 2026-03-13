@@ -7,10 +7,11 @@ FastAPI+HTMX+SSE. PG16(62tbl)+Redis7. 375py/148KLOC. Port 8099(dev)/8090(prod). 
 ## ALWAYS — Start of Session
 git pull on ALL project repos before any work:
 ```sh
-for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron; do
-  (cd ~/\_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
+for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron _FLO _PSY YOLONOW; do
+  (cd ~/_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
 done
 ```
+Note: PSY remote=github (not origin). YOLONOW has no remote yet (local-only).
 
 ## NEVER
 - `import platform` top-level — shadows stdlib; use `from platform.X import Y`
@@ -71,11 +72,15 @@ DB: users . user_sessions . user_project_roles . password_reset_codes
 Config: AWS_SES_REGION (dflt eu-west-1) . AWS_SES_FROM_EMAIL (dflt noreply@macaron-software.com)
 
 ## Projects (SF-Baby: sf-baby.macaron-software.com)
-| proj | repo | stack |
-|------|------|-------|
-| Baby | macaron-software/baby (priv) | Rust/WASM+SvelteKit+iOS/Android |
-| ADA-NDIS | macaron-software/ada-ndis (pub) | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
-| SF | macaron-software/software-factory | Python/FastAPI+HTMX |
+| proj | repo | path | stack |
+|------|------|------|-------|
+| Baby | macaron-software/baby (priv) | _BABY | Rust/WASM+SvelteKit+iOS/Android |
+| ADA-NDIS | macaron-software/ada-ndis (pub) | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
+| SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
+| FLO | macaron-software/luna | _FLO | TBD |
+| PSY | macaron-software/psy-platform (priv) | _PSY | Rust/Axum+React |
+| YOLONOW | (no remote) | YOLONOW | Rust |
+| MesAides | macaron-software/mes-aides | _HELP/aides-macaron | Rust+WASM+SwiftUI+Kotlin |
 
 SAFe CRUD API: POST /api/missions (epic) . POST /api/epics/{id}/features . POST /api/features/{id}/stories
 Memory API: POST /api/memory/project/{id} (key,value,category,source,confidence)

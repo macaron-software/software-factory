@@ -7,11 +7,12 @@
 ## ALWAYS -- Start of Session
 git pull on ALL project repos before any work:
 ```sh
-for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron; do
+for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron _FLO _PSY YOLONOW; do
   (cd ~/_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
 done
 ```
 Paths: SF=_SOFTWARE_FACTORY . Baby=_BABY . ADA-NDIS=MVP_ADA . MesAides=_HELP/aides-macaron
+       FLO=_FLO (repo:luna) . PSY=_PSY (remote:github) . YOLONOW=YOLONOW (no remote yet)
 
 ## NEVER
 - `import platform` top-level (shadows stdlib) -> `from platform.X import Y`
@@ -59,11 +60,15 @@ projects/              baby.yaml factory.yaml (per-project config+git_url)
 ```
 
 ## Projects (SF-Baby: sf-baby.macaron-software.com)
-| proj | repo | stack |
-|------|------|-------|
-| Baby | macaron-software/baby (priv) | Rust/WASM+SvelteKit+iOS/Android |
-| ADA-NDIS | macaron-software/ada-ndis (pub) | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
-| SF | macaron-software/software-factory | Python/FastAPI+HTMX |
+| proj | repo | path | stack |
+|------|------|------|-------|
+| Baby | macaron-software/baby (priv) | _BABY | Rust/WASM+SvelteKit+iOS/Android |
+| ADA-NDIS | macaron-software/ada-ndis (pub) | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
+| SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
+| FLO | macaron-software/luna | _FLO | TBD |
+| PSY | macaron-software/psy-platform (priv) | _PSY | Rust/Axum+React |
+| YOLONOW | (no remote) | YOLONOW | Rust |
+| MesAides | macaron-software/mes-aides | _HELP/aides-macaron | Rust+WASM+SwiftUI+Kotlin |
 
 SAFe CRUD: POST /api/missions (epic) . /api/epics/{id}/features . /api/features/{id}/stories
 Memory: POST /api/memory/project/{id} {key,value,category,source,confidence}
