@@ -2269,6 +2269,13 @@ class EpicOrchestrator:
             except Exception as promo_err:
                 logger.warning(f"Global memory promotion failed: {promo_err}")
 
+        # on_complete chaining: auto-launch companion workflow when this run completes
+        if mission.status == EpicStatus.COMPLETED:
+            try:
+                await _on_complete_chain(mission)
+            except Exception as chain_err:
+                logger.warning(f"on_complete chain failed: {chain_err}")
+
     def _build_edges(self, pattern_type: str, aids: list, leader: str) -> list:
         """Build edges for the pattern graph."""
         edges = []
@@ -2345,6 +2352,118 @@ class EpicOrchestrator:
                 edges.append({"from": w, "to": dispatcher, "type": "report"})
 
         return edges
+
+
+async def _on_complete_chain(mission) -> None:
+    """Auto-launch companion workflows defined in the workflow's on_complete config.
+
+    Reads workflow.config_json → on_complete → {workflow_id, condition}.
+    Creates a new epic + epic_run for each companion workflow.
+    Used to auto-trigger documentation-pipeline, knowledge-maintenance, etc.
+    """
+    import json as _json
+    from ..db.migrations import get_db as _get_db
+    from ..services.auto_resume import _launch_new_run
+
+    wf_id = getattr(mission, "workflow_id", None) or getattr(mission, "config", {}).get("workflow_id")
+    project_id = getattr(mission, "project_id", "") or ""
+    brief = getattr(mission, "brief", "") or getattr(mission, "goal", "") or mission.name
+
+    if not wf_id:
+        return
+
+    db = _get_db()
+    try:
+        row = db.execute(
+            "SELECT config_json FROM workflows WHERE id=?", (wf_id,)
+        ).fetchone()
+    finally:
+        db.close()
+
+    if not row or not row[0]:
+        return
+
+    try:
+        cfg = _json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    except Exception:
+        return
+
+    on_complete = cfg.get("on_complete")
+    if not on_complete:
+        return
+    # Support list or single dict
+    chains = on_complete if isinstance(on_complete, list) else [on_complete]
+
+    for chain in chains:
+        next_wf_id = chain.get("workflow_id")
+        condition = chain.get("condition", "completed")
+        if not next_wf_id:
+            continue
+        if condition not in ("always", "completed"):
+            continue
+
+        # Avoid duplicate: skip if a run for this workflow+project already running/pending
+        db2 = _get_db()
+        try:
+            existing = db2.execute(
+                """SELECT id FROM epic_runs
+                   WHERE workflow_id=? AND project_id=? AND status IN ('running','pending')
+                   ORDER BY created_at DESC LIMIT 1""",
+                (next_wf_id, project_id),
+            ).fetchone()
+        finally:
+            db2.close()
+
+        if existing:
+            logger.info("on_complete chain: %s already running for project %s — skip", next_wf_id, project_id[:8])
+            continue
+
+        try:
+            # Find or create a companion epic for this workflow
+            db3 = _get_db()
+            try:
+                companion = db3.execute(
+                    "SELECT id FROM epics WHERE project_id=? AND workflow_id=? AND status='active' LIMIT 1",
+                    (project_id, next_wf_id),
+                ).fetchone()
+                companion_id = companion["id"] if companion else None
+            finally:
+                db3.close()
+
+            if not companion_id:
+                # Create a lightweight companion epic
+                import uuid as _uuid
+                companion_id = _uuid.uuid4().hex[:8]
+                db4 = _get_db()
+                try:
+                    db4.execute(
+                        """INSERT INTO epics (id, name, description, project_id, workflow_id, status, created_at)
+                           VALUES (?, ?, ?, ?, ?, 'active', datetime('now'))""",
+                        (
+                            companion_id,
+                            f"Auto: {next_wf_id} ← {wf_id}",
+                            f"Auto-launched after {wf_id} completed. Brief: {brief[:300]}",
+                            project_id,
+                            next_wf_id,
+                        ),
+                    )
+                    db4.commit()
+                finally:
+                    db4.close()
+
+            await _launch_new_run(
+                mission_id=companion_id,
+                workflow_id=next_wf_id,
+                project_id=project_id,
+                brief=brief,
+                mission_name=f"Auto: {next_wf_id} ← {wf_id}",
+            )
+            logger.warning(
+                "on_complete chain: launched %s for project=%s (triggered by %s)",
+                next_wf_id, project_id[:8], wf_id,
+            )
+        except Exception as e:
+            logger.warning("on_complete chain %s → %s failed: %s", wf_id, next_wf_id, e)
 
 
 def _promote_mission_to_global(mission) -> None:
