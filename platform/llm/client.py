@@ -595,7 +595,9 @@ class LLMClient:
                     is_rate_limit = "429" in err_str or "RateLimitReached" in err_str
                     is_transient = (
                         "ReadError" in err_str
+                        or "ReadTimeout" in err_str
                         or "ConnectError" in err_str
+                        or "ConnectTimeout" in err_str
                         or "RemoteProtocolError" in err_str
                     )
                     if attempt < max_attempts - 1 and (
