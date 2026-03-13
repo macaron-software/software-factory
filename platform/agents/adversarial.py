@@ -181,6 +181,27 @@ _CODE_SLOP_PATTERNS = [
         r"-moz-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
         "-moz- vendor prefix not needed since 2020",
     ),
+    # UI/UX — banned patterns
+    (
+        r"linear-gradient\s*\(",
+        "linear-gradient — banned: use flat solid colors from design tokens (var(--color-*))",
+    ),
+    (
+        r"radial-gradient\s*\(",
+        "radial-gradient — banned: use flat solid colors from design tokens",
+    ),
+    (
+        r"[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0001FA00-\U0001FAFF]",
+        "emoji in source — banned: use text labels or SVG icons from the design system",
+    ),
+    (
+        r"style\s*=\s*\{\s*\{",
+        "inline style object — banned: use CSS classes from design tokens / CSS modules",
+    ),
+    (
+        r"(?:color|background|border-color)\s*:\s*#[0-9a-fA-F]{3,8}\b",
+        "hardcoded hex color — use CSS custom property: var(--color-*) from tokens",
+    ),
 ]
 _HALLUCINATION_PATTERNS = [
     (

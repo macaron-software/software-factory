@@ -192,10 +192,35 @@ UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - ALL font sizes via tokens: var(--font-size-sm), var(--font-size-md), etc.
 - ALL spacing via tokens: var(--spacing-sm), var(--spacing-md), etc.
 - NO hardcoded hex colors (#fff, #333), NO hardcoded px font-sizes, NO inline styles
-- WCAG AA accessibility: aria-label on icons, aria-describedby on forms, role attributes
+- NO emoji (🎯📦 etc.) anywhere in UI — use text labels or SVG icons
+- NO gradient backgrounds (linear-gradient, radial-gradient) — flat solid colors only
+- NO inline style objects (style={{...}}) — use CSS classes or CSS modules
+
+DESIGN SYSTEM (MANDATORY):
+- Generate tokens.css with: --color-*, --font-size-*, --spacing-*, --radius-*, --shadow-*
+- Light/dark mode: use [data-theme="dark"] selector, default to light
+- High contrast mode: [data-contrast="high"] with WCAG AAA ratios (7:1 min)
+- All components consume tokens — NO hardcoded values in component files
+- Font stack: system-ui first, define --font-sans, --font-mono tokens
+- Atomic CSS approach: small, composable utility classes
+
+WCAG AA ACCESSIBILITY (MANDATORY):
 - Semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>. NOT <div> soup.
-- Responsive: mobile-first, use CSS grid/flexbox, test 320px→1440px
-- Focus management: :focus-visible styles, skip-to-content link, keyboard navigation
+- Skip-to-content link as FIRST focusable element in <body>
+- aria-label on icon-only buttons, aria-describedby on form inputs
+- role="search" on search forms, role="navigation" on navs
+- Keyboard navigation: all interactive elements focusable, logical tab order
+- :focus-visible styles on ALL interactive elements (not just :focus)
+- Escape closes modals/dropdowns, Enter/Space activates buttons
+- Quick access menu (accesskey or skip links to main sections)
+- prefers-reduced-motion: respect via @media query
+- prefers-color-scheme: auto-detect light/dark preference
+
+RESPONSIVE (MANDATORY):
+- Mobile-first: base styles = mobile, @media (min-width) for larger
+- Breakpoints: 320px (mobile) → 768px (tablet) → 1024px (desktop) → 1440px (wide)
+- CSS grid/flexbox layout — NO float, NO fixed widths in px
+- Touch targets: min 44x44px on mobile (WCAG 2.5.5)
 - Loading/error/empty states for EVERY data-dependent component
 
 DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):

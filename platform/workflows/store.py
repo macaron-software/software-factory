@@ -599,6 +599,14 @@ _PHASE_TEMPLATES = [
      "team_roles": ["developer", "developer", "architect"], "gate": "no_veto"},
     {"id": "design-convergence", "name": "Design Convergence", "pattern": "blackboard",
      "team_roles": ["architect", "product", "tech-lead"], "gate": "no_veto"},
+    {"id": "design-system", "name": "Design System & Tokens", "pattern": "sequential",
+     "team_roles": ["ux-designer", "frontend-lead", "developer"], "gate": "no_veto",
+     "feedback": ["adversarial"],
+     "description": "Generate design tokens (colors, typography, spacing, radii, shadows). "
+                    "Define light/dark/high-contrast themes. Build atomic CSS components. "
+                    "Establish font stack, responsive breakpoints, WCAG AA patterns. "
+                    "Output: tokens.css, base.css, components.css, theme switching JS. "
+                    "All subsequent dev phases MUST import and consume these tokens."},
     {"id": "deploy", "name": "Deploy & Verify", "pattern": "sequential",
      "team_roles": ["infra", "qa"], "gate": "always"},
     {"id": "rework", "name": "Rework Sprint", "pattern": "hierarchical",
@@ -758,6 +766,28 @@ For ALL projects (not just migrations):
 - If coverage < 80%: compose a "trace-fix" phase (sequential)
   Team: ["trace-writer"] — adds # Ref: headers and SPECS.md links
 - For migration projects: ALWAYS include legacy-inventory → story-from-legacy → traceability-check
+
+─── INFRA-PROVISION RULES ───
+BEFORE dev phases, check if toolchain matches stack needs. If missing → compose "infra-provision":
+- web-node → needs: Node.js, npm/pnpm, Playwright (for E2E), ESLint
+- web-docker → needs: Docker, docker-compose, Playwright
+- rust-native → needs: rustc, cargo, clippy
+- android-native → needs: Android SDK, Gradle, emulator
+- ios-native → needs: Xcode, swift, xctest
+- ANY web frontend → needs: Playwright (npx playwright install --with-deps)
+If QA/test agents report "missing tool", "permission denied", or "command not found":
+  → compose phase(infra-provision) with task="install {missing_tool}" THEN loop the failed phase.
+Do NOT skip QA because tools are missing. Fix the environment first.
+
+─── DESIGN SYSTEM RULES ───
+For ALL projects with a frontend (web-node, web-docker, web-static, mobile):
+- BEFORE dev-sprint: compose "design-system" phase if not already done.
+  Team: ["ux_designer", "lead_dev"] — they produce tokens.css, base.css, components.css
+- Design system MUST include: light/dark mode, high-contrast mode, responsive breakpoints,
+  WCAG AA patterns (skip-to-content, focus-visible, aria, semantic HTML, keyboard nav).
+- NO emoji in UI. NO gradient backgrounds. NO inline styles. NO hardcoded colors.
+- After design-system: compose "ux-review" with adversarial feedback to validate compliance.
+- If dev agents produce code with inline styles or hardcoded colors → loop with feedback.
 """
 
 

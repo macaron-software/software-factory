@@ -1,0 +1,77 @@
+id: design_system_enforcer
+name: "Design System Enforcement"
+version: "1.0"
+
+description: >
+  Rules for design system compliance. All frontend agents MUST follow these rules.
+  Violations are caught by adversarial L0 checks and result in automatic rejection.
+
+rules:
+  tokens:
+    - "ALL colors via CSS custom properties: var(--color-primary), var(--color-surface), etc."
+    - "ALL font sizes via tokens: var(--font-size-xs) through var(--font-size-3xl)"
+    - "ALL spacing via tokens: var(--spacing-xs) through var(--spacing-3xl)"
+    - "ALL border-radius via tokens: var(--radius-sm), var(--radius-md), var(--radius-lg), var(--radius-full)"
+    - "ALL shadows via tokens: var(--shadow-sm), var(--shadow-md), var(--shadow-lg)"
+    - "NO hardcoded hex colors (#fff, #333, rgb(), hsl()) in component files"
+    - "NO hardcoded px font-sizes — use token variables"
+    - "NO hardcoded px spacing — use token variables"
+
+  themes:
+    - "Light mode: [data-theme='light'] — default, clean whites and subtle grays"
+    - "Dark mode: [data-theme='dark'] — dark surfaces, light text, preserve contrast"
+    - "High contrast light: [data-contrast='high'][data-theme='light'] — WCAG AAA 7:1 ratio"
+    - "High contrast dark: [data-contrast='high'][data-theme='dark'] — WCAG AAA 7:1 ratio"
+    - "prefers-color-scheme: auto-detect user preference on first visit"
+    - "Theme switcher component: toggle light/dark, toggle high contrast, persist in localStorage"
+
+  banned_patterns:
+    - "NO emoji (🎯📦🔄 etc.) in UI text, labels, or headings — use SVG icons or text"
+    - "NO linear-gradient or radial-gradient backgrounds — flat solid colors only"
+    - "NO inline style objects (style={{...}}) — use CSS classes or CSS modules"
+    - "NO style={{}} props in JSX/TSX — extract to CSS class"
+    - "NO <div> soup — use semantic HTML: <nav>, <main>, <section>, <article>, <header>, <footer>"
+
+  typography:
+    - "Font stack: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+    - "Monospace: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace"
+    - "Define --font-sans and --font-mono tokens"
+    - "Scale: xs(0.75rem), sm(0.875rem), md(1rem), lg(1.125rem), xl(1.25rem), 2xl(1.5rem), 3xl(2rem)"
+    - "Line height: --leading-tight(1.25), --leading-normal(1.5), --leading-relaxed(1.75)"
+
+  responsive:
+    - "Mobile-first: base styles = 320px mobile"
+    - "Breakpoints: --bp-sm(640px), --bp-md(768px), --bp-lg(1024px), --bp-xl(1280px), --bp-2xl(1440px)"
+    - "Use @media (min-width: var(--bp-*)) for progressive enhancement"
+    - "CSS grid for page layout, flexbox for component layout"
+    - "NO float, NO fixed widths in px, NO absolute positioning for layout"
+    - "Touch targets: min 44x44px on mobile (WCAG 2.5.5)"
+    - "Container queries for reusable components where supported"
+
+  wcag_patterns:
+    - "Skip-to-content link as FIRST focusable element: <a href='#main' class='skip-link'>Aller au contenu</a>"
+    - "Quick access menu: accesskey shortcuts to main sections (accesskey='1' for home, '2' for search, etc.)"
+    - "role='search' on search forms, role='navigation' on <nav>, role='main' on <main>"
+    - "aria-label on icon-only buttons: <button aria-label='Fermer'><svg.../></button>"
+    - "aria-describedby on form inputs linked to help text or error messages"
+    - "aria-live='polite' for dynamic content updates (notifications, loading states)"
+    - "aria-expanded on accordion/dropdown triggers"
+    - ":focus-visible styles on ALL interactive elements — visible ring, not just outline"
+    - "Logical tab order: no tabindex > 0, use DOM order"
+    - "Escape closes modals/dropdowns, Enter/Space activates buttons"
+    - "prefers-reduced-motion: @media (prefers-reduced-motion: reduce) { animation: none }"
+    - "Color is NEVER the only indicator — add text, icon, or pattern"
+
+  component_structure:
+    - "Atomic design: atoms → molecules → organisms → templates → pages"
+    - "Each component in its own file with co-located CSS module"
+    - "Props interface typed (TypeScript) for every component"
+    - "Loading/error/empty states for EVERY data-dependent component"
+    - "Storybook-compatible: export default meta + named story exports"
+
+  files_required:
+    - "styles/tokens.css — all CSS custom properties (colors, fonts, spacing, radii, shadows)"
+    - "styles/themes.css — [data-theme] and [data-contrast] overrides"
+    - "styles/base.css — reset, typography baseline, skip-link, focus-visible"
+    - "styles/components.css — reusable component classes"
+    - "lib/theme.ts — theme detection, toggle, persistence (localStorage)"
