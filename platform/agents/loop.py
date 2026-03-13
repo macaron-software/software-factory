@@ -525,6 +525,13 @@ class AgentLoop:
         # Skills - Auto-inject relevant skills based on mission context
         skills_prompt = ""
 
+        # Select context tier based on agent profile
+        from ..llm.context_tiers import select_tier, build_tiered_skills
+        tier = select_tier(
+            hierarchy_rank=self.agent.hierarchy_rank,
+            capability_grade=grade,
+        )
+
         # Try automatic skills injection first
         try:
             from .skills_integration import enrich_agent_with_skills
@@ -544,22 +551,26 @@ class AgentLoop:
                 mission_description=mission_desc,
                 project_id=self.project_id,
                 fallback_skills=self.agent.skills,  # Fallback to manual skills
+                context_tier=tier.value,
             )
         except Exception as exc:
             logger.debug(f"Auto skills injection failed: {exc}, using manual skills")
 
-            # Fallback to original manual skill loading
+            # Fallback to original manual skill loading with tier awareness
             if self.agent.skills:
                 try:
                     lib = get_skill_library()
-                    parts = []
-                    for sid in self.agent.skills[:5]:
+                    raw_skills = []
+                    for sid in self.agent.skills[:10]:
                         skill = lib.get(sid)
-                        if skill and skill.get("content"):
-                            parts.append(
-                                f"### {skill['name']}\n{skill['content'][:1500]}"
-                            )
-                    skills_prompt = "\n\n".join(parts)
+                        if skill and (skill.content or skill.l0_summary):
+                            raw_skills.append({
+                                "name": skill.name,
+                                "content": skill.content or "",
+                                "l0": skill.l0_summary or "",
+                                "similarity": 0.0,
+                            })
+                    skills_prompt = build_tiered_skills(raw_skills, tier)
                 except Exception:
                     pass
 
@@ -606,6 +617,7 @@ class AgentLoop:
             tools_enabled=agent_tools_enabled,
             epic_run_id=epic_run_id,
             capability_grade=grade,
+            context_tier=tier.value,
         )
 
     # ------------------------------------------------------------------

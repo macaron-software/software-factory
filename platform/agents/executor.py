@@ -106,6 +106,8 @@ class ExecutionContext:
     epic_run_id: str | None = None
     # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
     capability_grade: str = "executor"
+    # Context tier: L0 (abstract) / L1 (overview) / L2 (detail) — controls prompt verbosity
+    context_tier: str = "L1"
     # Max tool-calling rounds (0 = use global MAX_TOOL_ROUNDS)
     max_rounds: int = 0
     # Files written by code_write/code_edit during this execution (for auto-commit)

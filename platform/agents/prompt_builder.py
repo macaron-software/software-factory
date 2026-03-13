@@ -287,28 +287,41 @@ If you don't have a feature ID, use the task name (e.g., # Ref: task-auth — Lo
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
 
+    # Apply tier-aware budgets for guidelines/memory/vision
+    from ..llm.context_tiers import ContextTier, apply_tier_to_context
+    tier = ContextTier(ctx.context_tier)
+
     # Inject architecture/tech guidelines if available for this project
     guidelines = _load_guidelines_for_prompt(ctx)
     if guidelines:
-        parts.append(f"\n## Architecture & Tech Guidelines (DSI)\n{guidelines}")
-
-    if ctx.capability_grade == "organizer":
-        # Organizers: full project context (constitution, vision, memory files)
-        if ctx.vision:
-            parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
-        if ctx.project_context:
-            parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
-        if ctx.project_memory:
-            parts.append(
-                f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
-            )
+        tiered = apply_tier_to_context(tier, guidelines=guidelines)
+        if tiered["guidelines"]:
+            parts.append(f"\n## Architecture & Tech Guidelines (DSI)\n{tiered['guidelines']}")
     else:
-        # Executors: task-scoped context only — no vision, condensed memory
-        # Avoids injecting the full project constitution into every dev/qa call
-        if ctx.project_context:
+        tiered = apply_tier_to_context(
+            tier,
+            project_context=ctx.project_context,
+            project_memory=ctx.project_memory,
+            vision=ctx.vision,
+        )
+
+    if tier == ContextTier.L2:
+        # L2: full project context (organizers, reviewers)
+        if tiered.get("vision"):
+            parts.append(f"\n## Project Vision\n{tiered['vision']}")
+        if tiered.get("project_context"):
+            parts.append(f"\n## Project Context\n{tiered['project_context']}")
+        if tiered.get("project_memory"):
             parts.append(
-                f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"
+                f"\n## Project Memory (auto-loaded instructions)\n{tiered['project_memory']}"
             )
+    elif tier == ContextTier.L1:
+        # L1: condensed context (standard agents)
+        if tiered.get("project_context"):
+            parts.append(
+                f"\n## Task Context (relevant memory)\n{tiered['project_context']}"
+            )
+    # L0: no memory/vision injected (routing only)
 
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")

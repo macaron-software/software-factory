@@ -17,6 +17,7 @@ def enrich_agent_with_skills(
     mission_description: str | None = None,
     project_id: str | None = None,
     fallback_skills: list[str] | None = None,
+    context_tier: str = "L1",
 ) -> str:
     """
     Automatically inject relevant external skills into agent's prompt.
@@ -27,6 +28,7 @@ def enrich_agent_with_skills(
         mission_description: Current mission/task description for context analysis
         project_id: Project identifier
         fallback_skills: Manual skill IDs to use if injection fails
+        context_tier: L0/L1/L2 — controls how much detail per skill
 
     Returns:
         Formatted skills prompt to inject into system_prompt
@@ -74,55 +76,61 @@ def enrich_agent_with_skills(
                 f"Injected {len(result['injected_skills'])} skills for {agent_role}: "
                 f"{[s['name'] for s in result['injected_skills']]}"
             )
-            return _format_skills_section(result["injected_skills"])
+            return _format_skills_section(result["injected_skills"], context_tier)
         logger.debug(f"No skills matched for {agent_role}, using fallback")
-        return _fallback_skills_prompt(fallback_skills)
+        return _fallback_skills_prompt(fallback_skills, context_tier)
 
     except ImportError:
         logger.debug("Skills injection system not available, using fallback")
-        return _fallback_skills_prompt(fallback_skills)
+        return _fallback_skills_prompt(fallback_skills, context_tier)
     except Exception as exc:
         logger.warning(f"Skills injection failed: {exc}, using fallback")
-        return _fallback_skills_prompt(fallback_skills)
+        return _fallback_skills_prompt(fallback_skills, context_tier)
 
 
-def _format_skills_section(skills: list[dict]) -> str:
-    """Format injected skills into prompt section."""
+def _format_skills_section(skills: list[dict], context_tier: str = "L1") -> str:
+    """Format injected skills into prompt section, respecting context tier."""
     if not skills:
         return ""
 
-    parts = []
-    for skill in skills[:10]:  # Max 10 skills
-        name = skill.get("name", "Unknown")
-        content = skill.get("content", "")
-        similarity = skill.get("similarity", 0.0)
+    from ..llm.context_tiers import ContextTier, build_tiered_skills
 
-        # Truncate long skills
-        if len(content) > 1500:
-            content = content[:1500] + "..."
+    tier = ContextTier(context_tier)
+    formatted_skills = []
+    for skill in skills:
+        formatted_skills.append({
+            "name": skill.get("name", "Unknown"),
+            "content": skill.get("content", ""),
+            "similarity": skill.get("similarity", 0.0),
+            "l0": "",
+        })
+    return build_tiered_skills(formatted_skills, tier)
 
-        parts.append(f"### {name} (relevance: {similarity:.2f})\n{content}")
 
-    return "\n\n".join(parts)
-
-
-def _fallback_skills_prompt(skill_ids: list[str] | None = None) -> str:
+def _fallback_skills_prompt(skill_ids: list[str] | None = None, context_tier: str = "L1") -> str:
     """Fallback to manual skill loading if injection fails."""
     if not skill_ids:
         return ""
 
     try:
         from ..skills.library import get_skill_library
+        from ..llm.context_tiers import ContextTier, build_tiered_skills
 
+        tier = ContextTier(context_tier)
         lib = get_skill_library()
-        parts = []
+        raw_skills = []
 
-        for sid in skill_ids[:5]:  # Max 5 fallback skills
+        for sid in skill_ids[:10]:
             skill = lib.get(sid)
-            if skill and skill.get("content"):
-                parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
+            if skill and (skill.get("content") or skill.get("l0_summary")):
+                raw_skills.append({
+                    "name": skill["name"],
+                    "content": skill.get("content", ""),
+                    "l0": skill.get("l0_summary", ""),
+                    "similarity": 0.0,
+                })
 
-        return "\n\n".join(parts)
+        return build_tiered_skills(raw_skills, tier)
     except Exception as exc:
         logger.debug(f"Fallback skill loading failed: {exc}")
         return ""

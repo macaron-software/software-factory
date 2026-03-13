@@ -15,6 +15,7 @@ import yaml
 
 from ..config import SKILLS_DIR, LEGACY_SKILLS_DIR, DATA_DIR
 from ..db.migrations import get_db
+from ..llm.context_tiers import extract_l0_summary
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class SkillInfo:
     updated_at: str = ""
     category: str = ""        # development|testing|security|design|ops|management
     triggers: list[str] = field(default_factory=list)  # when to activate
+    l0_summary: str = ""      # one-line abstract (auto-generated if empty)
 
 
 # ── Frontmatter parser for .md files ────────────────────────────
@@ -155,6 +157,7 @@ class SkillLibrary:
                     file_path=str(path),
                     category=cat,
                     triggers=trigs,
+                    l0_summary=extract_l0_summary(text, fm.get("name", heading or skill_id)),
                 )
                 self._cache[info.id] = info
                 results.append(info)
@@ -176,15 +179,19 @@ class SkillLibrary:
                 if not raw or not isinstance(raw, dict):
                     continue
                 role_id = raw.get("id", path.stem)
+                _sys = raw.get("system_prompt", "")
+                _persona = raw.get("persona", {})
+                _desc = (_persona.get("description", "") if isinstance(_persona, dict) else str(_persona)).strip()
                 info = SkillInfo(
                     id=role_id,
                     name=raw.get("name", role_id),
-                    description=raw.get("persona", {}).get("description", "").strip(),
-                    content=raw.get("system_prompt", ""),
+                    description=_desc,
+                    content=_sys,
                     source="local-yaml",
                     source_url=str(path),
                     tags=raw.get("skills", []) + raw.get("tags", []),
                     file_path=str(path),
+                    l0_summary=extract_l0_summary(_desc or _sys, raw.get("name", role_id)),
                 )
                 self._cache[info.id] = info
                 results.append(info)
