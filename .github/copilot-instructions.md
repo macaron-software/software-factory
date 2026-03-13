@@ -11,7 +11,7 @@ for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron _FLO _PSY YOLONOW; 
   (cd ~/_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
 done
 ```
-Note: PSY remote=github (not origin). YOLONOW has no remote yet (local-only).
+Note: PSY remote=github (not origin).
 
 ## NEVER
 - `import platform` top-level — shadows stdlib; use `from platform.X import Y`
@@ -79,7 +79,7 @@ Config: AWS_SES_REGION (dflt eu-west-1) . AWS_SES_FROM_EMAIL (dflt noreply@macar
 | SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
 | FLO | macaron-software/luna | _FLO | TBD |
 | PSY | macaron-software/psy-platform (priv) | _PSY | Rust/Axum+React |
-| YOLONOW | (no remote) | YOLONOW | Rust |
+| YOLONOW | macaron-software/yolonow (priv) | YOLONOW | Rust |
 | MesAides | macaron-software/mes-aides | _HELP/aides-macaron | Rust+WASM+SwiftUI+Kotlin |
 
 SAFe CRUD API: POST /api/missions (epic) . POST /api/epics/{id}/features . POST /api/features/{id}/stories
