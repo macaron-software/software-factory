@@ -757,6 +757,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Platform watchdog failed to start: %s", e)
 
+    # Traceability scheduler — periodic SAFe traceability audit on all projects
+    try:
+        from .ops.traceability_scheduler import ENABLED as _trace_enabled
+        from .ops.traceability_scheduler import traceability_scheduler_loop
+
+        if _trace_enabled and _mode != "ui":
+            asyncio.create_task(traceability_scheduler_loop())
+            logger.info("Traceability scheduler started")
+        elif _mode == "ui":
+            logger.info("Traceability scheduler SKIPPED (PLATFORM_MODE=ui)")
+    except Exception as e:
+        logger.warning("Traceability scheduler failed to start: %s", e)
+
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
         from .epics.store import get_epic_run_store
