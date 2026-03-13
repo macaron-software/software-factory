@@ -98,10 +98,13 @@ HTTP cache: Cache-Control immutable ?v= versioned . 1h unversioned static
 Coverage: 31/88 templates . DS page /design-system -> Skeleton tab (20 live demos)
 ```
 
-## PM v2 -- Lego Orchestrator
-Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).
+## Epic Workflow Engine (PM v2)
+NOT "PACMAN" — PACMAN is a game project. SF pipeline = Epic Runner.
+Epic -> workflow (YAML phases) -> epic_runs (DB) -> PM LLM drives phases.
+PM LLM: next|loop|done|skip|**phase**(dynamic brick).
 compose: pattern+team+gate+feedback -> PatternDef+WorkflowPhase -> _phase_queue.
 Checkpoint: quality<50% -> retry. PM_OVERRIDE: force on build fail. Cap: 20.
+Vocab: EpicRun . WorkflowPhase . PatternDef . epic_orch . auto_resume
 
 ```
 store.py layout:

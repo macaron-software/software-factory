@@ -90,7 +90,9 @@ Coverage: 31/88 templates (all data pages). DS page /design-system -> Skeleton t
 Cache: platform/cache.py TTL (agents 60s, missions 30s, runs 15s, wf 120s). Prefix invalidation.
 HTTP: Cache-Control immutable for versioned static (?v=), 1h unversioned.
 
-## PM v2 — Lego Orchestrator
+## Epic Workflow Engine — PM v2 (Lego Orchestrator)
+NOT "PACMAN" — PACMAN is a game project in SF. Pipeline = Epic Runner.
+Epic -> workflow YAML (phases) -> epic_runs (PG) -> PM LLM drives phases.
 Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).
 compose: pattern+team+gate+feedback -> PatternDef+WorkflowPhase -> _phase_queue.
 Checkpoint: quality<50% -> retry. PM_OVERRIDE: force on build fail. Cap: 20.
