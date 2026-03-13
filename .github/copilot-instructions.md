@@ -1,7 +1,7 @@
 # SF Platform — Quick Ref
 
 ## WHAT
-Multi-agent SAFe orch. ~215 agents . 26 patterns . 49 wf . 28 phase tpl . 52 tool mods . 1090 skills.
+Multi-agent SAFe orch. ~218 agents . 26 patterns . 49 wf . 28 phase tpl . 52 tool mods . 1090 skills.
 FastAPI+HTMX+SSE. PG16(61tbl)+Redis7. 372py/146KLOC. Port 8099(dev)/8090(prod). Dark purple UI.
 
 ## NEVER
@@ -90,3 +90,16 @@ CI: .github/workflows/deploy-demo.yml
 - Container: /app/macaron_platform/ not /app/platform/
 - SSE: `curl --max-time` — urllib blocks
 - Epic orch: _build_phase_prompt() not workflows/store.py
+
+## PUA / Motivation
+pua.py: Iron Rules+Proactivity ALL agents. L1-L4 pressure on retry.
+agent.motivation field: injected in prompt. L2+ fires [PERSONAL ACCOUNTABILITY] hook.
+_PUA_QA_BLOCK: QA = REVIEWER not IMPLEMENTER.
+5-step debug each retry: Smell→Elevate→Mirror→Execute→Retrospective
+
+## Traceability
+Adversarial L0: MISSING_TRACEABILITY — all .py/.ts files need `# Ref: FEAT-xxx`
+Tools: legacy_scan . traceability_coverage . traceability_validate . traceability_link
+Team: team-traceability (art-platform) — 4 agents: trace-lead/trace-auditor/trace-writer/trace-monitor
+Scheduler: ops/traceability_scheduler.py every 6h — SAFe hierarchy audit, incidents on >3 gaps
+PM v2: auto-inserts traceability-check after dev phases

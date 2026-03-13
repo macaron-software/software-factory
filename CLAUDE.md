@@ -1,7 +1,7 @@
 # SF Platform — Agentic Workflow Engine
 
 ## Stats
-~215 agents . 26 patterns (20 catalog+5 fractal+backprop) . 49 wf . 28 phase tpl
+~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 49 wf . 28 phase tpl
 52 tool mods . 134 schemas . 1090 skills . 372py/146KLOC . 61 PG tables
 
 ## NEVER
@@ -74,7 +74,8 @@ Feedback: adversarial->config.adversarial_guard | tools->require_tool_validation
 ```
 WorkflowPhase  id pattern_id name desc gate config retry_count skip_on_failure timeout
 PatternDef     id name desc type agents[{id,agent_id}] edges config steps
-AgentDef       id name role desc system_prompt provider model temp max_tokens skills[] tools[] tags[]
+AgentDef       id name role desc system_prompt provider model temp max_tokens
+               skills[] tools[] tags[] motivation="" persona=""
 EpicRun        id workflow_id session_id status current_phase started_at cancel_reason
 WorkflowRun    workflow session_id project_id current_phase phase_results[] status
 PatternRun     pattern session_id project_id project_path phase_id max_iterations
@@ -93,7 +94,17 @@ CC fn >10err >5warn . LOC >500err >300warn . MI <10err <20warn
 DB: legacy_items(uuid,project,category,name,metadata_json) + traceability_links(legacy->story/test)
 Tools: legacy_scan . traceability_link . traceability_coverage . traceability_validate
 Roles: cdp/arch/product/dev=all4 qa=coverage+validate
-Adversarial: `// Ref: FEAT-xxx` enforced (MISSING_TRACEABILITY)
+Adversarial: `# Ref: FEAT-xxx` / `// Ref:` enforced (MISSING_TRACEABILITY L0)
+Role: `traceability` in _classify_agent_role() + ROLE_TOOL_MAP['traceability'] (40+ tools)
+Team: team-traceability / art-platform (4 agents):
+  trace-lead (Nadia) . trace-auditor (Mehdi) . trace-writer (Sophie) . trace-monitor (Lucas)
+  VETO if coverage <80% . trace-writer = only SPECS.md maintainer
+Phase: traceability-check tpl uses team_roles=['traceability'×3, 'qa']
+PM v2: auto-inserts traceability-check after dev phases; legacy->story->traceability for migrations
+Scheduler: ops/traceability_scheduler.py — every 6h (TRACEABILITY_INTERVAL)
+  scans SAFe hierarchy: epics/features/stories/ACs completeness
+  creates platform incidents if >3 high-severity gaps
+  env: TRACEABILITY_SCHEDULER_ENABLED . TRACEABILITY_INTERVAL
 
 ## LLM — FROZEN
 local-mlx Qwen3.5-mlx . minimax M2.5(native tool_calls, no mangle, `<think>` stripped)
@@ -114,7 +125,23 @@ OVH: rsync -> --force-recreate Docker (blue/green/factory)
 Azure: systemd sf-platform -> az vm run-command
 CI: .github/workflows/deploy-demo.yml
 
-## Rules
+## PUA — Persistence Under Adversity
+Source: github.com/tanweai/pua (+36% fixes, +65% verif, +50% tool calls)
+Engine: platform/agents/pua.py — 3 Iron Rules + Proactivity injected ALL agents
+Pressure: L1(2nd fail=switch) L2(3rd=soul) L3(4th=7-pt checklist) L4(5th+=escalate)
+L2+: [PERSONAL ACCOUNTABILITY] hook fires using agent.motivation (own words)
+5-step debug (each retry): Smell→Elevate→Mirror→Execute→Retrospective
+QA boundary: _PUA_QA_BLOCK — REVIEWER≠IMPLEMENTER; QA persistence rules
+agent.motivation field injected in system prompt alongside persona
+engine.py: passes agent.motivation to build_retry_prompt() on adversarial reject
+
+## Deep Bench — Motivation ACs
+deep_bench_tools.py — agents layer adds 3 cases:
+  3i agents-motivation-coverage  det  ≥30% agents have motivation (currently 55%)
+  3j agents-pua-motivation-hook  det  PUA hook fires at L2+/with-motivation, silent at L1/none
+  3k agents-judge-motivation     llm  output reflects stated values under pressure
+
+
 - YAML phase.config > pattern.config (merge L892)
 - Agent resolve: explicit -> TeamSelector(Darwin) -> role -> dev_fullstack
 - pm_driven:true -> PM checkpoint each phase
