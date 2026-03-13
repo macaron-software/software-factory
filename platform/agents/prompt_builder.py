@@ -17,47 +17,11 @@ from .tool_schemas import (
 if TYPE_CHECKING:
     from .executor import ExecutionContext
 
-# ─── PUA Persistence Methodology ─────────────────────────────────────────────
-# Source: github.com/tanweai/pua (MIT) — adapted for SF agent context.
-# Core insight: force agents to exhaust all options before giving up/escalating.
-# 3 Iron Rules + 4 pressure levels + 5-step debug + forbidden passive patterns.
-_PUA_DEV_BLOCK = """
-## PUA — Persistence Under Adversity (MANDATORY)
-Source: github.com/tanweai/pua — do NOT give up until ALL options are exhausted.
-
-### 3 Iron Rules
-1. **Exhaust ALL options** — try ≥3 fundamentally different approaches before ESCALATE.
-2. **Act before asking** — use tools (code_read, list_files, deep_search) FIRST; only ask what tools cannot answer.
-3. **Take initiative end-to-end** — fix → verify (run tests / check output) → scan related files for same pattern. Never stop at the surface fix.
-
-### Auto-switch strategy when
-- Same approach failed 2+ consecutive times → MUST switch to fundamentally different method (not just tweak params)
-- About to write "I cannot" / "please handle manually" / "probably an env issue" → FORBIDDEN — verify with tools first
-- File written but no test run → INCOMPLETE — run verification before reporting done
-- No `# Ref:` header in generated file → INCOMPLETE — add traceability before submitting
-
-### 4 Pressure Levels (escalate automatically on consecutive failures)
-| Failures | Level | Mandatory Action |
-|----------|-------|-----------------|
-| 2nd | L1 Mild | Switch to completely different approach |
-| 3rd | L2 Root-cause | Read error word-by-word + deep_search + check environment |
-| 4th | L3 Checklist | (1) re-read task spec, (2) check all logs, (3) invert assumptions, (4) try simplest possible fix, (5) verify env vars, (6) check imports/deps, (7) search for prior working example |
-| 5th+ | L4 Escalate | ESCALATE to orchestrator with full failure log — never silently loop |
-
-### 5-Step Debug (when stuck)
-1. **Smell** — list ALL attempts made, identify the common failure pattern
-2. **Elevate** — read error message word-by-word → deep_search → read source code → verify env → invert assumptions
-3. **Mirror** — Am I repeating the same approach? Did I actually read the file? Did I check the simplest case?
-4. **Execute** — new approach MUST: be fundamentally different, have clear success criteria, produce new diagnostic info on failure
-5. **Retrospective** — what solved it? proactively check related files for same bug pattern
-
-### Forbidden Passive Patterns (automatic L1 trigger)
-- Tweaking the same line/param repeatedly with no new information
-- Writing "Fixed!" without running verification
-- Asking the user what a tool call could discover
-- Stopping after patching surface issue without checking related code
-"""
-
+# ─── QA Role Boundary (PUA-derived) ──────────────────────────────────────────
+# Source: github.com/tanweai/pua (MIT) — adapted for SF QA agents.
+# Full PUA engine (Iron Rules, L1-L4 pressure, 5-step debug) is in pua.py and
+# injected for ALL agents via build_motivation_block() at prompt assembly time.
+# This block adds QA-specific role boundary enforcement (REVIEW ≠ IMPLEMENT).
 _PUA_QA_BLOCK = """
 ## QA Role Boundaries (CRITICAL)
 You are a REVIEWER / VALIDATOR — NOT an implementer.
@@ -304,7 +268,7 @@ RULES:
 
     # Traceability requirement for all dev roles
     role_cat = _classify_agent_role(agent)
-    _dev_roles = {"backend", "frontend", "fullstack", "dev", "mobile", "architect"}
+    _dev_roles = {"backend", "frontend", "fullstack", "dev", "mobile", "architect", "architecture"}
     if role_cat in _dev_roles:
         parts.append("""
 ## Traceability (MANDATORY)
@@ -316,7 +280,6 @@ Example: # Ref: feat-a1b2 — User authentication endpoint
 This enables full audit trail: feature → code → test.
 If you don't have a feature ID, use the task name (e.g., # Ref: task-auth — Login flow).
 """)
-        parts.append(_PUA_DEV_BLOCK)
 
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
