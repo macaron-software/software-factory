@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_table %}
 
 {% block topbar_actions %}
 {% include "partials/view_switcher.html" %}
@@ -11,6 +12,44 @@
 {% endblock %}
 
 {% block content %}
+<!-- ── Tab bar ───────────────────────────────────────────────────── -->
+<style>
+.skills-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--bg-secondary); padding:0 1rem; margin-bottom:0; flex-shrink:0; }
+.skills-tab { padding:0.55rem 1.1rem; font-size:0.82rem; font-weight:600; color:var(--text-secondary); border:none; border-bottom:2px solid transparent; background:none; cursor:pointer; display:flex; align-items:center; gap:0.35rem; transition:color .15s; white-space:nowrap; }
+.skills-tab:hover { color:var(--text-primary); }
+.skills-tab.active { color:var(--text-primary); border-bottom-color:var(--purple,#7c3aed); }
+/* Skill AC styles */
+.sac-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+.sac-kpi { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px; padding:14px 16px; text-align:center; }
+.sac-kpi-val { font-size:1.6rem; font-weight:700; }
+.sac-kpi-lbl { font-size:0.75rem; color:var(--text-secondary); margin-top:3px; }
+.sac-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.sac-table th { text-align:left; padding:6px 10px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:.04em; }
+.sac-table td { padding:7px 10px; border-bottom:1px solid var(--border-subtle,#30363d); vertical-align:middle; }
+.sac-bar-wrap { background:var(--bg-primary); border-radius:4px; height:6px; min-width:80px; overflow:hidden; }
+.sac-bar { height:100%; border-radius:4px; transition:width .5s ease; }
+.sac-ok   { color:#3fb950; } .sac-warn { color:#d29922; } .sac-fail { color:#f47067; }
+.sac-badge { display:inline-block; padding:2px 7px; border-radius:9px; font-size:0.72rem; font-weight:700; }
+.sac-badge.ok   { background:#1c4322; color:#3fb950; }
+.sac-badge.warn { background:#3d2a00; color:#d29922; }
+.sac-badge.fail { background:#3c1c1c; color:#f47067; }
+.sac-details { font-size:0.75rem; color:var(--text-secondary); }
+.sac-details summary { cursor:pointer; color:var(--text-secondary); }
+.sac-details ul { margin:4px 0 0 14px; padding:0; }
+.sac-details li { color:#f47067; margin-bottom:2px; }
+</style>
+
+<div class="skills-tabs">
+  <button class="skills-tab active" id="stab-library" onclick="skillsTab('library')">
+    <svg class="icon icon-xs"><use href="#icon-layers"/></svg> Library
+  </button>
+  <button class="skills-tab" id="stab-ac" onclick="skillsTab('ac')">
+    <svg class="icon icon-xs"><use href="#icon-check-circle"/></svg> Brick Skills AC
+  </button>
+</div>
+
+<!-- ── Tab: Library ─────────────────────────────────────────────── -->
+<div id="skills-tab-library">
 <div id="skills-content-wrap">
 <!-- GitHub Sources (collapsible) -->
 <details class="gh-sources-panel">
@@ -77,6 +116,55 @@
     {% include "partials/skills_grid.html" %}
 </div>
 </div><!-- /skills-content-wrap -->
+</div><!-- /skills-tab-library -->
+
+<!-- ── Tab: Brick Skills AC ─────────────────────────────────────── -->
+<div id="skills-tab-ac" style="display:none;padding:16px 0">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div>
+      <h3 style="margin:0;font-size:1.1rem">Brick Skills AC</h3>
+      <p style="margin:4px 0 0;font-size:0.78rem;color:var(--text-secondary)">
+        Layer 2 — quality checks · Layer 3 — trigger routing accuracy
+      </p>
+    </div>
+    <button class="btn btn-sm btn-ghost" onclick="loadSkillAC(true)">
+      <svg class="icon icon-xs"><use href="#icon-refresh"/></svg> Refresh
+    </button>
+  </div>
+
+  <div id="sac-loading" style="text-align:center;padding:40px;color:var(--text-secondary);display:none">
+    <svg class="icon icon-sm" style="animation:spin 1s linear infinite"><use href="#icon-loader"/></svg> Running AC…
+  </div>
+  <div id="sac-error" style="display:none;color:#f47067;padding:12px;background:#3c1c1c;border-radius:8px;margin-bottom:14px"></div>
+
+  <!-- Summary KPIs -->
+  <div id="sac-summary" class="sac-summary" style="display:none">
+    <div class="sac-kpi"><div id="sac-total" class="sac-kpi-val">—</div><div class="sac-kpi-lbl">Bricks</div></div>
+    <div class="sac-kpi"><div id="sac-passing" class="sac-kpi-val sac-ok">—</div><div class="sac-kpi-lbl">Fully passing</div></div>
+    <div class="sac-kpi"><div id="sac-quality" class="sac-kpi-val">—</div><div class="sac-kpi-lbl">Avg quality score</div></div>
+    <div class="sac-kpi"><div id="sac-trigger" class="sac-kpi-val">—</div><div class="sac-kpi-lbl">Avg trigger accuracy</div></div>
+  </div>
+
+  <!-- Skeleton initial state for AC tab -->
+  <div id="sac-skeleton">
+    {{ skeleton_stat_cards(4) }}
+    <div style="margin-top:1rem">{{ skeleton_table(6, 6) }}</div>
+  </div>
+
+  <!-- Results table -->
+  <div id="sac-table-wrap" style="display:none">
+    <table class="sac-table">
+      <thead><tr>
+        <th>Brick</th><th>Skill</th>
+        <th>Quality <small style="font-weight:400;text-transform:none">(L2)</small></th>
+        <th>Trigger acc. <small style="font-weight:400;text-transform:none">(L3)</small></th>
+        <th>Status</th>
+        <th>Issues</th>
+      </tr></thead>
+      <tbody id="sac-tbody"></tbody>
+    </table>
+  </div>
+</div>
 
 <div id="skill-preview" class="skill-preview-panel collapsed">
     <div class="skill-preview-header">
@@ -101,6 +189,87 @@ function toggleSkillPreview(show) {
     else panel.classList.toggle('collapsed');
     const isCollapsed = panel.classList.contains('collapsed');
     if (wrap) wrap.style.paddingRight = isCollapsed ? '0' : '420px';
+}
+
+// ── Tab switching ────────────────────────────────────────────────
+function skillsTab(tab) {
+    document.querySelectorAll('.skills-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('skills-tab-library').style.display = tab === 'library' ? '' : 'none';
+    document.getElementById('skills-tab-ac').style.display = tab === 'ac' ? '' : 'none';
+    document.getElementById('stab-' + tab).classList.add('active');
+    if (tab === 'ac' && !document.getElementById('sac-tbody').dataset.loaded) loadSkillAC();
+}
+
+// ── Skill AC loader ──────────────────────────────────────────────
+let _sacLoading = false;
+async function loadSkillAC(force) {
+    if (_sacLoading) return;
+    const tbody = document.getElementById('sac-tbody');
+    if (!force && tbody.dataset.loaded) return;
+    _sacLoading = true;
+    document.getElementById('sac-loading').style.display = '';
+    document.getElementById('sac-summary').style.display = 'none';
+    document.getElementById('sac-table-wrap').style.display = 'none';
+    document.getElementById('sac-error').style.display = 'none';
+    try {
+        const res = await fetch('/api/bricks/skill-ac');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderSkillAC(data);
+        tbody.dataset.loaded = '1';
+    } catch(e) {
+        document.getElementById('sac-error').textContent = 'Error: ' + e.message;
+        document.getElementById('sac-error').style.display = '';
+    } finally {
+        document.getElementById('sac-loading').style.display = 'none';
+        _sacLoading = false;
+    }
+}
+
+function renderSkillAC(data) {
+    const skEl = document.getElementById('sac-skeleton');
+    if (skEl) skEl.style.display = 'none';
+    const s = data.summary || {};
+    document.getElementById('sac-total').textContent   = s.total_bricks ?? '—';
+    document.getElementById('sac-passing').textContent = s.fully_passing ?? '—';
+    document.getElementById('sac-quality').textContent = s.avg_quality_score != null ? Math.round(s.avg_quality_score * 100) + '%' : '—';
+    document.getElementById('sac-trigger').textContent = s.avg_trigger_accuracy != null ? Math.round(s.avg_trigger_accuracy * 100) + '%' : '—';
+    document.getElementById('sac-summary').style.display = '';
+
+    const tbody = document.getElementById('sac-tbody');
+    tbody.innerHTML = '';
+    const results = data.results || {};
+    Object.entries(results).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([bid, r]) => {
+        const qs = Math.round((r.quality_score ?? 0) * 100);
+        const ta = r.trigger_accuracy != null ? Math.round(r.trigger_accuracy * 100) : null;
+        const ok = r.ok;
+        const qColor = qs >= 80 ? '#3fb950' : qs >= 50 ? '#d29922' : '#f47067';
+        const tColor = ta == null ? 'var(--text-secondary)' : ta >= 80 ? '#3fb950' : ta >= 60 ? '#d29922' : '#f47067';
+        const badge = ok ? '<span class="sac-badge ok">✓ pass</span>' : '<span class="sac-badge fail">✗ fail</span>';
+        const failedQ = (r.quality_failed || []);
+        const failedT = (r.trigger_failed || []);
+        const issues = [...failedQ, ...failedT];
+        const issuesHtml = issues.length ? `<details class="sac-details"><summary>${issues.length} issue${issues.length>1?'s':''}</summary><ul>${issues.map(i=>`<li>${i}</li>`).join('')}</ul></details>` : '<span style="color:var(--text-secondary);font-size:0.75rem">—</span>';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><code style="font-size:0.8rem">${bid}</code></td>
+          <td style="color:var(--text-secondary);font-size:0.8rem">${r.skill_name || '—'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="sac-bar-wrap"><div class="sac-bar" style="width:${qs}%;background:${qColor}"></div></div>
+              <span style="color:${qColor};font-weight:700;font-size:0.8rem">${qs}%</span>
+            </div>
+          </td>
+          <td>
+            ${ta != null
+              ? `<div style="display:flex;align-items:center;gap:6px"><div class="sac-bar-wrap"><div class="sac-bar" style="width:${ta}%;background:${tColor}"></div></div><span style="color:${tColor};font-weight:700;font-size:0.8rem">${ta}%</span></div>`
+              : '<span style="color:var(--text-secondary);font-size:0.75rem">no cases</span>'}
+          </td>
+          <td>${badge}</td>
+          <td>${issuesHtml}</td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('sac-table-wrap').style.display = '';
 }
 </script>
 {% endblock %}

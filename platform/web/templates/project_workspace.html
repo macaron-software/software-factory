@@ -70,6 +70,7 @@ html,body{height:100%;overflow:hidden}
 {% endblock %}
 
 {% block content %}
+{% from "partials/skeleton.html" import skeleton_block, skeleton_table, skeleton_kanban, skeleton_item_grid, skeleton_feed %}
 <div class="ws-layout" id="wsLayout" data-view="code">
 
   <!-- ── Activity Bar ─────────────────────────────────────────── -->
@@ -142,7 +143,7 @@ html,body{height:100%;overflow:hidden}
       <span>{{ project.name }}</span>
     </div>
     <div class="ws-filetree-body" id="wsTreeBody">
-      <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Chargement…</div>
+      {{ skeleton_block(6) }}
     </div>
   </div>
 
@@ -228,11 +229,11 @@ html,body{height:100%;overflow:hidden}
           <div class="ws-pane-content">
             <div class="ws-tab-content active" id="ws-code-toolcalls">
               <div class="ws-toolcalls" id="wsToolcallsBody">
-                <div class="ws-empty-state"><span>Chargement…</span></div>
+                {{ skeleton_block(4) }}
               </div>
             </div>
             <div class="ws-tab-content" id="ws-code-progress">
-              <div class="ws-empty-state"><span>Chargement PROGRESS.md…</span></div>
+              {{ skeleton_block(5) }}
             </div>
           </div>
         </div>
@@ -246,7 +247,7 @@ html,body{height:100%;overflow:hidden}
           </div>
           <div class="ws-pane-content">
             <div class="ws-git" id="wsGitBody" style="overflow-y:auto">
-              <div class="ws-empty-state"><span>Chargement…</span></div>
+              {{ skeleton_block(5) }}
             </div>
           </div>
         </div>
@@ -266,7 +267,7 @@ html,body{height:100%;overflow:hidden}
           <div class="ws-pane-content">
             <div class="ws-tab-content active" id="ws-git-log">
               <div class="ws-git-log-area" id="wsGitLogArea">
-                <div class="ws-empty-state"><span>Chargement…</span></div>
+                {{ skeleton_block(6) }}
               </div>
             </div>
             <div class="ws-tab-content" id="ws-git-diff">
@@ -309,10 +310,7 @@ html,body{height:100%;overflow:hidden}
         <div class="ws-pane-content">
           <div class="ws-tab-content active" id="ws-docker-containers">
             <div class="ws-docker" id="wsDockerBody">
-              <div class="ws-empty-state">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                <span>Chargement…</span>
-              </div>
+              {{ skeleton_block(4) }}
             </div>
           </div>
           <div class="ws-tab-content" id="ws-docker-portainer">
@@ -324,7 +322,7 @@ html,body{height:100%;overflow:hidden}
                 <h3>Portainer CE</h3>
                 <p>Gestion complète des containers Docker — images, volumes, réseaux, logs.</p>
                 <div class="ws-tool-stats" id="wsPortainerStats">
-                  <span class="ws-badge">Chargement…</span>
+                  <div class="sk sk-line" style="width:100px"></div>
                 </div>
               </div>
               <div class="ws-tool-actions">
@@ -398,7 +396,7 @@ html,body{height:100%;overflow:hidden}
               <div id="wsLaunchMissionStatus" style="font-size:.72rem;color:var(--text-secondary)"></div>
             </div>
             <div class="ws-agents" id="wsAgentsBody" style="flex:1;overflow-y:auto">
-              <div class="ws-empty-state"><span>Chargement…</span></div>
+              {{ skeleton_item_grid(4) }}
             </div>
           </div>
         </div>
@@ -408,7 +406,7 @@ html,body{height:100%;overflow:hidden}
           </div>
           <div class="ws-pane-content">
             <div class="ws-toolcalls" id="wsAgentsToolcalls">
-              <div class="ws-empty-state"><span>Chargement…</span></div>
+              {{ skeleton_block(4) }}
             </div>
           </div>
         </div>
@@ -417,10 +415,7 @@ html,body{height:100%;overflow:hidden}
       <!-- ── VIEW: Backlog ─────────────────────────────────────── -->
       <div class="ws-view-panel" id="ws-view-backlog">
         <div class="ws-backlog" id="wsBacklogBody">
-          <div class="ws-empty-state">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>
-            <span>Chargement…</span>
-          </div>
+          {{ skeleton_table(8, 5) }}
         </div>
       </div>
 
@@ -432,7 +427,7 @@ html,body{height:100%;overflow:hidden}
         </div>
         <div id="wsComplianceSummary" style="display:flex;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0;font-size:.72rem;color:var(--text-secondary)"></div>
         <div id="wsComplianceBody" style="flex:1;overflow-y:auto;padding:.5rem .75rem">
-          <div class="ws-empty-state"><span>Chargement…</span></div>
+          {{ skeleton_table(5, 4) }}
         </div>
       </div>
 
@@ -604,7 +599,7 @@ html,body{height:100%;overflow:hidden}
           <button class="ws-term-run" style="padding:.15rem .5rem;font-size:.7rem" onclick="wsLiveClear()">Clear</button>
         </div>
         <div class="ws-live-feed" id="wsLiveFeed">
-          <div class="ws-empty-state"><span>En attente d'événements…</span><span class="ws-empty-hint">Les tool calls, fichiers, commits et messages apparaissent ici en temps réel</span></div>
+          {{ skeleton_feed(5) }}
         </div>
       </div>
 
@@ -637,7 +632,7 @@ html,body{height:100%;overflow:hidden}
             oninput="wsPkgFilter_()">
         </div>
         <div id="wsPkgList" style="flex:1;overflow-y:auto;padding:0 .5rem .5rem">
-          <div class="ws-empty-state"><span>Chargement…</span></div>
+          {{ skeleton_block(5) }}
         </div>
       </div>
 

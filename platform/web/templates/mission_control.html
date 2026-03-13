@@ -10,6 +10,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "partials/skeleton.html" import skeleton_timeline, skeleton_feed %}
 <link rel="stylesheet" href="/static/css/mission-control.css?v=20260221">
 
 
@@ -149,7 +150,9 @@
                                 {% include "partials/msg_unified.html" %}
                                 {% endfor %}
                             {% else %}
-                                <div class="mc-discuss-empty">{{ _("en_attente_d_execution") }}</div>
+                                <div class="mc-discuss-empty">
+                                    {{ skeleton_timeline(3) }}
+                                </div>
                             {% endif %}
                         </div>
                     </div>

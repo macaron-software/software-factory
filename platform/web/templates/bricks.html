@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_table %}
+
+{% block topbar_actions %}
+<form method="get" action="/bricks" style="display:flex;gap:0.5rem;align-items:center">
+    <select name="project_id" class="filter-select" onchange="this.form.submit()" style="min-width:180px">
+        <option value="">— All bricks —</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if p.id == project_id %}selected{% endif %}>{{ p.name or p.id }}</option>
+        {% endfor %}
+    </select>
+</form>
+{% if project_id %}
+<button onclick="runHealthCheck()" class="btn btn-sm btn-secondary">
+    <svg class="icon icon-sm"><use href="#icon-activity"/></svg> Health Check
+</button>
+{% endif %}
+<button onclick="runSkillAC()" class="btn btn-sm btn-secondary">
+    <svg class="icon icon-sm"><use href="#icon-check-circle"/></svg> Skill AC
+</button>
+{% endblock %}
+
+{% block content %}
+<div style="padding:1.5rem">
+
+    <!-- Header stats -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.5rem">
+        <h1 style="font-size:1.6rem;font-weight:700;margin:0">
+            <svg class="icon icon-lg" style="vertical-align:-3px;margin-right:0.4rem;color:var(--purple)"><use href="#icon-layers"/></svg>
+            Tool Bricks
+        </h1>
+        <span class="badge badge-blue">{{ total }} total</span>
+        {% if project_id %}
+        <span class="badge badge-green">{{ active_count }} active for {{ project_id }}</span>
+        {% endif %}
+    </div>
+
+    {% if project_id %}
+    <!-- Health check results container -->
+    <div id="health-results" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;font-size:0.85rem">
+        <strong>Health Check:</strong> <span id="health-status">running...</span>
+        <div id="health-details" style="margin-top:0.5rem;display:flex;gap:0.75rem;flex-wrap:wrap"></div>
+    </div>
+    {% endif %}
+
+    <!-- Skill AC results container -->
+    <div id="skill-ac-results" style="display:none;margin-bottom:1.5rem;padding:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem">
+            <strong style="font-size:0.9rem">Skill AC</strong>
+            <span id="skill-ac-status" style="font-size:0.82rem;color:var(--text-secondary)">running...</span>
+        </div>
+        <div id="skill-ac-summary" style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem;font-size:0.82rem">
+            {{ skeleton_stat_cards(4) }}
+        </div>
+        <div style="overflow-x:auto">
+            <table id="skill-ac-table" style="width:100%;border-collapse:collapse;font-size:0.8rem;display:none">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border);text-align:left">
+                        <th style="padding:0.4rem 0.6rem;color:var(--text-secondary)">Brick</th>
+                        <th style="padding:0.4rem 0.6rem;color:var(--text-secondary)">Skill</th>
+                        <th style="padding:0.4rem 0.6rem;color:var(--text-secondary)">Quality</th>
+                        <th style="padding:0.4rem 0.6rem;color:var(--text-secondary)">Trigger Acc.</th>
+                        <th style="padding:0.4rem 0.6rem;color:var(--text-secondary)">OK</th>
+                    </tr>
+                </thead>
+                <tbody id="skill-ac-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Bricks grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem">
+        {% for brick in bricks %}
+        <div class="card" style="
+            border: 1px solid {{ 'var(--green)' if brick.active else 'var(--border)' }};
+            border-radius:12px;padding:1.25rem;
+            background:var(--bg-secondary);
+            opacity:{{ '1' if brick.active or not project_id else '0.55' }};
+            transition:opacity 0.2s
+        " id="brick-{{ brick.id }}">
+
+            <!-- Card header -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.75rem">
+                <div style="display:flex;align-items:center;gap:0.6rem">
+                    <div style="
+                        width:36px;height:36px;border-radius:8px;
+                        background:{{ 'var(--green)' if brick.active else 'var(--bg-tertiary)' }}22;
+                        border:1px solid {{ 'var(--green)' if brick.active else 'var(--border)' }};
+                        display:flex;align-items:center;justify-content:center
+                    ">
+                        <svg class="icon icon-sm" style="color:{{ 'var(--green)' if brick.active else 'var(--text-secondary)' }}">
+                            <use href="#icon-{% if brick.id == 'git' %}git-branch{% elif brick.id == 'docker' %}box{% elif brick.id == 'rag' %}search{% elif brick.id == 'sonarqube' %}shield{% elif brick.id == 'jira' %}trello{% elif brick.id == 'lint' %}check-square{% elif brick.id == 'security' %}lock{% elif brick.id == 'test' %}play-circle{% elif brick.id == 'mcp' %}plug{% else %}tool{% endif %}"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight:600;font-size:0.95rem">{{ brick.id }}</div>
+                        <div style="font-size:0.72rem;color:var(--text-secondary)">v{{ brick.version }}</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.4rem;align-items:center">
+                    {% if brick.active %}
+                    <span class="badge badge-green" style="font-size:0.7rem">active</span>
+                    {% endif %}
+                    {% if brick.has_skill %}
+                    <span class="badge" style="font-size:0.7rem;background:var(--purple)22;color:var(--purple);border:1px solid var(--purple)44" title="Has skill injection">skill ✓</span>
+                    {% endif %}
+                    {% if brick.tool_schemas_count > 0 %}
+                    <span class="badge badge-blue" style="font-size:0.7rem">{{ brick.tool_schemas_count }} schemas</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Skill name -->
+            {% if brick.skill_name %}
+            <div style="font-size:0.82rem;font-weight:500;color:var(--purple);margin-bottom:0.5rem">
+                {{ brick.skill_name }}
+            </div>
+            {% endif %}
+
+            <!-- Capabilities -->
+            <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.75rem">
+                {% for cap in brick.capabilities[:6] %}
+                <span class="tag" style="font-size:0.68rem;padding:0.15rem 0.4rem">{{ cap }}</span>
+                {% endfor %}
+                {% if brick.capabilities|length > 6 %}
+                <span class="tag" style="font-size:0.68rem;padding:0.15rem 0.4rem;opacity:0.6">+{{ brick.capabilities|length - 6 }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Tools from skill -->
+            {% if brick.skill_tools %}
+            <div style="margin-bottom:0.75rem">
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.3rem">Tools:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.25rem">
+                    {% for t in brick.skill_tools %}
+                    <code style="font-size:0.68rem;background:var(--bg-tertiary);padding:0.1rem 0.35rem;border-radius:4px;color:var(--text-primary)">{{ t }}</code>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Patterns -->
+            {% if brick.skill_patterns %}
+            <div style="border-top:1px solid var(--border);padding-top:0.6rem;margin-top:0.25rem">
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.4rem">Patterns:</div>
+                {% for p in brick.skill_patterns %}
+                <div style="font-size:0.75rem;margin-bottom:0.2rem">
+                    <span style="font-weight:500;color:var(--text-primary)">{{ p.name }}</span>
+                    <span style="color:var(--text-secondary)"> — {{ p.description }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Health badge (injected by JS after health check) -->
+            <div id="health-brick-{{ brick.id }}" style="display:none;margin-top:0.5rem;font-size:0.75rem;padding:0.3rem 0.5rem;border-radius:4px"></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not bricks %}
+    <div class="empty-state">
+        <svg class="icon icon-xl"><use href="#icon-layers"/></svg>
+        <h3>No bricks registered</h3>
+        <p>Bricks auto-register on server start. Check platform logs.</p>
+    </div>
+    {% endif %}
+
+    <!-- Declare brick for a project hint -->
+    {% if project_id %}
+    <div style="margin-top:2rem;padding:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;font-size:0.82rem">
+        <strong>To activate a brick for <code>{{ project_id }}</code>:</strong>
+        <pre style="margin-top:0.5rem;background:var(--bg-tertiary);padding:0.75rem;border-radius:6px;font-size:0.78rem">bricks:
+  git:
+    remote: https://github.com/org/{{ project_id }}
+    default_branch: main
+  lint:
+    linter: auto
+    min_coverage: 80</pre>
+        <p style="margin:0.5rem 0 0;color:var(--text-secondary)">Add to <code>projects/{{ project_id }}.yaml</code></p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function runHealthCheck() {    const container = document.getElementById('health-results');
+    const statusEl = document.getElementById('health-status');
+    const detailsEl = document.getElementById('health-details');
+    container.style.display = 'block';
+    statusEl.textContent = 'running...';
+    detailsEl.innerHTML = '';
+
+    try {
+        const resp = await fetch('/api/bricks/{{ project_id }}/health');
+        const data = await resp.json();
+        statusEl.textContent = data.ok ? '✅ All healthy' : '⚠️ Some bricks unhealthy';
+        statusEl.style.color = data.ok ? 'var(--green)' : 'var(--yellow)';
+
+        for (const [brickId, result] of Object.entries(data.bricks || {})) {
+            // Inline badge
+            const badge = document.getElementById('health-brick-' + brickId);
+            if (badge) {
+                badge.style.display = 'block';
+                badge.style.background = result.ok ? 'var(--green)18' : 'var(--red)18';
+                badge.style.border = `1px solid ${result.ok ? 'var(--green)' : 'var(--red)'}44`;
+                badge.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+                badge.textContent = (result.ok ? '✓ ' : '✗ ') + result.message;
+            }
+            // Summary
+            const chip = document.createElement('span');
+            chip.className = 'badge ' + (result.ok ? 'badge-green' : 'badge-red');
+            chip.textContent = brickId + ': ' + (result.ok ? 'OK' : 'FAIL');
+            chip.title = result.message;
+            detailsEl.appendChild(chip);
+        }
+    } catch(e) {
+        statusEl.textContent = 'Error: ' + e.message;
+    }
+}
+
+async function runSkillAC() {
+    const container = document.getElementById('skill-ac-results');
+    const statusEl = document.getElementById('skill-ac-status');
+    const summaryEl = document.getElementById('skill-ac-summary');
+    const table = document.getElementById('skill-ac-table');
+    const tbody = document.getElementById('skill-ac-tbody');
+    container.style.display = 'block';
+    statusEl.textContent = 'running...';
+    summaryEl.innerHTML = '';
+    tbody.innerHTML = '';
+    table.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/bricks/skill-ac');
+        const data = await resp.json();
+        const s = data.summary || {};
+        statusEl.textContent = `${s.fully_passing || 0}/${s.total || 0} fully passing`;
+        statusEl.style.color = (s.fully_passing === s.total) ? 'var(--green)' : 'var(--yellow)';
+
+        const metrics = [
+            ['Total', s.total],
+            ['Fully Passing', s.fully_passing],
+            ['Avg Quality', (s.avg_quality_score * 100).toFixed(0) + '%'],
+            ['Avg Trigger', (s.avg_trigger_accuracy * 100).toFixed(0) + '%'],
+        ];
+        metrics.forEach(([label, val]) => {
+            summaryEl.innerHTML += `<span><strong>${label}:</strong> ${val}</span>`;
+        });
+
+        for (const [brickId, r] of Object.entries(data.results || {})) {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border)';
+            const okColor = r.ok ? 'var(--green)' : 'var(--red)';
+            const qPct = Math.round((r.quality_score || 0) * 100);
+            const tPct = Math.round((r.trigger_accuracy || 0) * 100);
+            tr.innerHTML = `
+                <td style="padding:0.35rem 0.6rem;font-weight:500">${brickId}</td>
+                <td style="padding:0.35rem 0.6rem;color:var(--text-secondary);font-size:0.75rem">${r.skill_name || ''}</td>
+                <td style="padding:0.35rem 0.6rem">
+                    <div style="display:flex;align-items:center;gap:0.4rem">
+                        <div style="width:60px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                            <div style="width:${qPct}%;height:100%;background:${qPct>=80?'var(--green)':'var(--yellow)'}"></div>
+                        </div>
+                        <span style="font-size:0.75rem">${qPct}%</span>
+                    </div>
+                </td>
+                <td style="padding:0.35rem 0.6rem">
+                    <div style="display:flex;align-items:center;gap:0.4rem">
+                        <div style="width:60px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                            <div style="width:${tPct}%;height:100%;background:${tPct>=80?'var(--green)':'var(--yellow)'}"></div>
+                        </div>
+                        <span style="font-size:0.75rem">${tPct}%</span>
+                    </div>
+                </td>
+                <td style="padding:0.35rem 0.6rem;color:${okColor};font-weight:600">${r.ok ? '✓' : '✗'}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+        table.style.display = 'table';
+    } catch(e) {
+        statusEl.textContent = 'Error: ' + e.message;
+    }
+}
+</script>
+{% endblock %}

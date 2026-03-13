@@ -42,6 +42,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "partials/skeleton.html" import skeleton_timeline, skeleton_feed %}
 <link rel="stylesheet" href="/static/css/live.css?v=20260221">
 
 <div class="session-wrap">
@@ -129,7 +130,9 @@
               </div>
             </div>
           </div>
-          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-messages" id="chatMessages">
+            {{ skeleton_timeline(4) }}
+          </div>
         </div>
         <div class="chat-panel">
           <div class="chat-panel-header">
@@ -140,7 +143,9 @@
               <button class="panel-filter" data-filter="errors">{{ _("errors") }}</button>
             </div>
           </div>
-          <div class="chat-panel-feed" id="panelFeed"></div>
+          <div class="chat-panel-feed" id="panelFeed">
+            {{ skeleton_feed(5) }}
+          </div>
         </div>
       </div>
     </div>

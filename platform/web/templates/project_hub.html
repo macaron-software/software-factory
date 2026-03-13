@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_kanban, skeleton_hub_cards, skeleton_table %}
 
 {% block content %}
 <style>
@@ -541,7 +542,7 @@
         </select>
       </div>
       <div id="feature-board-cols" style="display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:.75rem;overflow-x:auto">
-        <!-- filled by JS -->
+        {{ skeleton_kanban(5, 2) }}
       </div>
     </div>
 

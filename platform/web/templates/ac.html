@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_kpi_row, skeleton_table %}
+
+{% block topbar_actions %}
+<button onclick="runAllAC()" class="btn btn-sm btn-secondary" id="run-all-btn">
+    <svg class="icon icon-sm"><use href="#icon-check-circle"/></svg> Run All
+</button>
+<select id="scope-select" class="filter-select" style="min-width:160px">
+    <option value="">— All types —</option>
+    <option value="brick">Bricks</option>
+    <option value="skill">Skills</option>
+    <option value="agent">Agents</option>
+    <option value="team">Teams</option>
+    <option value="pattern">Patterns</option>
+    <option value="workflow">Workflows</option>
+    <option value="memory">Memory</option>
+    <option value="sf">SF Projects</option>
+    <option value="phase">Phases</option>
+</select>
+<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--text-secondary)">
+    <input type="checkbox" id="llm-judge-toggle" style="margin:0"> LLM Judge
+</label>
+{% endblock %}
+
+{% block content %}
+<div style="padding:1.5rem">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.5rem">
+        <h1 style="font-size:1.6rem;font-weight:700;margin:0">
+            <svg class="icon icon-lg" style="vertical-align:-3px;margin-right:0.4rem;color:var(--purple)"><use href="#icon-check-circle"/></svg>
+            Unified AC Report
+        </h1>
+        <span id="ac-status-badge" class="badge badge-blue" style="display:none">running…</span>
+    </div>
+
+    <!-- KPI summary cards -->
+    <div id="ac-summary" style="display:none;margin-bottom:1.5rem">
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+            <div class="card" style="padding:1rem 1.5rem;min-width:120px;text-align:center;border:1px solid var(--border);border-radius:10px;background:var(--bg-secondary)">
+                <div style="font-size:1.8rem;font-weight:700" id="kpi-total">—</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary)">Total</div>
+            </div>
+            <div class="card" style="padding:1rem 1.5rem;min-width:120px;text-align:center;border:1px solid var(--green);border-radius:10px;background:var(--bg-secondary)">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--green)" id="kpi-passing">—</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary)">Passing</div>
+            </div>
+            <div class="card" style="padding:1rem 1.5rem;min-width:120px;text-align:center;border:1px solid var(--red);border-radius:10px;background:var(--bg-secondary)">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--red)" id="kpi-failing">—</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary)">Failing</div>
+            </div>
+            <div class="card" style="padding:1rem 1.5rem;min-width:120px;text-align:center;border:1px solid var(--border);border-radius:10px;background:var(--bg-secondary)">
+                <div style="font-size:1.8rem;font-weight:700" id="kpi-score">—</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary)">Score</div>
+            </div>
+        </div>
+        <div id="ac-timestamp" style="font-size:0.75rem;color:var(--text-secondary)"></div>
+    </div>
+
+    <!-- Results by component type -->
+    <div id="ac-results-container"></div>
+
+    <!-- Empty state -->
+    <div id="ac-empty" style="text-align:center;padding:3rem;color:var(--text-secondary)">
+        <svg class="icon" style="width:48px;height:48px;margin-bottom:1rem;opacity:0.3"><use href="#icon-check-circle"/></svg>
+        <div style="font-size:1rem;margin-bottom:1.5rem">Select a scope and click <strong>Run All</strong> to start the AC evaluation.</div>
+        {{ skeleton_kpi_row(4) }}
+        <div style="margin-top:1rem">{{ skeleton_table(5, 5) }}</div>
+    </div>
+
+</div>
+
+<script>
+const COMPONENT_LABELS = {
+    brick: 'Bricks', skill: 'Skills', agent: 'Agents', team: 'Teams',
+    pattern: 'Patterns', workflow: 'Workflows', memory: 'Memory',
+    sf: 'SF Projects', phase: 'Phases'
+};
+
+function scoreColor(score) {
+    if (score >= 0.8) return 'var(--green)';
+    if (score >= 0.5) return 'var(--yellow)';
+    return 'var(--red)';
+}
+
+function renderScoreBar(score) {
+    const pct = Math.round(score * 100);
+    const color = scoreColor(score);
+    return `<div style="display:flex;align-items:center;gap:0.5rem">
+        <div style="width:80px;height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden;flex-shrink:0">
+            <div style="width:${pct}%;height:100%;background:${color};transition:width 0.3s"></div>
+        </div>
+        <span style="font-size:0.75rem;color:${color};font-weight:600">${pct}%</span>
+    </div>`;
+}
+
+function renderMethodBadge(method) {
+    if (method === 'llm_judge') return '<span class="badge badge-blue" style="font-size:0.65rem">LLM</span>';
+    if (method === 'llm_judge_skipped') return '<span class="badge" style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--text-secondary)">skipped</span>';
+    if (method === 'llm_judge_error') return '<span class="badge badge-red" style="font-size:0.65rem">LLM err</span>';
+    return '';
+}
+
+function renderResultRow(r) {
+    const score = r.score || 0;
+    const okIcon = r.ok
+        ? '<span style="color:var(--green);font-weight:700">✓</span>'
+        : '<span style="color:var(--red);font-weight:700">✗</span>';
+    const violations = (r.sandbox_violations || []).length > 0
+        ? `<span class="badge badge-red" style="font-size:0.65rem" title="${r.sandbox_violations.join(', ')}">⚠ sandbox</span>`
+        : '';
+    const failedChecks = (r.checks || []).filter(c => !c.passed);
+    const details = failedChecks.length > 0
+        ? `<div style="font-size:0.72rem;color:var(--red);margin-top:0.2rem">${failedChecks.map(c => c.check_id).join(', ')}</div>`
+        : '';
+    return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:0.4rem 0.6rem;font-weight:500;font-size:0.85rem">${r.component_id}</td>
+        <td style="padding:0.4rem 0.6rem">${renderScoreBar(score)}</td>
+        <td style="padding:0.4rem 0.6rem;font-size:0.75rem;color:var(--text-secondary)">${(r.checks || []).length}</td>
+        <td style="padding:0.4rem 0.6rem">${violations}</td>
+        <td style="padding:0.4rem 0.6rem">${okIcon}${details}</td>
+    </tr>`;
+}
+
+function renderTypeSection(ct, results, typeStats) {
+    const label = COMPONENT_LABELS[ct] || ct;
+    const pct = typeStats ? Math.round(typeStats.score * 100) : 0;
+    const color = scoreColor(typeStats ? typeStats.score : 0);
+    const sectionId = `ac-section-${ct}`;
+    const bodyId = `ac-body-${ct}`;
+
+    const rows = results.map(renderResultRow).join('');
+
+    return `<div style="margin-bottom:1rem;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div onclick="toggleSection('${bodyId}')" style="cursor:pointer;display:flex;align-items:center;gap:1rem;padding:0.75rem 1rem;background:var(--bg-secondary);user-select:none">
+            <span style="font-weight:600;font-size:0.9rem;flex:1">${label}</span>
+            ${typeStats ? `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44;font-size:0.75rem">${typeStats.passing}/${typeStats.total} passing</span>` : ''}
+            <div style="width:100px">${renderScoreBar(typeStats ? typeStats.score : 0)}</div>
+            <svg class="icon icon-sm" style="color:var(--text-secondary)"><use href="#icon-chevron-down"/></svg>
+        </div>
+        <div id="${bodyId}" style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border);background:var(--bg-tertiary);text-align:left">
+                        <th style="padding:0.35rem 0.6rem;color:var(--text-secondary)">Component</th>
+                        <th style="padding:0.35rem 0.6rem;color:var(--text-secondary)">Score</th>
+                        <th style="padding:0.35rem 0.6rem;color:var(--text-secondary)">Checks</th>
+                        <th style="padding:0.35rem 0.6rem;color:var(--text-secondary)">Sandbox</th>
+                        <th style="padding:0.35rem 0.6rem;color:var(--text-secondary)">OK</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function toggleSection(bodyId) {
+    const el = document.getElementById(bodyId);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function runAllAC() {
+    const btn = document.getElementById('run-all-btn');
+    const badge = document.getElementById('ac-status-badge');
+    const scope = document.getElementById('scope-select').value;
+    const llmJudge = document.getElementById('llm-judge-toggle').checked;
+
+    btn.disabled = true;
+    badge.style.display = '';
+    badge.textContent = 'running…';
+    badge.className = 'badge badge-blue';
+    document.getElementById('ac-empty').style.display = 'none';
+    document.getElementById('ac-summary').style.display = 'none';
+    document.getElementById('ac-results-container').innerHTML = '';
+
+    let url = '/api/ac/run?sandbox=false';
+    if (scope) url += `&scope=${encodeURIComponent(scope)}`;
+    if (llmJudge) url += '&llm_judge=true';
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (data.error) {
+            badge.textContent = 'Error: ' + data.error;
+            badge.className = 'badge badge-red';
+            return;
+        }
+
+        const s = data.summary || {};
+        document.getElementById('kpi-total').textContent = s.total || 0;
+        document.getElementById('kpi-passing').textContent = s.passing || 0;
+        document.getElementById('kpi-failing').textContent = s.failing || 0;
+        document.getElementById('kpi-score').textContent = Math.round((s.score || 0) * 100) + '%';
+        document.getElementById('kpi-score').style.color = scoreColor(s.score || 0);
+        document.getElementById('ac-timestamp').textContent = 'Generated: ' + (data.timestamp || '');
+        document.getElementById('ac-summary').style.display = '';
+
+        const container = document.getElementById('ac-results-container');
+        const byType = s.by_type || {};
+        for (const [ct, results] of Object.entries(data.results || {})) {
+            container.innerHTML += renderTypeSection(ct, results, byType[ct]);
+        }
+
+        const allOk = s.total > 0 && s.failing === 0;
+        badge.textContent = allOk ? `✓ All ${s.total} passing` : `${s.failing} failing`;
+        badge.className = 'badge ' + (allOk ? 'badge-green' : 'badge-red');
+
+    } catch(e) {
+        badge.textContent = 'Error: ' + e.message;
+        badge.className = 'badge badge-red';
+    } finally {
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

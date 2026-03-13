@@ -1,3 +1,4 @@
+{% from "partials/skeleton.html" import skeleton_teams_table, skeleton_table, skeleton_chart, skeleton_block %}
 <style>
 .teams-tabs {
     display: flex; gap: 0; margin-bottom: 1.5rem;
@@ -128,7 +129,7 @@
         <p>Fitness-based agent selection — Thompson Sampling per technology and phase type</p>
     </div>
     <div class="teams-header-meta" id="teams-ctx-summary">
-        Loading contexts...
+        <div class="sk sk-line" style="width:120px"></div>
     </div>
 </div>
 
@@ -180,7 +181,7 @@
         <button class="btn-xs" onclick="loadLeaderboard()">Refresh</button>
     </div>
     <div id="leaderboard-table" style="padding: 0 1rem;">
-        <p style="color:var(--text-secondary);font-size:0.82rem;padding:2rem 0;">Loading leaderboard...</p>
+        {{ skeleton_teams_table(8) }}
     </div>
 </div>
 
@@ -204,7 +205,9 @@
         </select>
         <button class="btn-xs" onclick="loadOKR()">Refresh</button>
     </div>
-    <div id="okr-table" style="padding: 0 1rem;"></div>
+    <div id="okr-table" style="padding: 0 1rem;">
+        {{ skeleton_table(6, 5) }}
+    </div>
 </div>
 
 <!-- EVOLUTION -->
@@ -252,7 +255,9 @@
         </select>
         <button class="btn-xs" onclick="loadSelections()">Refresh</button>
     </div>
-    <div id="selections-list" style="padding: 0 1rem;"></div>
+    <div id="selections-list" style="padding: 0 1rem;">
+        {{ skeleton_table(6, 4) }}
+    </div>
 </div>
 
 <!-- A/B TESTS -->
@@ -267,7 +272,9 @@
         </select>
         <button class="btn-xs" onclick="loadABTests()">Refresh</button>
     </div>
-    <div id="abtests-list" style="padding: 0 1rem;"></div>
+    <div id="abtests-list" style="padding: 0 1rem;">
+        {{ skeleton_table(4, 5) }}
+    </div>
     <div class="empty-state" id="ab-explain" style="display:none">
         <p>A/B tests run automatically when two teams have close fitness scores (delta &lt; 10)</p>
         <p>or probabilistically (10% of missions spawn a shadow parallel run).</p>
@@ -291,10 +298,14 @@
             <svg class="icon icon-sm" style="width:12px;height:12px"><use href="#icon-settings"/></svg> LLM Config
         </a>
     </div>
-    <div id="llmab-leaderboard" style="padding:0 1rem"></div>
+    <div id="llmab-leaderboard" style="padding:0 1rem">
+        {{ skeleton_table(5, 5) }}
+    </div>
     <div style="margin:1.5rem 1rem 0">
         <h4 style="font-size:0.83rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.3px;margin-bottom:0.8rem">Recent LLM A/B Tests</h4>
-        <div id="llmab-tests"></div>
+        <div id="llmab-tests">
+            {{ skeleton_table(3, 4) }}
+        </div>
     </div>
     <div class="empty-state" id="llmab-explain" style="display:none">
         <p>LLM A/B tests run automatically via Thompson Sampling.</p>
