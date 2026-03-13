@@ -44,6 +44,8 @@ skills:
   - frontend-design
   - figma-design-sync
   - design-tokens
+  - error-handling-ux
+  - network-resilience
 
 tools:
   - code_read

@@ -3,7 +3,6 @@ name: "Léa Nguyen"
 avatar: "LN"
 role: "Mobile Developer"
 version: "1.0"
-description: "Développeur mobile."
 
 persona:
   description: >
@@ -30,6 +29,9 @@ skills:
   - e2e-browser-testing
   - accessibility-audit
   - code-review-excellence
+  - network-resilience
+  - error-handling-ux
+  - pwa-offline-first
 
 tools:
   - code_read

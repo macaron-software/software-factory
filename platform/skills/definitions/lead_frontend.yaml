@@ -2,7 +2,6 @@ id: lead_frontend
 name: "Emma Laurent"
 version: "1.0"
 role: "Lead Frontend"
-description: "Lead Frontend — React · SvelteKit · TypeScript · a11y"
 hierarchy_rank: 25
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=emma-frontend"
 tagline: "React · SvelteKit · TypeScript · a11y"
@@ -39,6 +38,9 @@ skills:
   - accessibility-audit
   - ui
   - ux
+  - network-resilience
+  - error-handling-ux
+  - pwa-offline-first
 
 tools:
   - code_read
@@ -67,7 +69,3 @@ permissions:
   escalation_to: architecte
 
 tags: [frontend, react, svelte, typescript, lead, a11y]
-triggers:
-  - when a new UI feature needs implementation
-  - when frontend performance regression is detected
-  - when accessibility review is required
