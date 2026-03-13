@@ -283,12 +283,15 @@ _STACK_RULES = {
     # If task mentions these keywords, .ts/.js/.py files are wrong
     "rust_project": {
         "keywords": ["rust", "axum", "sqlx", "tonic", "cargo", "macroquad", "bevy", "ggez"],
+        # If task ALSO mentions these, suppress the rule (mixed context from sprint learnings)
+        "conflicts_with": ["typescript", "react", "next.js", "nextjs", "node.js", "npm run"],
         "wrong_extensions": [".ts", ".js", ".mjs", ".jsx", ".tsx", ".py"],
         "wrong_in_path": ["src/", "app/", "lib/"],
         "message": "STACK_MISMATCH: Code written in TypeScript/JavaScript/Python but project stack is Rust — use .rs files only",
     },
     "svelte_frontend": {
         "keywords": ["sveltekit", "svelte"],
+        "conflicts_with": [],
         "wrong_extensions": [".jsx", ".tsx"],
         "wrong_in_path": ["src/frontend/", "src/routes/"],
         "message": "STACK_MISMATCH: Frontend code in React/JSX but project stack is SvelteKit",
@@ -296,12 +299,14 @@ _STACK_RULES = {
     # Mobile stack rules
     "ios_swift": {
         "keywords": ["swift", "swiftui", "ios", "xcode", "uikit"],
+        "conflicts_with": [],
         "wrong_extensions": [".kt", ".java", ".ts", ".js", ".dart"],
         "wrong_in_path": ["Sources/", "App/", "Features/", "Models/"],
         "message": "STACK_MISMATCH: iOS app must use Swift/SwiftUI only — no Kotlin/Java/TypeScript",
     },
     "android_kotlin": {
         "keywords": ["kotlin", "jetpack compose", "android", "gradle"],
+        "conflicts_with": [],
         "wrong_extensions": [".swift", ".m", ".dart"],
         "wrong_in_path": ["src/main/", "app/src/"],
         "message": "STACK_MISMATCH: Android app must use Kotlin/Compose only — no Swift",
@@ -399,6 +404,9 @@ def _check_stack_mismatch(tool_calls: list, task: str) -> list[str]:
     issues = []
     for rule in _STACK_RULES.values():
         if not any(kw in task_lower for kw in rule["keywords"]):
+            continue
+        # If conflicting keywords also present, skip rule (mixed context from sprint learnings)
+        if rule.get("conflicts_with") and any(cw in task_lower for cw in rule["conflicts_with"]):
             continue
         for tc in tool_calls:
             if tc.get("name") not in ("code_write", "code_edit"):
