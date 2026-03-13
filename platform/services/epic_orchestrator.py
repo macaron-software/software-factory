@@ -192,35 +192,9 @@ def _extract_stack_fingerprint(workspace: str) -> str:
 
     parts: list[str] = []
 
-    # ── Rust ──────────────────────────────────────────────────────────────────
-    cargo_path = os.path.join(workspace, "Cargo.toml")
-    if os.path.exists(cargo_path):
-        try:
-            text = open(cargo_path).read()
-            edition = re.search(r'edition\s*=\s*"(\d+)"', text)
-            deps: dict[str, str] = {}
-            in_deps = False
-            for line in text.splitlines():
-                if re.match(r"^\[(.*dependencies.*)\]", line):
-                    in_deps = True
-                    continue
-                if line.startswith("[") and "dependencies" not in line:
-                    in_deps = False
-                if in_deps:
-                    m = re.match(r'^([\w-]+)\s*=\s*["\{]?([0-9][^\s,"}\n]*)', line)
-                    if m:
-                        deps[m.group(1)] = m.group(2).rstrip('",}')
-            parts.append("Rust (cargo)")
-            if edition:
-                parts.append(f"edition={edition.group(1)}")
-            if deps:
-                parts.append(", ".join(f"{k}={v}" for k, v in list(deps.items())[:8]))
-        except Exception:
-            parts.append("Rust (cargo)")
-
-    # ── Node.js / TypeScript ──────────────────────────────────────────────────
+    # ── Node.js / TypeScript (checked FIRST — most common, avoids Cargo.toml parasites) ──
     pkg_path = os.path.join(workspace, "package.json")
-    if os.path.exists(pkg_path) and not parts:
+    if os.path.exists(pkg_path):
         try:
             pkg = json.load(open(pkg_path))
             node_ver = pkg.get("engines", {}).get("node", "")
@@ -256,6 +230,32 @@ def _extract_stack_fingerprint(workspace: str) -> str:
                 )
         except Exception:
             parts.append("Node.js/TypeScript (npm)")
+
+    # ── Rust (after Node — package.json takes priority over Cargo.toml) ──────
+    cargo_path = os.path.join(workspace, "Cargo.toml")
+    if os.path.exists(cargo_path) and not parts:
+        try:
+            text = open(cargo_path).read()
+            edition = re.search(r'edition\s*=\s*"(\d+)"', text)
+            deps: dict[str, str] = {}
+            in_deps = False
+            for line in text.splitlines():
+                if re.match(r"^\[(.*dependencies.*)\]", line):
+                    in_deps = True
+                    continue
+                if line.startswith("[") and "dependencies" not in line:
+                    in_deps = False
+                if in_deps:
+                    m = re.match(r'^([\w-]+)\s*=\s*["\{]?([0-9][^\s,"}\n]*)', line)
+                    if m:
+                        deps[m.group(1)] = m.group(2).rstrip('",}')
+            parts.append("Rust (cargo)")
+            if edition:
+                parts.append(f"edition={edition.group(1)}")
+            if deps:
+                parts.append(", ".join(f"{k}={v}" for k, v in list(deps.items())[:8]))
+        except Exception:
+            parts.append("Rust (cargo)")
 
     # ── Python ────────────────────────────────────────────────────────────────
     py_path = os.path.join(workspace, "pyproject.toml")

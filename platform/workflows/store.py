@@ -1258,30 +1258,37 @@ async def run_workflow(
         )
         _declared_stack = ""
         if project_id:
-            # 1. Search project memory for stack info
+            # 1. Search project memory for stack info (two-pass: web first, niche second)
             try:
                 from ..memory.manager import get_memory_manager
                 _mm = get_memory_manager()
                 _stack_results = _mm.project_search(project_id, "stack architecture language", limit=3)
+                # Pass 1: check ALL results for web/common stacks (most likely)
                 for _sr in _stack_results:
                     _sv = _sr.get("value", "")
                     _svl = _sv.lower()
-                    # Check web/common stacks FIRST (more likely),
-                    # then niche stacks — prevents "chose X over Rust" false matches
                     if any(kw in _svl for kw in ("typescript", "react", "next.js", "nextjs", "node")):
                         _declared_stack = _sv[:200]
                         break
                     if any(kw in _svl for kw in ("python", "django", "fastapi", "flask")):
                         _declared_stack = _sv[:200]
                         break
-                    if any(kw in _svl for kw in ("rust", "cargo")):
-                        # Only trust if NO web keywords in same text
-                        if not any(w in _svl for w in ("typescript", "react", "next", "node", "npm")):
+                # Pass 2: only if no web stack found, check niche stacks
+                if not _declared_stack:
+                    for _sr in _stack_results:
+                        _sv = _sr.get("value", "")
+                        _svl = _sv.lower()
+                        if any(kw in _svl for kw in ("rust", "cargo")):
+                            if not any(w in _svl for w in ("typescript", "react", "next", "node", "npm")):
+                                _declared_stack = _sv[:200]
+                                break
+                        if any(kw in _svl for kw in ("go ", "swift", "java")):
                             _declared_stack = _sv[:200]
                             break
-                    if any(kw in _svl for kw in ("go ", "swift", "java")):
-                        _declared_stack = _sv[:200]
-                        break
+                _wf_log.getLogger(__name__).warning(
+                    "STACK_MEMORY project=%s declared=%s results=%d",
+                    project_id, _declared_stack[:80] if _declared_stack else "NONE", len(_stack_results)
+                )
             except Exception:
                 pass
             # 2. Check project description for stack keywords
