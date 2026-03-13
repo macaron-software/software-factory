@@ -1,4 +1,4 @@
-# SF Platform — Agentic Workflow Engine
+# SF Platform -- Agentic Workflow Engine
 
 ## Stats
 ~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 49 wf . 28 phase tpl
@@ -21,7 +21,7 @@ pytest tests/test_platform_api.py -v          # API (PG req)
 
 ## Tree
 ```
-platform/  server.py          lifespan drain auth-mw
+platform/  server.py          lifespan drain auth-mw 8-bg-tasks
   agents/              exec store(~215) adversarial(L0+L1) tool_runner(134)
                        guardrails perms selection(Thompson) evolution(GA) rl(Q) darwin
   patterns/engine.py   26 topo: solo seq par loop hier net router aggr wave hitl mr bb
@@ -36,13 +36,31 @@ platform/  server.py          lifespan drain auth-mw
   db/                  adapter(PG+SQLite) schema(61tbl) migrations tenant
   tools/(52)           code git deploy build web sec mem mcp trace ast lint lsp ...
   traceability/        legacy_items + traceability_links CRUD
+  ops/(17)             auto_heal traceability_scheduler knowledge_scheduler ...
   web/routes/          missions pages sessions wf agents projects . tpl(117)
-  rbac/ ops/(17) mcps/ modules/(24) bricks/ metrics/
+  rbac/ mcps/ modules/(24) bricks/ metrics/
 cli/sf.py              sf status | sf ideation | sf missions list
 skills/                1090 .md
+projects/              baby.yaml factory.yaml (per-project config+git_url)
 ```
 
-## PM v2 — Lego Orchestrator
+## Projects (SF-Baby: sf-baby.macaron-software.com)
+| proj | repo | stack |
+|------|------|-------|
+| Baby | macaron-software/baby (priv) | Rust/WASM+SvelteKit+iOS/Android |
+| ADA-NDIS | macaron-software/ada-ndis (pub) | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
+| SF | macaron-software/software-factory | Python/FastAPI+HTMX |
+
+SAFe CRUD: POST /api/missions (epic) . /api/epics/{id}/features . /api/features/{id}/stories
+Memory: POST /api/memory/project/{id} {key,value,category,source,confidence}
+Auth: POST /api/auth/login -> cookie JWT (15min+7d refresh)
+
+## Auto-Commit+Push (agents/executor.py)
+code_write/code_edit -> ctx.code_files_written -> end of run: _auto_commit_and_push()
+branch: agent/{agent_id}/{session_id[:8]} (never main/master/develop)
+post-phase hook (epics/internal.py): git add -A + commit + push after EVERY phase
+
+## PM v2 -- Lego Orchestrator
 Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).
 compose: pattern+team+gate+feedback -> PatternDef+WorkflowPhase -> _phase_queue.
 Checkpoint: quality<50% -> retry. PM_OVERRIDE: force on build fail. Cap: 20.
@@ -53,7 +71,7 @@ store.py layout:
   L580   _PHASE_TEMPLATES (28 bricks)
   L700   _PM_DECISION_PROMPT_V2
   L754   _build_dynamic_phase(block) -> (WPhase, PatDef)
-  L809   _build_evidence() — src/build/test from tool_calls
+  L809   _build_evidence() -- src/build/test from tool_calls
   L1054  _dynamic_patterns{} + _phase_queue[]
   L1592  PM inserts: _dynamic_patterns[id] = _dyn_pattern
 ```
@@ -90,23 +108,36 @@ PatternRun     pattern session_id project_id project_path phase_id max_iteration
 
 CC fn >10err >5warn . LOC >500err >300warn . MI <10err <20warn
 
+## Scheduled Background Tasks (server.py lifespan)
+| task | interval | purpose |
+|------|----------|---------|
+| auto_resume | 5min | resume paused epics, retry continuous missions |
+| traceability | 6h | SAFe audit: hierarchy+ACs completeness, incidents on gaps |
+| evolution | 02:00 UTC | GA + RL nightly retrain |
+| auto_heal | 60s | incident->epic->TMA workflow |
+| platform_watchdog | varies | false-positive detection |
+| node_heartbeat | 10s | cluster registration |
+| knowledge | 04:00 UTC | memory audit+seed+curate (manual start) |
+
 ## Traceability
 DB: legacy_items(uuid,project,category,name,metadata_json) + traceability_links(legacy->story/test)
 Tools: legacy_scan . traceability_link . traceability_coverage . traceability_validate
 Roles: cdp/arch/product/dev=all4 qa=coverage+validate
 Adversarial: `# Ref: FEAT-xxx` / `// Ref:` enforced (MISSING_TRACEABILITY L0)
 Role: `traceability` in _classify_agent_role() + ROLE_TOOL_MAP['traceability'] (40+ tools)
-Team: team-traceability / art-platform (4 agents):
+Team (platform): team-traceability / art-platform:
   trace-lead (Nadia) . trace-auditor (Mehdi) . trace-writer (Sophie) . trace-monitor (Lucas)
   VETO if coverage <80% . trace-writer = only SPECS.md maintainer
-Phase: traceability-check tpl uses team_roles=['traceability'×3, 'qa']
+Team (SF-Baby): Trace Lead . QA Traceability . Code Auditor . Trace Reporter
+Phase: traceability-check tpl uses team_roles=['traceability' x3, 'qa']
 PM v2: auto-inserts traceability-check after dev phases; legacy->story->traceability for migrations
-Scheduler: ops/traceability_scheduler.py — every 6h (TRACEABILITY_INTERVAL)
-  scans SAFe hierarchy: epics/features/stories/ACs completeness
+Scheduler: ops/traceability_scheduler.py -- every 6h (TRACEABILITY_INTERVAL env)
+  scans ALL active projects: SAFe hierarchy (epics/features/stories/ACs)
+  stores in memory: traceability-audit-latest + traceability-metrics
   creates platform incidents if >3 high-severity gaps
-  env: TRACEABILITY_SCHEDULER_ENABLED . TRACEABILITY_INTERVAL
+UDID format: EP-{PRJ}-NNN . FT-{PRJ}-NNN . US-{PRJ}-NNN . AC-{PRJ}-NNN
 
-## LLM — FROZEN
+## LLM -- FROZEN
 local-mlx Qwen3.5-mlx . minimax M2.5(native tool_calls, no mangle, `<think>` stripped)
 azure-openai gpt-5-mini/5.2/5.2-codex . azure-ai gpt-5.2 . nvidia Kimi-K2
 MiniMax: no temp . parallel_tool_calls=False . json fences stripped
@@ -123,36 +154,37 @@ innov    3-node: n2(nginx lb) n1(primary) n3(PG+Redis 10.0.1.6)
 ## Deploy
 OVH: rsync -> --force-recreate Docker (blue/green/factory)
 Azure: systemd sf-platform -> az vm run-command
-CI: .github/workflows/deploy-demo.yml
+CI: .github/workflows/deploy-demo.yml . deploy-baby.yml (backup/E2E/rollback)
 
-## PUA — Persistence Under Adversity
+## PUA -- Persistence Under Adversity
 Source: github.com/tanweai/pua (+36% fixes, +65% verif, +50% tool calls)
-Engine: platform/agents/pua.py — 3 Iron Rules + Proactivity injected ALL agents
+Engine: platform/agents/pua.py -- 3 Iron Rules + Proactivity injected ALL agents
 Pressure: L1(2nd fail=switch) L2(3rd=soul) L3(4th=7-pt checklist) L4(5th+=escalate)
 L2+: [PERSONAL ACCOUNTABILITY] hook fires using agent.motivation (own words)
-5-step debug (each retry): Smell→Elevate→Mirror→Execute→Retrospective
-QA boundary: _PUA_QA_BLOCK — REVIEWER≠IMPLEMENTER; QA persistence rules
+5-step debug (each retry): Smell->Elevate->Mirror->Execute->Retrospective
+QA boundary: _PUA_QA_BLOCK -- REVIEWER != IMPLEMENTER; QA persistence rules
 agent.motivation field injected in system prompt alongside persona
 engine.py: passes agent.motivation to build_retry_prompt() on adversarial reject
 
-## Deep Bench — Motivation ACs
-deep_bench_tools.py — agents layer adds 3 cases:
-  3i agents-motivation-coverage  det  ≥30% agents have motivation (currently 55%)
+## Deep Bench -- Motivation ACs
+deep_bench_tools.py -- agents layer adds 3 cases:
+  3i agents-motivation-coverage  det  >=30% agents have motivation (currently 55%)
   3j agents-pua-motivation-hook  det  PUA hook fires at L2+/with-motivation, silent at L1/none
   3k agents-judge-motivation     llm  output reflects stated values under pressure
 
-
+## Key Patterns
 - YAML phase.config > pattern.config (merge L892)
 - Agent resolve: explicit -> TeamSelector(Darwin) -> role -> dev_fullstack
 - pm_driven:true -> PM checkpoint each phase
-- _phase_queue mutable — PM inserts/reorders
+- _phase_queue mutable -- PM inserts/reorders
 - _dynamic_patterns{} run-scoped cache
 - env-setup: detect stack -> correct Dockerfile
 - Agent persona: emphasize tool usage (CRITICAL BEHAVIOR RULES)
-- NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE
+- NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED -- no DONE
 - Container: /app/macaron_platform/ not /app/platform/
 - `platform/` shadows stdlib
 - SSE: `curl --max-time` (urllib blocks)
+- Epic chat: _auto_create_planning_run() if no active run (execution.py)
 
 ## Repo
 GitHub macaron-software/software-factory (AGPL-3.0)

@@ -25,7 +25,7 @@ pytest tests/test_platform_api.py -v          # API (PG req)
 ## Tree
 ```
 platform/                       372py 146KLOC
-  server.py                     lifespan . drain . auth mw
+  server.py                     lifespan . drain . auth mw . 8 bg tasks
   agents/                       exec . store(~215) . adversarial(L0+L1) . tool_runner(134)
                                 selection(Thompson) . evolution(GA) . rl(Q) . darwin . skill_broker
   patterns/engine.py            26 topo: solo seq par loop hier net router aggr wave
@@ -39,10 +39,28 @@ platform/                       372py 146KLOC
   llm/client.py                 5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
   db/                           adapter(PG+SQLite) . schema(61tbl) . migrations . tenant
   tools/(52)                    code git deploy build web sec mem mcp trace ast lint lsp ...
+  ops/(17)                      auto_heal . traceability_scheduler . knowledge_scheduler ...
   web/routes/                   missions pages sessions wf agents projects . tpl(117)
-  rbac/ ops/(17) mcps/ modules/(24) bricks/ metrics/
+  rbac/ mcps/ modules/(24) bricks/ metrics/
 skills/                         1090 .md
+projects/                       baby.yaml . factory.yaml (per-project config+git_url)
 ```
+
+## Projects (SF-Baby: sf-baby.macaron-software.com)
+| proj | repo | stack |
+|------|------|-------|
+| Baby | macaron-software/baby (priv) | Rust/WASM+SvelteKit+iOS/Android |
+| ADA-NDIS | macaron-software/ada-ndis (pub) | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
+| SF | macaron-software/software-factory | Python/FastAPI+HTMX |
+
+SAFe CRUD API: POST /api/missions (epic) . POST /api/epics/{id}/features . POST /api/features/{id}/stories
+Memory API: POST /api/memory/project/{id} (key,value,category,source,confidence)
+Auth: POST /api/auth/login -> cookie JWT (15min access + 7d refresh)
+
+## Auto-Commit+Push (agents/executor.py)
+code_write/code_edit -> ctx.code_files_written tracked -> end of run: _auto_commit_and_push()
+branch: agent/{agent_id}/{session_id[:8]} (never main/master/develop)
+post-phase hook (epics/internal.py): git add -A + commit + push after EVERY phase
 
 ## PM v2 — Lego Orchestrator
 Phase -> PM LLM: next|loop|done|skip|**phase**(dynamic brick).
@@ -70,8 +88,20 @@ Checkpoint: quality<50% -> retry. PM_OVERRIDE: force on build fail. Cap: 20.
 
 CC fn >10err >5warn . LOC >500err >300warn . MI <10err <20warn
 
+## Scheduled Background Tasks (server.py lifespan)
+| task | file | interval | purpose |
+|------|------|----------|---------|
+| auto_resume | services/auto_resume.py | 5min | resume paused epics, retry continuous missions |
+| traceability | ops/traceability_scheduler.py | 6h | SAFe audit: epics/feat/stories/ACs gaps, incidents |
+| evolution | agents/evolution_scheduler.py | 02:00 UTC | GA + RL nightly retrain |
+| auto_heal | ops/auto_heal.py | 60s | incident->epic->TMA workflow |
+| platform_watchdog | ops/platform_watchdog.py | varies | false-positive detection |
+| node_heartbeat | server.py | 10s | cluster registration |
+| knowledge | ops/knowledge_scheduler.py | 04:00 UTC | memory audit+seed+curate (manual start) |
+
 ## SAFe Vocab
 Epic=MissionDef . Feature=FeatureDef . Story=UserStoryDef . PI=MissionRun . Sprint=SprintDef
+UDID format: EP-{PRJ}-NNN . FT-{PRJ}-NNN . US-{PRJ}-NNN . AC-{PRJ}-NNN
 
 ## LLM — FROZEN
 local-mlx Qwen3.5-mlx . minimax M2.5 . azure-openai gpt-5-mini/5.2/5.2-codex
@@ -80,7 +110,7 @@ azure-ai gpt-5.2 . nvidia Kimi-K2
 ## Deploy
 OVH: blue-green Docker slots/{blue,green,factory}/ --force-recreate
 Azure: systemd sf-platform via az vm run-command . Innovation: 3-node nginx lb
-CI: .github/workflows/deploy-demo.yml
+CI: .github/workflows/deploy-demo.yml . deploy-baby.yml (backup/E2E/rollback)
 
 ## Gotchas
 - `platform/` shadows stdlib — NEVER `import platform`
@@ -90,16 +120,21 @@ CI: .github/workflows/deploy-demo.yml
 - Container: /app/macaron_platform/ not /app/platform/
 - SSE: `curl --max-time` — urllib blocks
 - Epic orch: _build_phase_prompt() not workflows/store.py
+- Epic chat: _auto_create_planning_run() if no active run (execution.py)
 
 ## PUA / Motivation
 pua.py: Iron Rules+Proactivity ALL agents. L1-L4 pressure on retry.
 agent.motivation field: injected in prompt. L2+ fires [PERSONAL ACCOUNTABILITY] hook.
 _PUA_QA_BLOCK: QA = REVIEWER not IMPLEMENTER.
-5-step debug each retry: Smell→Elevate→Mirror→Execute→Retrospective
+5-step debug each retry: Smell->Elevate->Mirror->Execute->Retrospective
 
 ## Traceability
 Adversarial L0: MISSING_TRACEABILITY — all .py/.ts files need `# Ref: FEAT-xxx`
 Tools: legacy_scan . traceability_coverage . traceability_validate . traceability_link
-Team: team-traceability (art-platform) — 4 agents: trace-lead/trace-auditor/trace-writer/trace-monitor
-Scheduler: ops/traceability_scheduler.py every 6h — SAFe hierarchy audit, incidents on >3 gaps
+Team (SF-Baby): Trace Lead . QA Traceability . Code Auditor . Trace Reporter
+Team (platform): team-traceability (art-platform) — trace-lead/auditor/writer/monitor
+Scheduler: ops/traceability_scheduler.py every 6h (TRACEABILITY_INTERVAL env)
+  scans ALL active projects: SAFe hierarchy audit, GIVEN/WHEN/THEN AC check
+  stores results in project memory: traceability-audit-latest + traceability-metrics
+  creates platform incidents if >3 high-severity gaps
 PM v2: auto-inserts traceability-check after dev phases
