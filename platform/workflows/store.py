@@ -1318,17 +1318,18 @@ async def run_workflow(
                     pass
 
         if _declared_stack:
-            # Map declared stack to build commands
+            # Map declared stack to build commands (web stacks first to avoid
+            # false matches from adversarial rejection messages containing "Rust")
             _stack_lower = _declared_stack.lower()
-            if "rust" in _stack_lower:
-                _build_str = "cargo check"
-                _detected_stack = f"Rust ({_declared_stack})"
-            elif "node" in _stack_lower or "typescript" in _stack_lower or "react" in _stack_lower:
+            if "node" in _stack_lower or "typescript" in _stack_lower or "react" in _stack_lower or "next" in _stack_lower:
                 _build_str = "npm run build"
                 _detected_stack = f"Node.js/TypeScript ({_declared_stack})"
             elif "python" in _stack_lower:
                 _build_str = "python3 -m py_compile"
                 _detected_stack = f"Python ({_declared_stack})"
+            elif "rust" in _stack_lower:
+                _build_str = "cargo check"
+                _detected_stack = f"Rust ({_declared_stack})"
             elif "go" in _stack_lower:
                 _build_str = "go build ./..."
                 _detected_stack = f"Go ({_declared_stack})"
