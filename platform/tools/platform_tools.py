@@ -13,20 +13,6 @@ from .registry import BaseTool
 
 logger = logging.getLogger(__name__)
 
-# Tools restricted to CTO/orchestrator agents — not available to project-scoped agents
-_PLATFORM_ONLY_TOOLS: set[str] = {
-    "create_project",
-    "platform_agents",
-    "platform_metrics",
-    "platform_sessions",
-    "platform_workflows",
-    "launch_ideation",
-    "launch_mkt_ideation",
-    "launch_group_ideation",
-    "create_domain",
-    "platform_guide",
-}
-
 
 class PlatformAgentsTool(BaseTool):
     name = "platform_agents"
@@ -151,10 +137,8 @@ class PlatformMemoryTool(BaseTool):
         project_id = params.get("project_id")
         category = params.get("category")
         limit = int(params.get("limit", 20))
-        if query and project_id:
-            entries = mem.project_search(project_id, query, limit=limit)
-        elif query:
-            entries = mem.global_search(query, limit=limit)
+        if query:
+            entries = mem.search(query, limit=limit)
         elif project_id:
             entries = mem.project_get(project_id, category=category, limit=limit)
         else:
@@ -541,15 +525,16 @@ class PlatformLaunchEpicRunTool(BaseTool):
             if not wf:
                 return _json.dumps({"error": f"Workflow '{wf_id}' not found"})
 
-            # Build phase runs from WorkflowPhase objects
+            # Build phase runs
+            phases = wf.phases_json if isinstance(wf.phases_json, list) else []
             phase_runs = [
                 PhaseRun(
-                    phase_id=p.id,
-                    phase_name=p.name or p.id,
-                    pattern_id=p.pattern_id or "sequential",
+                    phase_id=p["id"],
+                    phase_name=p.get("name", p["id"]),
+                    pattern_id=p.get("pattern_id", "sequential"),
                     status=PhaseStatus.PENDING,
                 )
-                for p in (wf.phases or [])
+                for p in phases
             ]
 
             run_id = str(uuid.uuid4())[:8]
@@ -565,32 +550,32 @@ class PlatformLaunchEpicRunTool(BaseTool):
                 phases_json=phase_runs,
             )
             run_store = get_epic_run_store()
-            run_store.create(run)
+            run_store.create_run(run)
 
             # Create session
             ss = get_session_store()
             s = SessionDef(
                 id=session_id,
                 project_id=mission.project_id,
-                name=f"{mission.name} — {wf.name}",
-                goal=f"Execute workflow '{wf.name}' for epic '{mission.name}'",
-                status="active",
+                title=f"{mission.name} — {wf.name}",
+                messages=[
+                    MessageDef(
+                        role="user",
+                        content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
+                    )
+                ],
             )
-            ss.create(s)
-            ss.add_message(
-                MessageDef(
-                    session_id=session_id,
-                    from_agent="user",
-                    content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
-                )
-            )
+            ss.create_session(s)
 
-            # Resume immediately (async background task)
+            # Resume immediately
             from ..workflows.store import run_workflow
             import asyncio
 
-            asyncio.get_event_loop().create_task(
-                run_workflow(wf, session_id, mission.name, mission.project_id)
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                asyncio.to_thread(
+                    run_workflow, wf, session_id, mission.name, mission.project_id
+                )
             )
 
             return _json.dumps(
@@ -600,7 +585,7 @@ class PlatformLaunchEpicRunTool(BaseTool):
                     "session_id": session_id,
                     "workflow_id": wf_id,
                     "epic_id": epic_id,
-                    "phases": [p.id for p in wf.phases],
+                    "phases": [p["id"] for p in phases],
                 }
             )
         except Exception as e:
@@ -675,14 +660,8 @@ class PlatformCheckRunTool(BaseTool):
                 run = store.get(run_id)
                 if not run:
                     return _json.dumps({"error": f"Run '{run_id}' not found"})
-                phases = run.phases if isinstance(run.phases, list) else []
-                sprint_count = 0
-                try:
-                    from ..epics.store import get_epic_store
-                    sprints = get_epic_store().list_sprints(run.parent_epic_id or run_id)
-                    sprint_count = len(sprints)
-                except Exception:
-                    pass
+                phases = run.phases_json if isinstance(run.phases_json, list) else []
+                sprints = store.list_sprints(run.parent_epic_id or run_id)
                 return _json.dumps(
                     {
                         "run_id": run.id,
@@ -695,7 +674,7 @@ class PlatformCheckRunTool(BaseTool):
                         ]
                         if phases
                         else [],
-                        "sprint_count": sprint_count,
+                        "sprint_count": len(sprints),
                         "resume_attempts": getattr(run, "resume_attempts", 0),
                     }
                 )
@@ -736,27 +715,6 @@ class PlatformCreateProjectTool(BaseTool):
         from ..projects.manager import get_project_store, Project, scaffold_project
 
         name = params.get("name", "").strip()
-
-        # Only CTO/orchestrator agents can create projects
-        if agent and hasattr(agent, "role"):
-            role = (agent.role or "").lower()
-            _cto_roles = {
-                "cto",
-                "chief_technology_officer",
-                "orchestrator",
-                "organizer",
-                "platform",
-                "jarvis",
-                "strat-cto",
-            }
-            if not any(r in role for r in _cto_roles):
-                return json.dumps(
-                    {
-                        "error": "create_project is restricted to CTO/orchestrator agents. Use the existing project workspace.",
-                        "hint": "You are already in a project context. Work within the current workspace.",
-                    }
-                )
-
         if not name:
             return json.dumps({"error": "name is required"})
         import uuid
@@ -765,22 +723,6 @@ class PlatformCreateProjectTool(BaseTool):
         git_url = (params.get("git_url") or "").strip()
 
         store = get_project_store()
-        # Idempotency: return existing active project if same name already exists
-        existing = store.list_all()
-        for p in existing:
-            if (
-                p.name.strip().lower() == name.lower()
-                and getattr(p, "status", "active") != "archived"
-            ):
-                return json.dumps(
-                    {
-                        "id": p.id,
-                        "name": p.name,
-                        "path": p.path,
-                        "note": "project already exists, returning existing",
-                        "workspace": p.path,
-                    }
-                )
         proj = Project(
             id=str(uuid.uuid4())[:8],
             name=name,
@@ -1120,7 +1062,7 @@ class PlatformCreateMissionTool(BaseTool):
 
             asyncio.get_event_loop().create_task(_launch())
         except Exception as _e:
-            run_info = {"launch_note": f"Auto-launch skipped ({_e}). Use launch_epic_run(epic_id=...) to start the mission manually."}
+            run_info = {"launch_warning": str(_e)}
 
         return json.dumps(
             {
@@ -1330,7 +1272,7 @@ class LaunchGroupIdeationTool(BaseTool):
         pattern = PatternDef(
             id=f"group-{group_id}-network",
             name=f"{group['name']} Network",
-            pattern_type="network",
+            type="network",
             agents=[a["id"] for a in group["agents"]],
         )
 
