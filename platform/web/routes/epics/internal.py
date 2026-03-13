@@ -2400,13 +2400,14 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
     has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
     has_rust = (ws / "Cargo.toml").exists()
 
-    # Rust detection first (specific stack, no ambiguity)
-    if has_rust:
-        return "rust-native"
-
-    # Web indicators take priority over Swift (prevents accidental Swift bias)
+    # Web indicators take priority — package.json is unambiguous,
+    # and a stray Cargo.toml from a confused agent must not override it.
     if has_node:
         return "web-node"
+
+    # Rust detection only if no Node/web indicators
+    if has_rust:
+        return "rust-native"
 
     if has_docker:
         return "web-docker"
