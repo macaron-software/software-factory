@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_chart, skeleton_block %}
 
 {% block content %}
 {% set p = request.state.perspective|default('admin') %}
@@ -268,7 +269,7 @@
         <div class="dora-card" style="text-align:left">
             <div class="dora-card-title" style="text-align:center">Release Notes</div>
             <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
-                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+                {{ skeleton_block(4) }}
             </div>
         </div>
     </div>
@@ -299,7 +300,7 @@
         <div class="dora-card" style="text-align:left">
             <div class="dora-card-title" style="text-align:center">Release Notes</div>
             <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
-                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+                {{ skeleton_block(4) }}
             </div>
         </div>
     </div>
@@ -333,7 +334,7 @@
         <div class="dora-card" style="text-align:left">
             <div class="dora-card-title" style="text-align:center">Release Notes</div>
             <div id="releaseNotes" style="max-height:220px;overflow-y:auto;font-size:0.78rem;color:var(--text-secondary)">
-                <p style="color:var(--text-muted);font-style:italic">Loading...</p>
+                {{ skeleton_block(4) }}
             </div>
         </div>
     </div>

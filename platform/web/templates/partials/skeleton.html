@@ -1,19 +1,67 @@
 {# Skeleton loading macros — include then call: skeleton_agents(n), skeleton_metrics(n), etc. #}
 
-{# ── Agent card grid skeleton ── #}
-{% macro skeleton_agents(count=8) %}
-<div class="sk-grid sk-grid-agents">
+{# ── Universal .item-grid card skeleton (agents, projects, sessions, patterns, missions, workflows) ── #}
+{% macro skeleton_item_grid(count=8, with_icon=true) %}
+<div class="item-grid" data-view-grid style="pointer-events:none">
   {% for _ in range(count) %}
-  <div class="sk-card">
-    <div class="sk-row" style="border:none">
-      <div class="sk sk-circle sk-avatar"></div>
-      <div class="sk-text">
+  <div class="item-card">
+    {% if with_icon %}
+    <div class="item-icon"><div class="sk sk-circle" style="width:42px;height:42px"></div></div>
+    {% endif %}
+    <div class="item-main">
+      <div class="sk sk-line" style="width:65%"></div>
+      <div class="sk sk-line-sm" style="width:45%"></div>
+      <div class="item-detail">
+        <div class="sk sk-line" style="width:90%;margin-top:0.3rem"></div>
         <div class="sk sk-line" style="width:70%"></div>
-        <div class="sk sk-line-sm" style="width:50%"></div>
+        <div class="item-tags" style="margin-top:0.3rem">
+          <div class="sk sk-badge" style="width:50px"></div>
+          <div class="sk sk-badge" style="width:40px"></div>
+        </div>
       </div>
     </div>
-    <div class="sk sk-line" style="width:90%;margin-top:0.4rem"></div>
-    <div class="sk sk-line-sm" style="width:40%"></div>
+    <div class="item-meta"><div class="sk sk-badge"></div></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Agent card grid skeleton ── #}
+{% macro skeleton_agents(count=8) %}
+{{ skeleton_item_grid(count, with_icon=true) }}
+{% endmacro %}
+
+{# ── Project card grid skeleton ── #}
+{% macro skeleton_projects_grid(count=6) %}
+{{ skeleton_item_grid(count, with_icon=true) }}
+{% endmacro %}
+
+{# ── Session card grid skeleton ── #}
+{% macro skeleton_sessions(count=6) %}
+{{ skeleton_item_grid(count, with_icon=false) }}
+{% endmacro %}
+
+{# ── Mission/Epic card skeleton ── #}
+{% macro skeleton_missions(count=6) %}
+<div class="item-grid" data-view-grid style="pointer-events:none">
+  {% for _ in range(count) %}
+  <div class="item-card">
+    <div class="item-main">
+      <div class="sk sk-line-lg" style="width:60%"></div>
+      <div class="sk sk-line-sm" style="width:40%"></div>
+      <div style="margin-top:0.5rem">
+        <div class="sk sk-line" style="width:85%"></div>
+        <div class="sk sk-line" style="width:65%"></div>
+      </div>
+      <div style="display:flex;gap:0.4rem;margin-top:0.5rem">
+        <div class="sk sk-badge" style="width:55px"></div>
+        <div class="sk sk-badge" style="width:45px"></div>
+        <div class="sk sk-badge" style="width:65px"></div>
+      </div>
+    </div>
+    <div class="item-meta">
+      <div class="sk" style="width:100%;height:4px;border-radius:2px;margin-top:0.3rem"></div>
+    </div>
   </div>
   {% endfor %}
 </div>
@@ -31,6 +79,28 @@
 </div>
 {% endmacro %}
 
+{# ── Stat cards skeleton (analytics/ops/monitoring) ── #}
+{% macro skeleton_stat_cards(count=4) %}
+<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem">
+  {% for _ in range(count) %}
+  <div class="stat-card sk-card">
+    <div class="sk sk-line-sm" style="width:50%"></div>
+    <div class="sk" style="height:2.2rem;width:35%;margin:0.4rem 0"></div>
+    <div class="sk sk-line-sm" style="width:70%"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Chart placeholder skeleton ── #}
+{% macro skeleton_chart(height='200px') %}
+<div class="sk-card" style="min-height:{{ height }};display:flex;align-items:flex-end;gap:4px;padding:1rem 1rem 0.5rem">
+  {% for w in [40,65,30,80,55,70,45,60,35,75,50,40] %}
+  <div class="sk" style="flex:1;height:{{ w }}%;border-radius:2px 2px 0 0"></div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
 {# ── Table rows skeleton ── #}
 {% macro skeleton_table(rows=6, cols=4) %}
 <table style="width:100%">
@@ -42,6 +112,19 @@
   </tr>
   {% endfor %}
 </table>
+{% endmacro %}
+
+{# ── KPI row skeleton (metrics page) ── #}
+{% macro skeleton_kpi_row(count=4) %}
+<div style="display:grid;grid-template-columns:repeat({{ count }},1fr);gap:1rem">
+  {% for _ in range(count) %}
+  <div class="sk-card" style="text-align:center;padding:1.2rem">
+    <div class="sk sk-line-sm" style="width:40%;margin:0 auto 0.5rem"></div>
+    <div class="sk" style="height:2.5rem;width:50%;margin:0 auto 0.4rem;border-radius:4px"></div>
+    <div class="sk sk-line-sm" style="width:60%;margin:0 auto"></div>
+  </div>
+  {% endfor %}
+</div>
 {% endmacro %}
 
 {# ── Strategic agent cards skeleton (portfolio) ── #}
@@ -97,6 +180,155 @@
       <div class="sk sk-line" style="width:{% if loop.index is odd %}75{% else %}60{% endif %}%"></div>
       <div class="sk sk-line-sm" style="width:30%"></div>
     </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Dashboard card skeleton (ck-card) ── #}
+{% macro skeleton_ck_card(lines=3, title_width='50%') %}
+<div class="ck-card">
+  <div class="ck-card-title"><div class="sk sk-line" style="width:{{ title_width }}"></div></div>
+  {% for _ in range(lines) %}
+  <div class="ck-row">
+    <div class="ck-row-left" style="flex:1">
+      <div class="sk sk-line" style="width:{% if loop.first %}70{% else %}55{% endif %}%"></div>
+      <div class="sk sk-line-sm" style="width:35%"></div>
+    </div>
+    <div class="sk sk-badge"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Hub card skeleton (project_hub) ── #}
+{% macro skeleton_hub_cards(count=4) %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">
+  {% for _ in range(count) %}
+  <div class="sk-card">
+    <div class="sk sk-line" style="width:50%;margin-bottom:0.8rem"></div>
+    <div class="sk" style="height:2rem;width:40%;margin-bottom:0.6rem"></div>
+    <div class="sk sk-line" style="width:80%"></div>
+    <div class="sk sk-line-sm" style="width:60%"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Kanban column skeleton ── #}
+{% macro skeleton_kanban(columns=4, cards_per=3) %}
+<div style="display:flex;gap:0.75rem;overflow-x:auto;padding:0.5rem 0">
+  {% for _ in range(columns) %}
+  <div style="min-width:240px;flex:1">
+    <div class="sk sk-line" style="width:50%;margin-bottom:0.6rem"></div>
+    {% for _ in range(cards_per) %}
+    <div class="sk-card" style="margin-bottom:0.5rem">
+      <div class="sk sk-line" style="width:75%"></div>
+      <div class="sk sk-line-sm" style="width:50%"></div>
+      <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+        <div class="sk sk-badge" style="width:35px"></div>
+        <div class="sk sk-badge" style="width:45px"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Timeline/message list skeleton ── #}
+{% macro skeleton_timeline(count=6) %}
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+  {% for _ in range(count) %}
+  <div style="display:flex;gap:0.6rem;padding:0.5rem 0">
+    <div class="sk sk-circle" style="width:32px;height:32px;flex-shrink:0"></div>
+    <div style="flex:1">
+      <div class="sk sk-line" style="width:30%;margin-bottom:0.3rem"></div>
+      <div class="sk-card" style="padding:0.6rem">
+        <div class="sk sk-line" style="width:{% if loop.index is odd %}85{% else %}65{% endif %}%"></div>
+        <div class="sk sk-line" style="width:{% if loop.index is odd %}60{% else %}75{% endif %}%"></div>
+        {% if loop.index % 3 == 0 %}
+        <div class="sk sk-line-sm" style="width:40%"></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Marketplace / Mercato grid skeleton ── #}
+{% macro skeleton_marketplace(count=8) %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.75rem">
+  {% for _ in range(count) %}
+  <div class="sk-card">
+    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem">
+      <div class="sk sk-circle" style="width:36px;height:36px"></div>
+      <div style="flex:1">
+        <div class="sk sk-line" style="width:60%"></div>
+        <div class="sk sk-line-sm" style="width:40%"></div>
+      </div>
+    </div>
+    <div class="sk sk-line" style="width:90%"></div>
+    <div class="sk sk-line" style="width:70%"></div>
+    <div style="display:flex;gap:0.3rem;margin-top:0.5rem">
+      <div class="sk sk-badge" style="width:50px"></div>
+      <div class="sk sk-badge" style="width:40px"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Tab panel skeleton (generic, for any tabbed content) ── #}
+{% macro skeleton_tab_panel(style='cards') %}
+{% if style == 'cards' %}
+  {{ skeleton_item_grid(6) }}
+{% elif style == 'table' %}
+  {{ skeleton_table(6, 5) }}
+{% elif style == 'metrics' %}
+  {{ skeleton_stat_cards(4) }}
+  <div style="margin-top:1rem">{{ skeleton_chart() }}</div>
+{% elif style == 'feed' %}
+  {{ skeleton_feed(6) }}
+{% elif style == 'text' %}
+  {{ skeleton_block(8) }}
+{% else %}
+  {{ skeleton_block(6) }}
+{% endif %}
+{% endmacro %}
+
+{# ── Teams / Leaderboard table skeleton ── #}
+{% macro skeleton_teams_table(rows=8) %}
+<table style="width:100%">
+  <thead><tr>
+    {% for w in ['5%','25%','20%','15%','15%','10%','10%'] %}
+    <th style="padding:0.5rem"><div class="sk sk-line" style="width:70%"></div></th>
+    {% endfor %}
+  </tr></thead>
+  <tbody>
+  {% for _ in range(rows) %}
+  <tr class="sk-row">
+    <td style="padding:0.5rem"><div class="sk sk-line" style="width:20px"></div></td>
+    <td style="padding:0.5rem;display:flex;align-items:center;gap:0.5rem"><div class="sk sk-circle" style="width:28px;height:28px"></div><div class="sk sk-line" style="width:60%;flex:1"></div></td>
+    <td style="padding:0.5rem"><div class="sk sk-line-sm" style="width:50%"></div></td>
+    <td style="padding:0.5rem"><div class="sk sk-badge"></div></td>
+    <td style="padding:0.5rem"><div class="sk" style="height:6px;width:80%;border-radius:3px"></div></td>
+    <td style="padding:0.5rem"><div class="sk sk-line" style="width:40px"></div></td>
+    <td style="padding:0.5rem"><div class="sk sk-line" style="width:30px"></div></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{# ── Design system tokens skeleton ── #}
+{% macro skeleton_ds_tokens(count=12) %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:0.5rem">
+  {% for _ in range(count) %}
+  <div class="sk-card" style="padding:0.6rem;text-align:center">
+    <div class="sk" style="width:40px;height:40px;border-radius:8px;margin:0 auto 0.4rem"></div>
+    <div class="sk sk-line-sm" style="width:60%;margin:0 auto"></div>
   </div>
   {% endfor %}
 </div>

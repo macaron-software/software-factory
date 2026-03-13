@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_marketplace %}
 {% block topbar_actions %}
 <div class="wallet-badge" id="walletBadge">
     <svg class="icon" width="16" height="16"><use href="#icon-database"/></svg>
@@ -147,7 +148,7 @@
         <div class="mercato-panel">
             <h3>Roster</h3>
             <div id="rosterCards" class="mercato-roster">
-                <p class="empty-state">Select a project</p>
+                {{ skeleton_marketplace(6) }}
             </div>
         </div>
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/skeleton.html" import skeleton_marketplace %}
 
 {% block extra_head %}
 <style>
@@ -75,7 +76,7 @@
 </div>
 
 <div class="mkt-grid" id="mktGrid">
-    <div class="mkt-empty">Chargement…</div>
+    {{ skeleton_marketplace(8) }}
 </div>
 
 <!-- Detail panel -->
