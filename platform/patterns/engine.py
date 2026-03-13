@@ -1268,15 +1268,31 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
 
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
-                # Re-run agent with rejection feedback
+                # Re-run agent with PUA pressure escalation (source: tanweai/pua MIT)
                 feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
-                retry_task = (
-                    f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ]\n"
-                    f"Problèmes:\n{feedback}\n\n"
-                    f"Corrige ces problèmes. Même tâche:\n{task}"
+
+                # Collect phase-level failure context for cross-agent pressure
+                _phase_failures: dict[str, int] = {}
+                try:
+                    for _nid, _nstate in run.nodes.items():
+                        if _nstate.status in (NodeStatus.FAILED, NodeStatus.VETOED):
+                            # node agents are stored in pattern.agents list
+                            for _pa in (run.pattern.agents or []):
+                                if _pa.get("id") == _nid:
+                                    _pname = _pa.get("agent_id", _nid)
+                                    _phase_failures[_pname] = _phase_failures.get(_pname, 0) + 1
+                except Exception:
+                    pass  # best-effort peer context
+
+                from ..agents.pua import build_retry_prompt
+                retry_task = build_retry_prompt(
+                    task=task,
+                    feedback=feedback,
+                    consecutive_failures=_adv_attempt + 2,  # +2: first run + current attempt
+                    agent_name=agent.name,
+                    phase_failures=_phase_failures or None,
+                    protocol_override=protocol_override or "",
                 )
-                if protocol_override:
-                    retry_task += "\n\n" + protocol_override
 
                 await _sse(
                     run,

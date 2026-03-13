@@ -173,6 +173,10 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
     if agent.description:
         parts.append(f"Description: {agent.description}")
 
+    # PUA motivation baseline — Iron Rules + Proactivity (source: tanweai/pua MIT)
+    from .pua import build_motivation_block
+    parts.append(build_motivation_block())
+
     if ctx.tools_enabled:
         parts.append("""
 You have access to tools via function calling. When you need to take action, call the tools directly — do NOT write tool calls as text (no [TOOL_CALL], no JSON in your response). The system handles tool execution automatically when you use function calling.
