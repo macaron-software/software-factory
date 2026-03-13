@@ -545,6 +545,16 @@ def check_l0(
                 test_files += 1
             elif fp.endswith((".py", ".ts", ".js", ".rs", ".go", ".kt", ".swift")):
                 source_files += 1
+            # Skip structural quality checks for non-code files
+            # (CSS, markdown, JSON, YAML, config — these naturally have deep
+            # nesting / many lines without being "complex code")
+            _is_code = fp.lower().endswith(
+                (".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".go",
+                 ".kt", ".swift", ".java", ".c", ".cpp", ".h", ".hpp",
+                 ".cs", ".rb", ".php")
+            )
+            if not _is_code:
+                continue
             # COGNITIVE_COMPLEXITY: nesting × control-flow increments
             # (SonarQube-style: each if/for/while/catch adds 1 + current nesting level)
             if lines > 30:
