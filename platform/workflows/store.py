@@ -931,9 +931,7 @@ async def _pm_checkpoint(
 
 
 PHASE_TIMEOUT_SECONDS = 172800  # 48h — industrial pipeline, never stop
-WORKFLOW_TIMEOUT_SECONDS = (
-    3600  # 1h total workflow timeout — 30min too tight with rate-limit contention
-)
+WORKFLOW_TIMEOUT_SECONDS = 0  # no global timeout — workflows can run for days
 
 
 async def run_workflow(
@@ -1095,9 +1093,9 @@ async def run_workflow(
 
         run.current_phase = i
 
-        # Workflow-level timeout — prevents zombie sessions
+        # Workflow-level timeout — 0 = disabled (workflows can run for days)
         _elapsed = _time.monotonic() - _workflow_start
-        if _elapsed > WORKFLOW_TIMEOUT_SECONDS:
+        if WORKFLOW_TIMEOUT_SECONDS > 0 and _elapsed > WORKFLOW_TIMEOUT_SECONDS:
             logger.warning(
                 "WORKFLOW TIMEOUT after %.0fs (limit=%ds) — stopping at phase %d/%d",
                 _elapsed,
