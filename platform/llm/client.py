@@ -517,23 +517,34 @@ class LLMClient:
                         _send_system,
                         tools,
                     )
-                    # Auto-retry on 0-token empty response (MiniMax M2.5 quirk)
+                    # Auto-retry on empty response (MiniMax M2.5 quirk):
+                    # - tokens_out==0: classic empty response
+                    # - tokens_out>0 but content empty: <think> tokens counted, body stripped to ""
+                    # - finish_reason==content_filter: content blocked, content will be ""
                     _content_empty = not (result.content or "").strip()
                     _no_tools = not result.tool_calls
-                    if result.tokens_out == 0 and _content_empty and _no_tools:
+                    _blocked = (result.finish_reason or "") == "content_filter"
+                    if _content_empty and _no_tools:
                         if attempt < max_attempts - 1:
                             logger.warning(
-                                "LLM %s/%s returned 0 tokens (empty response) — "
+                                "LLM %s/%s returned empty response (tokens_out=%d, finish=%s) — "
                                 "retrying (attempt %d/%d)",
-                                prov, use_model, attempt + 1, max_attempts,
+                                prov, use_model, result.tokens_out,
+                                result.finish_reason, attempt + 1, max_attempts,
                             )
                             await asyncio.sleep(2 + attempt * 2)
                             continue
-                        logger.warning(
-                            "LLM %s/%s 0-token response persists after %d attempts — "
-                            "falling back to next provider",
-                            prov, use_model, max_attempts,
-                        )
+                        if _blocked:
+                            logger.warning(
+                                "LLM %s/%s content_filter — falling back to next provider",
+                                prov, use_model,
+                            )
+                        else:
+                            logger.warning(
+                                "LLM %s/%s empty response persists after %d attempts — "
+                                "falling back to next provider",
+                                prov, use_model, max_attempts,
+                            )
                         self._cb_record_failure(prov)
                         self._provider_cooldown[prov] = time.monotonic() + 30
                         break  # try next provider in fallback chain
