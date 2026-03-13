@@ -780,6 +780,12 @@ Pick the pattern that matches the situation:
 - Tests not executed or failed
 - Source files < 3 (non-trivial project)
 - Adversarial guard rejected (score >= 7)
+- Acceptance criteria (AC-xxxxxx) generated but not all validated DONE
+- Frontend project missing design-system phase (tokens, themes, WCAG)
+- Frontend project missing ux-review gate (css_computed_check not run)
+- Responsive: not tested on mobile (375px) + tablet (768px) + desktop (1280px)
+- Themes: light / dark / high-contrast not implemented + togglable
+- WCAG AA: no skip-to-content, no focus-visible, no aria landmarks, no keyboard nav
 
 ─── TRACEABILITY TEAM ───
 A dedicated traceability team (trace-lead, trace-auditor, trace-writer, trace-monitor) is available.
@@ -806,14 +812,17 @@ Do NOT skip QA because tools are missing. Fix the environment first.
 For ALL projects with a frontend (web-node, web-docker, web-static, mobile):
 - BEFORE dev-sprint: compose "design-system" phase if not already done.
   Team: ["ds-lead", "ux-adversarial"] — ds-lead produces tokens.css, themes.css, base.css, components.css, lib/theme.ts.
-- Design system MUST include: light/dark mode, high-contrast mode (WCAG AAA 7:1), responsive (mobile-first),
-  WCAG AA patterns (skip-to-content, focus-visible, aria landmarks, semantic HTML, keyboard nav, Cmd+K palette).
-- NO emoji in UI. NO gradient backgrounds. NO inline styles. NO hardcoded colors.
-- After design-system: compose "ux-review" phase: team ["ux-adversarial", "llm-judge-ux"].
-  ux-adversarial greps for violations. llm-judge-ux runs css_computed_check on the running app.
-- If dev agents produce code with inline styles or hardcoded colors → loop with feedback.
-- Tool available to all DS agents: css_computed_check (deterministic computed style verification),
-  ds_token_audit (static token completeness check).
+- Design system MUST include:
+    * Theming:     light + dark + high-contrast (WCAG AAA 7:1 min ratio). All 3 togglable via <html data-theme>.
+    * Responsive:  mobile-first (375px) → tablet (768px) → desktop (1280px). CSS grid/flex, no fixed widths.
+    * WCAG AA+:    skip-to-content link, focus-visible outline, aria landmarks (main/nav/aside), semantic HTML (h1→h6 hierarchy, button vs div), keyboard nav (Tab/Shift+Tab/Enter/Esc/Arrow), Cmd+K command palette.
+    * Atomic DS:   design tokens (spacing, color, radius, shadow, typography) in CSS vars. Components: Button, Input, Card, Badge, Modal, Toast, Table, Tabs, Accordion.
+    * Forbidden:   NO emoji in UI, NO gradient backgrounds, NO inline styles, NO hardcoded hex colors, NO px font-size (use rem).
+- After design-system: ALWAYS compose "ux-review" phase: team ["ux-adversarial", "llm-judge-ux"].
+  ux-adversarial: grep codebase for violations (inline styles, hardcoded colors, missing aria, wrong semantics).
+  llm-judge-ux: run css_computed_check + ds_token_audit → fails = VETO.
+- If dev agents produce code with violations → loop with feedback from ux-adversarial grep output.
+- Tools: css_computed_check (computed style + WCAG contrast), ds_token_audit (token completeness).
 
 ─── FRACTAL DECOMPOSITION RULES ───
 An epic is too large for a single dev phase when it has 3+ user stories or multiple distinct modules.
