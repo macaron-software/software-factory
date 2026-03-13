@@ -1,25 +1,25 @@
-# SF Platform -- Agentic Workflow Engine
+# SF Platform — Quick Ref
 
-## Stats
-~218 agents . 26 patterns (20 catalog+5 fractal+backprop) . 50 wf . 28 phase tpl
-52 tool mods . 134 schemas . 1091 skills . 375py/148KLOC . 62 PG tables
+## WHAT
+Multi-agent SAFe orch. ~221 agents . 26 patterns . 69 wf . 32 phase tpl . 54 tool mods . 139 skills.
+FastAPI+HTMX+SSE. PG16(62tbl)+Redis7. 375py/148KLOC. Port 8099(dev)/8090(prod).
 
-## ALWAYS -- Start of Session
-git pull on ALL project repos before any work:
+## ALWAYS — Start of Session
 ```sh
 for d in _SOFTWARE_FACTORY _BABY MVP_ADA _HELP/aides-macaron _FLO _PSY YOLONOW; do
   (cd ~/_MACARON-SOFTWARE/$d && git pull --rebase --autostash 2>/dev/null)
 done
 ```
-Paths: SF=_SOFTWARE_FACTORY . Baby=_BABY . ADA-NDIS=MVP_ADA . MesAides=_HELP/aides-macaron
-       FLO=_FLO (repo:luna) . PSY=_PSY (remote:github) . YOLONOW=YOLONOW
+PSY remote=github (not origin).
 
 ## NEVER
-- `import platform` top-level (shadows stdlib) -> `from platform.X import Y`
-- `--reload` (same) . `*_API_KEY=dummy` . change LLM models . emoji . WebSocket
+- `import platform` top-level — shadows stdlib; use `from platform.X import Y`
+- `--reload` (same shadow) . `*_API_KEY=dummy` — Infisical/.env
+- change LLM models . emoji in UI . WebSocket — SSE only (`--ws none`) . SVG Feather icons only
+- gradient bg . inline styles . hardcoded hex colors in UI
 
 ## Stack
-Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(62tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical/.env
+Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(62tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical . zero build
 
 ## Run / Test
 ```sh
@@ -31,215 +31,151 @@ pytest tests/test_platform_api.py -v          # API (PG req)
 
 ## Tree
 ```
-platform/  server.py          lifespan drain auth-mw 8-bg-tasks
-  agents/              exec store(~215) adversarial(L0+L1) tool_runner(134)
-                       guardrails perms selection(Thompson) evolution(GA) rl(Q) darwin
-  patterns/engine.py   26 topo: solo seq par loop hier net router aggr wave hitl mr bb
-                       comp tournament escalation voting speculative red-blue relay mob
-                       fractal_{qa,stories,tests,worktree} backprop_merge
-  workflows/           store(PM v2, 28 tpl, 20 catalog) . defs/(50 YAML)
-  services/            epic_orch . auto_resume . pm_checkpoint . evidence . notif
-  a2a/                 bus veto negotiation jarvis_mcp azure_bridge
-  ac/                  reward(14d) convergence experiments skill_thompson
-  security/            prompt_guard output_validator audit sanitize
-  auth/                service(JWT+bcrypt) . middleware(RBAC) . ses(AWS SES pw reset)
-  llm/client.py        5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
-  db/                  adapter(PG+SQLite) schema(62tbl) migrations tenant
-  cache.py             TTL cache get/put/invalidate . prefix invalidation (key*)
-  tools/(52)           code git deploy build web sec mem mcp trace ast lint lsp ...
-  traceability/        legacy_items + traceability_links CRUD
-  ops/(17)             auto_heal traceability_scheduler knowledge_scheduler ...
-  web/routes/          missions pages sessions wf agents projects auth . tpl(123)
-  web/routes/api/partials.py   deferred HTML fragments for skeleton loading
-  web/static/css/      main.css components.css(+skeleton .sk) agents.css ...
-  web/templates/partials/      skeleton.html(20 macros) agent_cards.html ...
-  rbac/ mcps/ modules/(24) bricks/ metrics/
-cli/sf.py              sf status | sf ideation | sf missions list
-skills/                1091 .md
-projects/              baby.yaml factory.yaml (per-project config+git_url)
+platform/                    375py 148KLOC
+  server.py                  lifespan . drain . auth mw . 8 bg tasks
+  agents/                    exec . store(~221) . adversarial(L0+L1) . tool_runner(134)
+                             selection(Thompson) . evolution(GA) . rl(Q) . darwin . skill_broker
+  patterns/engine.py         26 topo: solo seq par loop hier net router aggr wave hitl mr bb
+                             comp tournament escalation voting speculative red-blue relay mob
+                             fractal_{qa,stories,tests,worktree} backprop
+  workflows/                 store(PM v2, 32 tpl, 9 prompt sects) . defs/(69 YAML)
+  services/                  epic_orch(+on_complete chain) . auto_resume . pm_checkpoint . notif
+  a2a/                       bus . veto . negotiation . jarvis_mcp . azure_bridge
+  ac/                        reward(14d) . convergence . experiments . skill_thompson
+  security/                  prompt_guard . output_validator . audit . sanitize
+  auth/                      service(JWT+bcrypt) . middleware(RBAC) . ses(AWS SES pw reset)
+  llm/client.py              5 providers: azure-ai/azure-openai/nvidia/minimax/local-mlx
+  db/                        adapter(PG+SQLite) . schema(62tbl) . migrations . tenant
+  tools/(54)                 code git deploy build web sec mem mcp trace ast lint lsp ds ...
+  ops/(17)                   auto_heal . traceability_scheduler . knowledge_scheduler ...
+  web/routes/                missions pages sessions wf agents projects auth . tpl(123)
+  web/static/css/            main.css components.css(.sk shimmer) agents.css ...
+  web/templates/partials/    skeleton.html(20 macros) . agent_cards.html ...
+skills/                      139 YAML
+projects/                    baby.yaml . factory.yaml (per-project config+git_url)
 ```
 
-## Projects (SF-Baby: sf-baby.macaron-software.com)
+## DB — LIVE = PostgreSQL
+DATABASE_URL=postgresql://macaron:macaron@localhost:5432/macaron_platform
+data/platform.db = STALE SQLite — do NOT query for live data.
+psql: PGPASSWORD=macaron /opt/homebrew/bin/psql -h localhost -U macaron -d macaron_platform
+
+## Projects
 | proj | repo | path | stack |
 |------|------|------|-------|
-| Baby | macaron-software/baby (priv) | _BABY | Rust/WASM+SvelteKit+iOS/Android |
-| ADA-NDIS | macaron-software/ada-ndis (pub) | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC+iOS/Android |
+| Baby | macaron-software/baby | _BABY | Rust/WASM+SvelteKit+iOS/Android |
+| ADA-NDIS | macaron-software/ada-ndis | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC |
 | SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
 | FLO | macaron-software/luna | _FLO | TBD |
-| PSY | macaron-software/psy-platform (priv) | _PSY | Rust/Axum+React |
-| YOLONOW | macaron-software/yolonow (priv) | YOLONOW | Rust |
+| PSY | macaron-software/psy-platform | _PSY | Rust/Axum+React |
+| YOLONOW | macaron-software/yolonow | YOLONOW | Rust |
 | MesAides | macaron-software/mes-aides | _HELP/aides-macaron | Rust+WASM+SwiftUI+Kotlin |
-
-SAFe CRUD: POST /api/missions (epic) . /api/epics/{id}/features . /api/features/{id}/stories
-Memory: POST /api/memory/project/{id} {key,value,category,source,confidence}
 
 ## Auth
 JWT+bcrypt. Cookie: access 15min + refresh 7d. Rate limit: 5/60s per IP.
-POST /api/auth/login . /register . /refresh . /logout . /setup . /demo
-POST /api/auth/forgot-password -> 6-digit code via AWS SES (15min TTL, 5 attempts)
-POST /api/auth/verify-reset-code -> validate code
-POST /api/auth/reset-password -> set new pw + invalidate all sessions
-OAuth: GitHub (/auth/github) . Microsoft AD (/auth/azure)
-DB: users . user_sessions . user_project_roles . password_reset_codes
-Config: AWS_SES_REGION(eu-west-1) . AWS_SES_FROM_EMAIL(noreply@macaron-software.com)
-ses.py: boto3 send_email (styled HTML + plain text)
+POST /api/auth/login . /register . /refresh . /logout . /forgot-password . /reset-password
+OAuth: GitHub(/auth/github) . Azure AD(/auth/azure) . Demo(/api/auth/demo)
+AWS SES: 6-digit code, 15min TTL, 5 attempts max.
 
-## Auto-Commit+Push (agents/executor.py)
-code_write/code_edit -> ctx.code_files_written -> end of run: _auto_commit_and_push()
+## Auto-Commit+Push
+code_write/code_edit -> ctx.code_files_written -> _auto_commit_and_push()
 branch: agent/{agent_id}/{session_id[:8]} (never main/master/develop)
-post-phase hook (epics/internal.py): git add -A + commit + push after EVERY phase
+post-phase hook: git add -A + commit + push after EVERY phase
 
-## Skeleton Loading — UI System
-```
-CSS:   .sk shimmer . .sk-line .sk-line-sm .sk-line-lg . .sk-circle .sk-avatar
-       .sk-badge . .sk-card . .sk-metric . .sk-loaded(fade-in 0.3s)
-       @keyframes skeleton-shimmer { background-position 200%->-200% }
-Macros (partials/skeleton.html — import + call):
-  skeleton_item_grid(n,with_icon) . skeleton_agents(n) . skeleton_missions(n)
-  skeleton_stat_cards(n) . skeleton_chart(h) . skeleton_kpi_row(n)
-  skeleton_table(r,c) . skeleton_teams_table(n) . skeleton_strategic(n)
-  skeleton_pipeline(n) . skeleton_marketplace(n) . skeleton_kanban(cols,cards)
-  skeleton_timeline(n) . skeleton_feed(n) . skeleton_hub_cards(n)
-  skeleton_projects(n) . skeleton_ck_card(lines) . skeleton_tab_panel(style)
-  skeleton_ds_tokens(n) . skeleton_block(lines)
-Deferred: hx-get="/partial/X" hx-trigger="load" hx-swap="innerHTML"
-Partials: /partial/portfolio/metrics . /partial/agents/grid . /partial/projects/grid
-          /partial/sessions/grid . /partial/patterns/grid . /partial/missions/grid
-          /partial/cockpit/pipeline . /partial/cockpit/projects
-Cache: platform/cache.py TTL: agents 60s . missions 30s . runs 15s . wf 120s . projects 60s
-  invalidate("missions:*") — prefix glob . CUD ops auto-invalidate
-HTTP cache: Cache-Control immutable ?v= versioned . 1h unversioned static
-Coverage: 31/88 templates . DS page /design-system -> Skeleton tab (20 live demos)
-```
-
-## Epic Workflow Engine (PM v2)
-NOT "PACMAN" — PACMAN is a game project. SF pipeline = Epic Runner.
-Epic -> workflow (YAML phases) -> epic_runs (DB) -> PM LLM drives phases.
-PM LLM: next|loop|done|skip|**phase**(dynamic brick).
+## Epic Workflow Engine — PM v2
+Epic -> workflow(YAML phases) -> epic_runs(PG) -> PM LLM: next|loop|done|skip|phase(dyn).
 compose: pattern+team+gate+feedback -> PatternDef+WorkflowPhase -> _phase_queue.
-Checkpoint: quality<50% -> retry. PM_OVERRIDE: force on build fail. Cap: 20.
-Vocab: EpicRun . WorkflowPhase . PatternDef . epic_orch . auto_resume
+Checkpoint: quality<50% -> retry. Cap: 20. pm_driven:true -> PM checkpoint each phase.
+on_complete: _on_complete_chain() reads workflow.config_json.on_complete[] -> auto-launch companion wf.
+  41 wf configured: code-deliverable -> doc-pipeline+knowledge-maint; findings -> knowledge-maint.
 
-```
-store.py layout:
-  L543   _PATTERN_CATALOG (20)   L556 _FEEDBACK_TYPES _GATE_TYPES
-  L580   _PHASE_TEMPLATES (28 bricks)
-  L700   _PM_DECISION_PROMPT_V2
-  L754   _build_dynamic_phase(block) -> (WPhase, PatDef)
-  L809   _build_evidence() -- src/build/test from tool_calls
-  L1054  _dynamic_patterns{} + _phase_queue[]
-  L1592  PM inserts: _dynamic_patterns[id] = _dyn_pattern
-```
+## PM v2 — 9 Prompt Sections
+DECISION . PATTERN GUIDE . PROGRESSION . NEVER-done(10 items) . TRACEABILITY . INFRA-PROVISION
+DESIGN-SYSTEM . FRACTAL . PUA
 
-## 28 Phase Templates
+NEVER done if: build fail . tests fail . src<3 . adversarial reject(>=7) . AC-xxx unresolved
+  . frontend missing design-system phase . frontend missing ux-review gate
+  . responsive not tested(375/768/1280) . themes(light/dark/hi-contrast) missing
+  . WCAG AA missing(skip-link/focus-visible/aria/kbd) . error states show raw tech copy
+
+## 32 Phase Templates
 inception design design-debate dev-sprint parallel-dev tdd-sprint code-review
-qa-acceptance multi-file-refactor design-convergence deploy rework bug-triage
-creative-tournament tiered-fix quality-vote speculative-fix security-audit
+qa-acceptance multi-file-refactor design-convergence design-system ux-review deploy rework
+bug-triage creative-tournament tiered-fix quality-vote speculative-fix security-audit
 progressive-build mob-debug legacy-inventory story-from-legacy traceability-check
 migration-sprint migration-verify infra-provision wave-build human-review
+fractal-decomp story-sprint
 
-## Gates and Feedback
-Gates: all_approved . no_veto . always . best_effort
-Feedback: adversarial->config.adversarial_guard | tools->require_tool_validation
-          judge->network+debate | human->hitl
+feature-sprint (PG) — 11 phases:
+  feature-design -> story-decomp -> qa-decomp -> design-system* -> env-setup
+  -> tdd-sprint[dev-react,dev-java-spring,testeur] -> adversarial-review[archi,code-critic,code-reviewer]
+  -> traceability-check[trace-lead,trace-auditor,trace-monitor] -> ux-review[ux-adversarial,llm-judge-ux]
+  -> feature-e2e -> feature-deploy  (*skip_on_failure if no frontend)
 
-## Dataclasses
-```
-WorkflowPhase  id pattern_id name desc gate config retry_count skip_on_failure timeout
-PatternDef     id name desc type agents[{id,agent_id}] edges config steps
-AgentDef       id name role desc system_prompt provider model temp max_tokens
-               skills[] tools[] tags[] motivation="" persona=""
-EpicRun        id workflow_id session_id status current_phase started_at cancel_reason
-WorkflowRun    workflow session_id project_id current_phase phase_results[] status
-PatternRun     pattern session_id project_id project_path phase_id max_iterations
-```
+## Design System
+Agents: ds-lead . ux-adversarial . llm-judge-ux
+Tools: css_computed_check(WCAG contrast+computed styles) . ds_token_audit(token completeness)
+Skills: design_system_enforcer . ds_lead . ux_adversarial . llm_judge_ux
+Required files: tokens.css . themes.css([data-theme]) . base.css . components.css . lib/theme.ts
+Themes: light + dark + high-contrast(WCAG AAA 7:1) togglable via <html data-theme>.
+Responsive: mobile-first 375->768->1024->1280px. Touch targets min 44x44px.
+WCAG AA+: skip-to-content . focus-visible . aria landmarks . semantic HTML . kbd nav . Cmd+K.
+Adv checks: hardcoded hex . gradient bg . emoji . inline styles . missing aria . no retry btn.
 
-## Quality Gates (17)
-1-4 HARD: guardrails(regex) . veto(ABS/STRONG/ADV) . prompt_inject(block@7) . tool_acl(5-layer)
-5-6: adversarial L0(25 det) HARD . L1(LLM) SOFT
-7-9: AC reward(R[-1,+1] 14d 8crit@60) HARD . convergence SOFT . RBAC HARD
-10-13: CI ruff.compile.pytest HARD . complexity(radon) SOFT
-14-17: sonar SOFT . deploy canary HARD . output_validator SOFT . stale_prune SOFT
-
-CC fn >10err >5warn . LOC >500err >300warn . MI <10err <20warn
-
-## Scheduled Background Tasks (server.py lifespan)
-| task | interval | purpose |
-|------|----------|---------|
-| auto_resume | 5min | resume paused epics, retry continuous missions |
-| traceability | 6h | SAFe audit: hierarchy+ACs completeness, incidents on gaps |
-| evolution | 02:00 UTC | GA + RL nightly retrain |
-| auto_heal | 60s | incident->epic->TMA workflow |
-| platform_watchdog | varies | false-positive detection |
-| node_heartbeat | 10s | cluster registration |
-| knowledge | 04:00 UTC | memory audit+seed+curate (manual start) |
+## Network Resilience (skill: network_resilience.yaml)
+5 states per data component: loading(skeleton+aria-busy) . success . empty . error . offline(+stale)
+Web: window online/offline events + HEAD/healthz . SW + IDB mutation queue
+  fetchWithRetry: exp backoff+jitter(500ms*2^i+rnd*200) . AbortSignal.timeout(8s) . max 3
+iOS: NWPathMonitor(@Observable NetworkMonitor) . waitsForConnectivity=true . SwiftData PendingOp queue
+Android: ConnectivityManager.NetworkCallback -> StateFlow . WorkManager(CONNECTED) . retryWhen
+Empathetic copy: FORBIDDEN phrases = "Error" / "HTTP 5xx" / "Network Error" / "Request failed"
+  USE: "Youre offline - changes will sync when you reconnect."
+       "Something went wrong on our end - please try again."
+Adv checks: offline_state_missing . raw_error_in_ui . missing_retry_btn . forbidden_copy
 
 ## Traceability
-DB: legacy_items(uuid,project,category,name,metadata_json) + traceability_links(legacy->story/test)
-Tools: legacy_scan . traceability_link . traceability_coverage . traceability_validate
-Roles: cdp/arch/product/dev=all4 qa=coverage+validate
-Adversarial: `# Ref: FEAT-xxx` / `// Ref:` enforced (MISSING_TRACEABILITY L0)
-Role: `traceability` in _classify_agent_role() + ROLE_TOOL_MAP["traceability"] (40+ tools)
-Team (platform): team-traceability / art-platform:
-  trace-lead (Nadia) . trace-auditor (Mehdi) . trace-writer (Sophie) . trace-monitor (Lucas)
-  VETO if coverage <80% . trace-writer = only SPECS.md maintainer
-Team (SF-Baby): Trace Lead . QA Traceability . Code Auditor . Trace Reporter
-Phase: traceability-check tpl uses team_roles=["traceability" x3, "qa"]
-PM v2: auto-inserts traceability-check after dev phases; legacy->story->traceability for migrations
-Scheduler: ops/traceability_scheduler.py -- every 6h (TRACEABILITY_INTERVAL env)
-  scans ALL active projects: SAFe hierarchy (epics/features/stories/ACs)
-  stores in memory: traceability-audit-latest + traceability-metrics
-  creates platform incidents if >3 high-severity gaps
-UDID format: EP-{PRJ}-NNN . FT-{PRJ}-NNN . US-{PRJ}-NNN . AC-{PRJ}-NNN
+L0 det: MISSING_TRACEABILITY — all .py/.ts need `# Ref: FEAT-xxx`
+Tools: legacy_scan . traceability_coverage . traceability_validate . traceability_link
+Team: trace-lead . trace-auditor . trace-monitor . trace-writer (VETO if coverage <80%)
+UDID: EP-{PRJ}-NNN . FT-{PRJ}-NNN . US-{PRJ}-NNN . AC-{PRJ}-NNN
+Scheduler: ops/traceability_scheduler.py 6h — SAFe audit, incidents if >3 gaps
 
-## LLM -- FROZEN
-local-mlx Qwen3.5-mlx . minimax M2.5(native tool_calls, no mangle, `<think>` stripped)
-azure-openai gpt-5-mini/5.2/5.2-codex . azure-ai gpt-5.2 . nvidia Kimi-K2
-MiniMax: no temp . parallel_tool_calls=False . json fences stripped
-GPT-5.x: reasoning . max_completion_tokens not max_tokens . budget>=16K
+## PUA
+pua.py: Iron Rules+Proactivity ALL agents.
+L1(2nd fail)=switch . L2(3rd)=root cause . L3(4th)=7-pt checklist . L4(5th+)=escalate
+L2+: [PERSONAL ACCOUNTABILITY] hook. QA=REVIEWER not IMPLEMENTER.
+5-step retry: Smell->Elevate->Mirror->Execute->Retrospective.
 
-## Envs
-```
-local    :8099   PG localhost:5432 . MLX :8080
-ovh      OVH_IP blue-green Docker /opt/software-factory/slots/{blue,green}
-azure    SF_NODE1_IP:8090 . SF_NODE2_IP . az vm run-command (no SSH)
-innov    3-node: n2(nginx lb) n1(primary) n3(PG+Redis 10.0.1.6)
-```
+## Quality Gates (17)
+1-4 HARD: guardrails . veto(ABS/STR/ADV) . prompt_inject(block@7) . tool_acl(5-layer)
+5-6: adv L0(25 det) HARD . L1(LLM) SOFT
+7-9: AC reward(R[-1,+1] 14d 8crit@60) HARD . convergence SOFT . RBAC HARD
+10-12: CI ruff.compile.pytest HARD . 13: complexity(radon) SOFT
+14-17: sonar SOFT . deploy canary HARD . output_validator SOFT . stale_prune SOFT
+CC>10err>5warn . LOC>500err>300warn . MI<10err<20warn
+
+## Bg Tasks
+auto_resume(5min) . traceability(6h) . evolution(02:00) . auto_heal(60s)
+platform_watchdog(varies) . node_heartbeat(10s) . knowledge(04:00)
+
+## LLM — FROZEN
+minimax M2.5 . azure-openai gpt-5-mini/5.2/5.2-codex . azure-ai gpt-5.2 . nvidia Kimi-K2 . local-mlx
+MiniMax quirks: no temp . no mangle . `<think>` stripped . json fences stripped . parallel_tool_calls=False
 
 ## Deploy
-OVH: rsync -> --force-recreate Docker (blue/green/factory)
-Azure: systemd sf-platform -> az vm run-command
-CI: .github/workflows/deploy-demo.yml . deploy-baby.yml (backup/E2E/rollback)
+OVH: blue-green Docker slots/{blue,green,factory}/ --force-recreate
+Azure: systemd sf-platform -> az vm run-command . Innovation: 3-node nginx lb
+CI: deploy-demo.yml . deploy-baby.yml
 
-## PUA -- Persistence Under Adversity
-Source: github.com/tanweai/pua (+36% fixes, +65% verif, +50% tool calls)
-Engine: platform/agents/pua.py -- 3 Iron Rules + Proactivity injected ALL agents
-Pressure: L1(2nd fail=switch) L2(3rd=soul) L3(4th=7-pt checklist) L4(5th+=escalate)
-L2+: [PERSONAL ACCOUNTABILITY] hook fires using agent.motivation (own words)
-5-step debug (each retry): Smell->Elevate->Mirror->Execute->Retrospective
-QA boundary: _PUA_QA_BLOCK -- REVIEWER != IMPLEMENTER; QA persistence rules
-agent.motivation field injected in system prompt alongside persona
-engine.py: passes agent.motivation to build_retry_prompt() on adversarial reject
+## Skeleton Loading
+CSS: .sk shimmer gradient . .sk-line .sk-circle .sk-badge .sk-card .sk-loaded(fade-in)
+Macros: partials/skeleton.html — 20 variants. Pattern: hx-get="/partial/X" hx-trigger="load".
 
-## Deep Bench -- Motivation ACs
-deep_bench_tools.py -- agents layer adds 3 cases:
-  3i agents-motivation-coverage  det  >=30% agents have motivation (currently 55%)
-  3j agents-pua-motivation-hook  det  PUA hook fires at L2+/with-motivation, silent at L1/none
-  3k agents-judge-motivation     llm  output reflects stated values under pressure
-
-## Key Patterns
-- YAML phase.config > pattern.config (merge L892)
-- Agent resolve: explicit -> TeamSelector(Darwin) -> role -> dev_fullstack
-- pm_driven:true -> PM checkpoint each phase
-- _phase_queue mutable -- PM inserts/reorders
-- _dynamic_patterns{} run-scoped cache
-- env-setup: detect stack -> correct Dockerfile
-- Agent persona: emphasize tool usage (CRITICAL BEHAVIOR RULES)
-- NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED -- no DONE
+## Gotchas
+- `platform/` shadows stdlib — NEVER `import platform`
+- NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE
+- PG advisory lock conn-scoped -> dedicated conn/mission
 - Container: /app/macaron_platform/ not /app/platform/
-- `platform/` shadows stdlib
 - SSE: `curl --max-time` (urllib blocks)
-- Epic chat: _auto_create_planning_run() if no active run (execution.py)
-
-## Repo
-GitHub macaron-software/software-factory (AGPL-3.0)
+- Epic orch: _build_phase_prompt() not workflows/store.py
+- Epic chat: _auto_create_planning_run() if no active run
