@@ -1308,14 +1308,22 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 try:
                     retry_result = await executor.run(ctx, retry_task)
                     retry_content = retry_result.content or ""
-                    # Strip think/tool artifacts
+                    # Strip think/tool artifacts — never produce empty
                     if "<think>" in retry_content:
-                        retry_content = _re.sub(
+                        stripped = _re.sub(
                             r"<think>.*?</think>\s*",
                             "",
                             retry_content,
                             flags=_re.DOTALL,
                         ).strip()
+                        if stripped and len(stripped) >= 10:
+                            retry_content = stripped
+                        elif "<think>" in retry_content and "</think>" in retry_content:
+                            ts = retry_content.index("<think>") + len("<think>")
+                            te = retry_content.index("</think>")
+                            extracted = retry_content[ts:te].strip()
+                            if extracted and len(extracted) >= 10:
+                                retry_content = extracted
                     if (
                         "<minimax:tool_call>" in retry_content
                         or "<tool_call>" in retry_content

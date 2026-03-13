@@ -1172,10 +1172,25 @@ class AgentExecutor:
             elapsed = int((time.monotonic() - t0) * 1000)
             # Strip raw MiniMax tool-call tokens that leak into content
             content = _strip_raw_tokens(content)
-            # Strip <think> blocks (MiniMax chain-of-thought) from stored content
-            content = re.sub(r"<think>[\s\S]*?</think>\s*", "", content).strip()
+            # Strip <think> blocks (MiniMax chain-of-thought) — never produce empty
+            stripped = re.sub(r"<think>[\s\S]*?</think>\s*", "", content).strip()
+            if stripped:
+                content = stripped
+            elif "<think>" in content and "</think>" in content:
+                # Think-only response — extract reasoning as content
+                ts = content.index("<think>") + len("<think>")
+                te = content.index("</think>")
+                extracted = content[ts:te].strip()
+                if extracted:
+                    content = extracted
             if "<think>" in content and "</think>" not in content:
-                content = content[: content.index("<think>")].strip()
+                before = content[: content.index("<think>")].strip()
+                if before:
+                    content = before
+                else:
+                    after = content[content.index("<think>") + len("<think>"):].strip()
+                    if after:
+                        content = after
 
             delegations = self._parse_delegations(content)
 

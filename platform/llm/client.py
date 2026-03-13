@@ -50,15 +50,7 @@ _PROVIDERS = {
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        # Deployed on inno-aks-openai: gpt-5-mini, gpt-5.2, gpt-5.2-codex ONLY (no gpt-5.1)
-        "models": [
-            "gpt-5-mini",
-            "gpt-5",
-            "gpt-5.1",
-            "gpt-5.2",
-            "gpt-5.1-codex",
-            "gpt-4.1",
-        ],
+        "models": ["gpt-5-mini", "gpt-5", "gpt-5.2", "gpt-5.1-codex", "gpt-5.2-codex"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
@@ -66,18 +58,16 @@ _PROVIDERS = {
         "azure_deployment_map": {
             "gpt-5-mini": os.environ.get("AZURE_DEPLOY_GPT5_MINI", "gpt-5-mini"),
             "gpt-5": os.environ.get("AZURE_DEPLOY_GPT5", "gpt-5"),
-            "gpt-5.1": os.environ.get("AZURE_DEPLOY_GPT51", "gpt-5.2"),
-            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-5.2"),
-            "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.2-codex"),
-            "gpt-4.1": os.environ.get("AZURE_DEPLOY_GPT41", "gpt-4.1"),
+            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-52"),
+            "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.1-codex"),
+            "gpt-5.2-codex": os.environ.get("AZURE_DEPLOY_CODEX2", "gpt-5.2-codex"),
         },
         "max_tokens_param": {
             "gpt-5-mini": "max_completion_tokens",
             "gpt-5": "max_completion_tokens",
-            "gpt-5.1": "max_completion_tokens",
             "gpt-5.2": "max_completion_tokens",
-            "gpt-4.1": "max_completion_tokens",
-            # gpt-5.1-codex uses Responses API (max_output_tokens handled separately)
+            "gpt-5.1-codex": "max_completion_tokens",
+            "gpt-5.2-codex": "max_completion_tokens",
         },
     },
     "nvidia": {
@@ -122,24 +112,15 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,
     },
-    # WHY: OpenCode Go subscription — OpenAI-compatible API at opencode.ai/zen/go/v1.
-    # Source of truth: https://models.dev/api.json (opencode-go provider).
-    # Base URL confirmed via models.dev registry: https://opencode.ai/zen/go/v1
-    # API key env var: OPENCODE_API_KEY (sk-... format from opencode.ai/auth)
-    # Full model catalog: https://opencode.ai/docs/zen
+    # WHY: opencode is an OpenAI-compatible self-hosted inference server (Go).
+    # Used on OVH demo env as primary provider; supports multiple models via /v1/models.
+    # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
     "opencode": {
         "name": "OpenCode (Go)",
-        "base_url": os.environ.get(
-            "OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1"
-        ),
+        "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
         "key_env": "OPENCODE_API_KEY",
-        "models": [
-            os.environ.get("OPENCODE_DEFAULT_MODEL", "kimi-k2.5"),
-            "kimi-k2.5",  # Kimi K2.5 — Moonshot AI via opencode-go subscription
-            "glm-5",  # GLM-5 — Zhipu AI via opencode-go subscription
-            "minimax-m2.5",  # MiniMax M2.5 via opencode-go subscription
-        ],
-        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", "kimi-k2.5"),
+        "models": [],  # fetched live from /v1/models; populated on first Settings load
+        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", ""),
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },
@@ -147,214 +128,34 @@ _PROVIDERS = {
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
 # Auto-detect Azure when AZURE_DEPLOY=1 (not just from key presence)
-# LOCAL_MLX_ENABLED=1 takes priority over MINIMAX_API_KEY for primary detection
-_local_mlx_enabled = os.environ.get("LOCAL_MLX_ENABLED", "").strip().lower() not in (
-    "",
-    "0",
-    "false",
-    "no",
-)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
-    "local-mlx"
-    if _local_mlx_enabled
-    else "azure-openai"
-    if os.environ.get("AZURE_OPENAI_API_KEY")
-    else "minimax"
+    "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
 _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
-
-# ── Per-model profiles (reasoning, token budget, API wire format) ──────────────
-# Each GPT-5.x model is a reasoning model: it consumes part of max_completion_tokens
-# budget on internal reasoning BEFORE producing visible output.  A budget of 8000
-# can leave 0 visible tokens on complex prompts.  We use 16000 as floor.
-# MiniMax-M2.5 uses <think> blocks (different mechanism) — also needs high budget.
-MODEL_PROFILES: dict[str, dict] = {
-    "gpt-5-mini": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_completion_tokens",
-        "api": "chat",
-    },
-    "gpt-5": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_completion_tokens",
-        "api": "chat",
-    },
-    "gpt-5.1": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_completion_tokens",
-        "api": "chat",
-    },
-    "gpt-5.2": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_completion_tokens",
-        "api": "chat",
-    },
-    "gpt-5.1-codex": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_output_tokens",
-        "api": "responses",
-    },
-    "gpt-5.2-codex": {
-        "reasoning": True,
-        "supports_temperature": False,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_output_tokens",
-        "api": "responses",
-    },
-    "gpt-4.1": {
-        "reasoning": False,
-        "supports_temperature": True,
-        "min_completion_tokens": 4096,
-        "max_tokens_param": "max_completion_tokens",
-        "api": "chat",
-    },
-    "MiniMax-M2.5": {
-        "reasoning": False,
-        "supports_temperature": True,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_tokens",
-        "api": "chat",
-        "think_blocks": True,
-    },
-    "MiniMax-M2.1": {
-        "reasoning": False,
-        "supports_temperature": True,
-        "min_completion_tokens": 16000,
-        "max_tokens_param": "max_tokens",
-        "api": "chat",
-        "think_blocks": True,
-    },
-}
-
-_DEFAULT_PROFILE: dict = {
-    "reasoning": False,
-    "supports_temperature": True,
-    "min_completion_tokens": 4096,
-    "max_tokens_param": "max_tokens",
-    "api": "chat",
-}
-
-
-def _get_profile(model: str) -> dict:
-    """Return model profile with prefix-matching fallback."""
-    if model in MODEL_PROFILES:
-        return MODEL_PROFILES[model]
-    # Prefix match (e.g. "gpt-5-mini-2025-02-01" → "gpt-5-mini")
-    for key in sorted(MODEL_PROFILES.keys(), key=len, reverse=True):
-        if model.startswith(key):
-            return MODEL_PROFILES[key]
-    return _DEFAULT_PROFILE
-
-
 # Local inference servers require explicit opt-in
-def _env_flag(name: str) -> bool:
-    """Return True only for non-empty values that are not '0', 'false', 'no'."""
-    v = os.environ.get(name, "").strip().lower()
-    return v not in ("", "0", "false", "no")
-
-
-_ollama_enabled = _env_flag("OLLAMA_ENABLED")
+_local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
+_ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _opencode_enabled = bool(
-    os.environ.get("OPENCODE_API_KEY", "")
-    or _env_flag("OPENCODE_ENABLED")
-    or os.path.isfile(os.path.expanduser("~/.config/factory/opencode.key"))
+    os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
 )
-# ── LLM timeout settings (override via env vars) ──────────────────────────────
-# LLM_TIMEOUT_HTTP     : httpx total timeout per request (seconds). Default: 600.
-# LLM_TIMEOUT_CONNECT  : httpx connect timeout (seconds). Default: 30.
-# LLM_TIMEOUT_MLX_WAIT : max seconds to wait for local-mlx server to become ready. Default: 120.
-_LLM_TIMEOUT_HTTP = float(os.environ.get("LLM_TIMEOUT_HTTP", "180"))
-_LLM_TIMEOUT_CONNECT = float(os.environ.get("LLM_TIMEOUT_CONNECT", "10"))
-_LLM_TIMEOUT_MLX_WAIT = int(os.environ.get("LLM_TIMEOUT_MLX_WAIT", "120"))
-# Hard wall-clock cap per LLM call — httpx read timeout resets on each chunk,
-# so chunked/streaming APIs (MiniMax <think>) can hang forever without this.
-_LLM_TIMEOUT_TOTAL = float(os.environ.get("LLM_TIMEOUT_TOTAL", "180"))
-
-_fallback_env = os.environ.get("PLATFORM_LLM_FALLBACK", None)
-# NO FALLBACK — ever. Fail fast, surface real LLM errors.
-# Silent fallback masks broken providers (opencode HTTP 500, minimax conn issues).
-# If primary fails → RuntimeError → visible in logs → fix the root cause.
-_FALLBACK_CHAIN = [_primary]
+_FALLBACK_CHAIN = [_primary] + [
+    p
+    for p in (
+        (["local-mlx"] if _local_mlx_enabled else [])
+        + (["ollama"] if _ollama_enabled else [])
+        + (["opencode"] if _opencode_enabled else [])
+        + (
+            ["minimax"]
+            + (["azure-openai"] if os.environ.get("AZURE_OPENAI_API_KEY") else [])
+            + (["azure-ai"] if os.environ.get("AZURE_AI_API_KEY") else [])
+            if not _is_azure
+            else ["azure-openai", "azure-ai"]
+        )
+    )
+    if p != _primary
+]
 
 _rtk_cache: dict = {}
-
-_mlx_proc: "subprocess.Popen | None" = None  # noqa: F821
-_mlx_lock = asyncio.Lock() if False else __import__("threading").Lock()
-
-
-def _ensure_mlx_server() -> None:
-    """Start mlx_lm.server if LOCAL_MLX_ENABLED and not already responding."""
-    import subprocess
-
-    global _mlx_proc
-
-    mlx_url = os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1")
-    mlx_model = os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
-
-    # Health check with generous timeout — avoids false negatives on loaded servers
-    def _is_up(t: float = 5.0) -> bool:
-        try:
-            import urllib.request
-
-            urllib.request.urlopen(f"{mlx_url}/models", timeout=t)
-            return True
-        except Exception:
-            return False
-
-    if _is_up():
-        return  # already running
-
-    with _mlx_lock:
-        if _is_up():
-            return
-
-        # Already launched by us and still running?
-        if _mlx_proc is not None and _mlx_proc.poll() is None:
-            return
-
-        logger.warning(
-            "local-mlx: server not found on %s — auto-launching mlx_lm.server", mlx_url
-        )
-        try:
-            port = int(mlx_url.rstrip("/").rsplit(":", 1)[-1].split("/")[0])
-        except Exception:
-            port = 8080
-        _mlx_proc = subprocess.Popen(
-            [
-                "python3",
-                "-m",
-                "mlx_lm.server",
-                "--model",
-                mlx_model,
-                "--port",
-                str(port),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        logger.warning("local-mlx: launched PID %d, model=%s", _mlx_proc.pid, mlx_model)
-
-        # Wait up to _LLM_TIMEOUT_MLX_WAIT seconds for it to come up
-        import time as _time
-
-        for _ in range(_LLM_TIMEOUT_MLX_WAIT):
-            _time.sleep(1)
-            if _is_up():
-                logger.warning("local-mlx: server ready on %s", mlx_url)
-                return
-        logger.warning(
-            "local-mlx: server did not become ready after %ds", _LLM_TIMEOUT_MLX_WAIT
-        )
 
 
 class _RateLimiter:
@@ -510,7 +311,7 @@ class LLMClient:
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = httpx.AsyncClient(timeout=_LLM_TIMEOUT_HTTP)
+            self._http = httpx.AsyncClient(timeout=300.0)
         return self._http
 
     async def close(self):
@@ -538,17 +339,10 @@ class LLMClient:
         except (OSError, FileNotFoundError):
             return ""
 
-    @staticmethod
-    def _is_codex_model(model: str) -> bool:
-        return "codex" in model
-
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
         if pcfg.get("azure_api_version") and base:
-            if self._is_codex_model(model):
-                # Codex models use Responses API (no deployment in URL, model in body)
-                return f"{base}/openai/responses?api-version=2025-03-01-preview"
-            # Standard Azure: deployment-based URL
+            # Azure uses deployment-based URLs; map model name → deployment name
             dep_map = pcfg.get("azure_deployment_map", {})
             deployment = dep_map.get(model, model)
             return f"{base}/openai/deployments/{deployment}/chat/completions?api-version={pcfg['azure_api_version']}"
@@ -572,7 +366,6 @@ class LLMClient:
         max_tokens: int = 4096,
         system_prompt: str = "",
         tools: list[dict] | None = None,
-        response_format: dict | None = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
         # ── Cache lookup (deterministic dedup) ──
@@ -598,11 +391,7 @@ class LLMClient:
 
         if _is_azure:
             provider = "azure-openai"
-        # NO FALLBACK — single provider, fail fast
-        providers_to_try = [provider]
-        if "local-mlx" in providers_to_try and _local_mlx_enabled:
-            _ensure_mlx_server()
-
+        providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
         # Thompson Sampling: reorder by Beta-sampled quality (skip on Azure — forced)
         if not _is_azure and len(providers_to_try) > 1:
             try:
@@ -624,7 +413,7 @@ class LLMClient:
             if cooldown_until > now:
                 remaining = int(cooldown_until - now)
                 logger.warning(
-                    "LLM %s in cooldown (%ds left), SKIPPING — NO FALLBACK",
+                    "LLM %s in cooldown (%ds left), skipping → fallback",
                     prov,
                     remaining,
                 )
@@ -632,9 +421,7 @@ class LLMClient:
 
             # Skip providers with open circuit breaker
             if self._cb_is_open(prov):
-                logger.warning(
-                    "LLM %s circuit breaker OPEN, SKIPPING — NO FALLBACK", prov
-                )
+                logger.warning("LLM %s circuit breaker OPEN, skipping → fallback", prov)
                 continue
 
             pcfg = self._get_provider_config(prov)
@@ -649,12 +436,12 @@ class LLMClient:
                 else pcfg["default"]
             )
 
-            # Rate limiter: queue until a slot is available (120s max to fail fast)
+            # Rate limiter: queue until a slot is available (no timeout — industrial pipeline)
             try:
-                await _rate_limiter.acquire(timeout=120.0)
+                await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:
                 logger.warning(
-                    "LLM rate limiter timeout (120s) — retrying (%s)",
+                    "LLM rate limiter timeout (86400s) — retrying (%s)",
                     _rate_limiter.usage,
                 )
                 await asyncio.sleep(10)
@@ -720,19 +507,15 @@ class LLMClient:
                                     pass
                         except Exception as _ce:
                             logger.debug("RTK compressor error (skipped): %s", _ce)
-                    result = await asyncio.wait_for(
-                        self._do_chat(
-                            pcfg,
-                            prov,
-                            use_model,
-                            _send_messages,
-                            temperature,
-                            max_tokens,
-                            _send_system,
-                            tools,
-                            response_format,
-                        ),
-                        timeout=_LLM_TIMEOUT_TOTAL,
+                    result = await self._do_chat(
+                        pcfg,
+                        prov,
+                        use_model,
+                        _send_messages,
+                        temperature,
+                        max_tokens,
+                        _send_system,
+                        tools,
                     )
                     self._stats["calls"] += 1
                     self._stats["tokens_in"] += result.tokens_in
@@ -775,36 +558,6 @@ class LLMClient:
                         )
                     except Exception:
                         pass
-                    # Content policy fallback: retry with gpt-5.2 then gpt-5-mini
-                    if (
-                        result.finish_reason == "content_filter"
-                        and prov == "azure-openai"
-                    ):
-                        for _fb in ["gpt-5.2", "gpt-5-mini"]:
-                            if _fb != use_model and _fb in pcfg.get("models", []):
-                                logger.warning(
-                                    "LLM %s/%s content policy — retrying with %s",
-                                    prov,
-                                    use_model,
-                                    _fb,
-                                )
-                                try:
-                                    _fb_result = await self._do_chat(
-                                        pcfg,
-                                        prov,
-                                        _fb,
-                                        _send_messages,
-                                        temperature,
-                                        max_tokens,
-                                        _send_system,
-                                        tools,
-                                        response_format,
-                                    )
-                                    if _fb_result.finish_reason != "content_filter":
-                                        result = _fb_result
-                                        break
-                                except Exception:
-                                    pass
                     return result
                 except Exception as exc:
                     err_str = repr(exc)
@@ -813,15 +566,9 @@ class LLMClient:
                         "ReadError" in err_str
                         or "ConnectError" in err_str
                         or "RemoteProtocolError" in err_str
-                        or "TimeoutError" in err_str
                     )
-                    is_quota_exhausted = (
-                        is_rate_limit and "usage limit exceeded" in err_str.lower()
-                    )
-                    if (
-                        attempt < max_attempts - 1
-                        and not is_quota_exhausted
-                        and (is_transient or (is_rate_limit and not _is_azure))
+                    if attempt < max_attempts - 1 and (
+                        is_transient or (is_rate_limit and not _is_azure)
                     ):
                         import random
 
@@ -849,12 +596,7 @@ class LLMClient:
                         err_str[:200],
                     )
                     self._stats["errors"] += 1
-                    # HTTP 4xx client errors shouldn't open the circuit breaker
-                    _is_client_err = any(
-                        f"HTTP {c}" in err_str for c in ("400", "401", "403", "404")
-                    )
-                    if not _is_client_err:
-                        self._cb_record_failure(prov)
+                    self._cb_record_failure(prov)
                     await self._persist_usage(prov, use_model, 0, 0, error=True)
                     # Thompson Sampling: record failure
                     try:
@@ -864,18 +606,12 @@ class LLMClient:
                     except Exception:
                         pass
                     if is_rate_limit:
-                        # quota exhausted → long cooldown (4h windows); generic 429 → 30s
-                        is_quota_exhausted = "usage limit exceeded" in err_str.lower()
-                        cd = 3600 if is_quota_exhausted else 30
-                        self._provider_cooldown[prov] = time.monotonic() + cd
+                        # Shorter cooldown so fallback to next provider happens faster
+                        self._provider_cooldown[prov] = time.monotonic() + 30
                         logger.warning(
-                            "LLM %s → cooldown %ds (%s), falling back to next provider",
+                            "LLM %s → cooldown 30s (rate limited), falling back to next provider",
                             prov,
-                            cd,
-                            "quota exhausted" if is_quota_exhausted else "rate limited",
                         )
-                        if is_quota_exhausted:
-                            break  # skip remaining retries — quota won't recover in seconds
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
@@ -890,13 +626,7 @@ class LLMClient:
         max_tokens: int,
         system_prompt: str,
         tools: list[dict] | None = None,
-        response_format: dict | None = None,
     ) -> LLMResponse:
-        # gpt-5.1-codex uses Responses API (completely different wire format)
-        if self._is_codex_model(model) and pcfg.get("azure_api_version"):
-            return await self._do_chat_responses(
-                pcfg, provider, model, messages, max_tokens, system_prompt, tools
-            )
         http = await self._get_http()
         url = self._build_url(pcfg, model)
         headers = self._build_headers(pcfg)
@@ -929,27 +659,7 @@ class LLMClient:
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
-            # MiniMax M2.5 supports standard tool_calls/tool format natively.
-            # Only mangle for M2.1 (which doesn't support tool role messages).
-            _is_minimax_legacy = provider == "minimax" and model == "MiniMax-M2.1"
-            if _is_minimax_legacy and d["role"] == "tool":
-                d["role"] = "user"
-                d["content"] = f"[Résultat de {name or 'tool'}]:\n{content}"
-                msgs.append(d)
-                continue
-            if _is_minimax_legacy and role == "assistant" and tool_calls:
-                tc_names = [
-                    tc.get("function", {}).get("name", "?")
-                    if isinstance(tc, dict)
-                    else "?"
-                    for tc in (tool_calls or [])
-                ]
-                d["content"] = f"[Appel outils: {', '.join(tc_names)}]"
-                msgs.append(d)
-                continue
-            # MiniMax requires consistent name across all messages (error 2013 if mixed).
-            # Strip name for MiniMax to avoid inconsistency between messages.
-            if name and provider != "minimax":
+            if name:
                 d["name"] = name
             if tool_call_id:
                 d["tool_call_id"] = tool_call_id
@@ -957,26 +667,6 @@ class LLMClient:
                 d["tool_calls"] = tool_calls
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
-
-        # Strip orphaned tool result messages: if tool_call_id has no matching
-        # assistant tool_calls entry, the API will reject with HTTP 400.
-        # This can happen on session resume when history is partially restored.
-        _known_call_ids: set[str] = set()
-        for _m in msgs:
-            if _m.get("role") == "assistant":
-                for _tc in _m.get("tool_calls") or []:
-                    _cid = _tc.get("id") if isinstance(_tc, dict) else None
-                    if _cid:
-                        _known_call_ids.add(_cid)
-        msgs = [
-            _m
-            for _m in msgs
-            if not (
-                _m.get("role") == "tool"
-                and _m.get("tool_call_id")
-                and _m.get("tool_call_id") not in _known_call_ids
-            )
-        ]
 
         # local-mlx requires system message strictly at position 0 — merge all system msgs
         if provider == "local-mlx":
@@ -990,50 +680,30 @@ class LLMClient:
             "model": model,
             "messages": msgs,
         }
-        # Per-model profile: reasoning, temperature, token budget, param name
-        _profile = _get_profile(model)
-        if _profile["supports_temperature"]:
+        # Reasoning models (gpt-5.x) don't support temperature param
+        _reasoning_model = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
+        if not _reasoning_model:
             body["temperature"] = temperature
-        effective_max = max(max_tokens, _profile["min_completion_tokens"])
-        mt_param = _profile["max_tokens_param"]
+        # MiniMax uses <think> blocks — boost token limit
+        # GPT-5.x are reasoning models — need extra tokens
+        effective_max = max_tokens
+        if provider == "minimax":
+            effective_max = max(max_tokens, 16000)
+        elif _reasoning_model:
+            effective_max = max(max_tokens, 8000)
+        # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
+        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
         body[mt_param] = effective_max
 
         if tools:
             body["tools"] = tools
-            if provider == "minimax":
-                # M2.5 supports standard tool_choice including "required".
-                # Use forced single-tool mode when only 1 tool (most reliable),
-                # otherwise "required" to force at least one tool call.
-                if len(tools) == 1:
-                    tool_name = tools[0].get("function", {}).get("name", "")
-                    body["tool_choice"] = {
-                        "type": "function",
-                        "function": {"name": tool_name},
-                    }
-                else:
-                    body["tool_choice"] = "required"
-                # Disable parallel tool calls — M2.5 is more reliable with sequential calls
-                body["parallel_tool_calls"] = False
-            else:
-                body["tool_choice"] = "auto"
-            # GPT models sometimes output tool calls as text "[Calling tools: ...]"
-            # instead of using the structured tool_calls format. Add explicit instruction.
-            _tool_instruction = (
-                "\n\n<tool_format_rule>NEVER write tool calls as text like "
-                "'[Calling tools: ...]' or '[Tool: ...]'. ALWAYS use the native "
-                "function_call/tool_calls API format. Text-formatted tool calls "
-                "will be rejected.</tool_format_rule>"
-            )
-            # Append to last system message or first message
-            for m in reversed(msgs):
-                if m.get("role") == "system":
-                    m["content"] = m.get("content", "") + _tool_instruction
-                    break
-            else:
-                if msgs and msgs[0].get("role") == "system":
-                    msgs[0]["content"] = msgs[0].get("content", "") + _tool_instruction
-        if response_format:
-            body["response_format"] = response_format
+            body["tool_choice"] = "auto"
 
         t0 = time.monotonic()
 
@@ -1059,25 +729,6 @@ class LLMClient:
 
         elapsed = int((time.monotonic() - t0) * 1000)
 
-        if resp.status_code == 400 and "content management policy" in resp.text.lower():
-            # Azure content filter blocked the prompt — not a transient error, don't
-            # count in circuit breaker, return a neutral synthetic completion instead.
-            logger.warning(
-                "LLM %s/%s HTTP 400 content policy — returning synthetic neutral response",
-                provider,
-                model,
-            )
-            return LLMResponse(
-                content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
-                model=model,
-                provider=provider,
-                tool_calls=[],
-                finish_reason="content_filter",
-                tokens_in=0,
-                tokens_out=0,
-                duration_ms=elapsed,
-            )
-
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
@@ -1087,29 +738,34 @@ class LLMClient:
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
         # Ollama/Qwen3: thinking models put response in reasoning field when content is empty
-        # GLM-5/kimi: use reasoning_content field
-        if not content:
-            for _rf in ("reasoning", "reasoning_content"):
-                _rtext = msg.get(_rf)
-                if _rtext:
-                    content = _rtext.strip()
-                    break
+        if not content and msg.get("reasoning"):
+            content = msg["reasoning"].strip()
         # Strip <think> blocks from MiniMax / Qwen3
+        # IMPORTANT: never let stripping produce empty content — keep original as fallback
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
             after_think = content[idx:].strip()
             if after_think:
                 content = after_think
             else:
-                # finish_reason=length: think block consumed all tokens
-                # Extract useful reasoning from think block as fallback
+                # Think block consumed all tokens — extract reasoning as content
                 think_start = content.index("<think>") + len("<think>")
                 think_end = content.index("</think>")
-                content = content[think_start:think_end].strip()
+                extracted = content[think_start:think_end].strip()
+                if extracted:
+                    content = extracted
+                # else: keep original content (with tags) — never return empty
         elif "<think>" in content and "</think>" not in content:
             # Incomplete think block (truncated by max_tokens)
-            think_start = content.index("<think>") + len("<think>")
-            content = content[think_start:].strip()
+            before_think = content[: content.index("<think>")].strip()
+            if before_think:
+                content = before_think
+            else:
+                think_start = content.index("<think>") + len("<think>")
+                extracted = content[think_start:].strip()
+                if extracted:
+                    content = extracted
+                # else: keep original content — never return empty
 
         # Parse tool calls from response
         parsed_tool_calls = []
@@ -1129,72 +785,6 @@ class LLMClient:
             )
 
         usage = data.get("usage", {})
-        _finish = choice.get("finish_reason", "stop")
-
-        # Reasoning model budget exhaustion: reasoning consumed all tokens → empty content.
-        # Retry once with doubled budget instead of returning empty/blocked.
-        if (
-            not content
-            and not parsed_tool_calls
-            and _finish == "length"
-            and _profile.get("reasoning")
-            and not getattr(self, "_reasoning_retry", False)
-        ):
-            doubled = effective_max * 2
-            logger.warning(
-                "LLM %s/%s reasoning budget exhausted (%d tokens, content empty) — retrying with %d",
-                provider,
-                model,
-                effective_max,
-                doubled,
-            )
-            self._reasoning_retry = True
-            try:
-                body[mt_param] = doubled
-                t0_retry = time.monotonic()
-                resp2 = await http.post(url, json=body, headers=headers)
-                elapsed2 = int((time.monotonic() - t0_retry) * 1000)
-                if resp2.status_code == 200:
-                    data2 = resp2.json()
-                    choices2 = data2.get("choices") or [{}]
-                    choice2 = choices2[0] if choices2 else {}
-                    msg2 = choice2.get("message", {})
-                    content2 = msg2.get("content", "") or ""
-                    if "<think>" in content2 and "</think>" in content2:
-                        idx2 = content2.index("</think>") + len("</think>")
-                        after2 = content2[idx2:].strip()
-                        if after2:
-                            content2 = after2
-                    tc2 = []
-                    for tc in msg2.get("tool_calls") or []:
-                        fn = tc.get("function", {})
-                        try:
-                            args = json.loads(fn.get("arguments", "{}"))
-                        except (json.JSONDecodeError, TypeError):
-                            args = {}
-                        tc2.append(
-                            LLMToolCall(
-                                id=tc.get("id", ""),
-                                function_name=fn.get("name", ""),
-                                arguments=args,
-                            )
-                        )
-                    usage2 = data2.get("usage", {})
-                    return LLMResponse(
-                        content=content2,
-                        model=data2.get("model", model),
-                        provider=provider,
-                        tokens_in=usage2.get("prompt_tokens", 0),
-                        tokens_out=usage2.get("completion_tokens", 0),
-                        duration_ms=elapsed + elapsed2,
-                        finish_reason=choice2.get("finish_reason", "stop"),
-                        tool_calls=tc2,
-                    )
-            except Exception as e:
-                logger.warning("LLM reasoning retry failed: %s", e)
-            finally:
-                self._reasoning_retry = False
-
         return LLMResponse(
             content=content,
             model=data.get("model", model),
@@ -1202,161 +792,7 @@ class LLMClient:
             tokens_in=usage.get("prompt_tokens", 0),
             tokens_out=usage.get("completion_tokens", 0),
             duration_ms=elapsed,
-            finish_reason=_finish,
-            tool_calls=parsed_tool_calls,
-        )
-
-    async def _do_chat_responses(
-        self,
-        pcfg: dict,
-        provider: str,
-        model: str,
-        messages: list[LLMMessage],
-        max_tokens: int,
-        system_prompt: str,
-        tools: list[dict] | None = None,
-    ) -> LLMResponse:
-        """Handle Azure Responses API for codex models (gpt-5.1-codex etc.)."""
-        import random
-
-        http = await self._get_http()
-        url = self._build_url(pcfg, model)
-        headers = self._build_headers(pcfg)
-
-        # Build input array — Responses API uses mixed item types
-        input_msgs: list[dict] = []
-        if system_prompt:
-            input_msgs.append({"role": "system", "content": system_prompt})
-        for m in messages:
-            if isinstance(m, dict):
-                role = m.get("role", "user")
-                content = m.get("content", "") or ""
-                tool_call_id = m.get("tool_call_id")
-                tool_calls = m.get("tool_calls")
-            else:
-                role = m.role
-                content = m.content or ""
-                tool_call_id = m.tool_call_id
-                tool_calls = m.tool_calls
-
-            if role == "tool" and tool_call_id:
-                # Tool result → function_call_output item
-                input_msgs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_call_id,
-                        "output": content,
-                    }
-                )
-            elif role == "assistant" and tool_calls:
-                # Previous assistant tool calls → function_call items
-                for tc in tool_calls or []:
-                    if isinstance(tc, dict):
-                        fn = tc.get("function", {})
-                        input_msgs.append(
-                            {
-                                "type": "function_call",
-                                "call_id": tc.get("id", ""),
-                                "name": fn.get("name", ""),
-                                "arguments": fn.get("arguments", "{}"),
-                            }
-                        )
-            else:
-                input_msgs.append({"role": role, "content": content})
-
-        # Convert tools from chat/completions format → Responses API format
-        resp_tools = None
-        if tools:
-            resp_tools = []
-            for t in tools:
-                fn = t.get("function", t)  # handle both wrapped and flat
-                resp_tools.append(
-                    {
-                        "type": "function",
-                        "name": fn.get("name", ""),
-                        "description": fn.get("description", ""),
-                        "parameters": fn.get("parameters", {}),
-                    }
-                )
-
-        _profile_r = _get_profile(model)
-        body: dict = {
-            "model": model,
-            "input": input_msgs,
-            "max_output_tokens": max(max_tokens, _profile_r["min_completion_tokens"]),
-        }
-        if resp_tools:
-            body["tools"] = resp_tools
-
-        t0 = time.monotonic()
-        for attempt in range(3):
-            resp = await http.post(url, json=body, headers=headers)
-            if resp.status_code != 429:
-                break
-            retry_after = int(resp.headers.get("Retry-After", (2**attempt) * 10))
-            retry_after = max(retry_after, 10)
-            retry_after = min(retry_after + random.randint(0, 5), 90)
-            logger.warning(
-                "LLM %s/%s rate-limited (429), retry in %ds (attempt %d/3)",
-                provider,
-                model,
-                retry_after,
-                attempt + 1,
-            )
-            await asyncio.sleep(retry_after)
-
-        elapsed = int((time.monotonic() - t0) * 1000)
-
-        if resp.status_code == 400 and "content management policy" in resp.text.lower():
-            logger.warning(
-                "LLM %s/%s HTTP 400 content policy (Responses API) — returning synthetic neutral response",
-                provider,
-                model,
-            )
-            return LLMResponse(
-                content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
-                model=model,
-                provider=provider,
-                tool_calls=[],
-                finish_reason="content_filter",
-                tokens_in=0,
-                tokens_out=0,
-                duration_ms=elapsed,
-            )
-
-        if resp.status_code != 200:
-            raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
-        data = resp.json()
-        content = ""
-        parsed_tool_calls: list[LLMToolCall] = []
-        for item in data.get("output", []):
-            itype = item.get("type", "")
-            if itype == "message":
-                for c in item.get("content", []):
-                    if c.get("type") == "output_text":
-                        content += c.get("text", "")
-            elif itype == "function_call":
-                try:
-                    args = json.loads(item.get("arguments", "{}"))
-                except (json.JSONDecodeError, TypeError):
-                    args = {}
-                parsed_tool_calls.append(
-                    LLMToolCall(
-                        id=item.get("call_id", item.get("id", "")),
-                        function_name=item.get("name", ""),
-                        arguments=args,
-                    )
-                )
-
-        usage = data.get("usage", {})
-        return LLMResponse(
-            content=content,
-            model=data.get("model", model),
-            provider=provider,
-            tokens_in=usage.get("input_tokens", 0),
-            tokens_out=usage.get("output_tokens", 0),
-            duration_ms=elapsed,
-            finish_reason=data.get("status", "completed"),
+            finish_reason=choice.get("finish_reason", "stop"),
             tool_calls=parsed_tool_calls,
         )
 
@@ -1369,11 +805,10 @@ class LLMClient:
         max_tokens: int = 4096,
         system_prompt: str = "",
     ) -> AsyncIterator[LLMStreamChunk]:
-        """Stream chat completion response — NO FALLBACK, single provider."""
+        """Stream chat completion response with provider fallback."""
         if _is_azure:
             provider = "azure-openai"
-        # NO FALLBACK — single provider, fail fast
-        providers_to_try = [provider]
+        providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
 
         for prov in providers_to_try:
             if prov not in _PROVIDERS:
@@ -1394,16 +829,16 @@ class LLMClient:
                 else pcfg["default"]
             )
             try:
-                await _rate_limiter.acquire(timeout=120.0)
+                await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:
                 logger.warning(
-                    "LLM stream rate limiter timeout (120s) — retrying (%s)",
+                    "LLM stream rate limiter timeout — retrying (%s)",
                     _rate_limiter.usage,
                 )
                 await asyncio.sleep(10)
                 continue
 
-            max_attempts = 4
+            max_attempts = 2
             for attempt in range(max_attempts):
                 try:
                     # RTK prompt compression — same as chat() path
@@ -1452,23 +887,22 @@ class LLMClient:
                     _stream_tokens_out = 0
                     _stream_accumulated = ""
                     _stream_t0 = time.monotonic()
-                    async with asyncio.timeout(_LLM_TIMEOUT_TOTAL):
-                        async for chunk in self._do_stream(
-                            pcfg,
-                            prov,
-                            use_model,
-                            _stream_messages,
-                            temperature,
-                            max_tokens,
-                            _stream_system,
-                        ):
-                            if chunk.delta:
-                                _stream_accumulated += chunk.delta
-                            if chunk.tokens_in:
-                                _stream_tokens_in = chunk.tokens_in
-                            if chunk.tokens_out:
-                                _stream_tokens_out = chunk.tokens_out
-                            yield chunk
+                    async for chunk in self._do_stream(
+                        pcfg,
+                        prov,
+                        use_model,
+                        _stream_messages,
+                        temperature,
+                        max_tokens,
+                        _stream_system,
+                    ):
+                        if chunk.delta:
+                            _stream_accumulated += chunk.delta
+                        if chunk.tokens_in:
+                            _stream_tokens_in = chunk.tokens_in
+                        if chunk.tokens_out:
+                            _stream_tokens_out = chunk.tokens_out
+                        yield chunk
                     # Estimate tokens if API didn't report them
                     if not _stream_tokens_in:
                         _stream_tokens_in = (
@@ -1502,15 +936,9 @@ class LLMClient:
                         or "ConnectError" in err_str
                         or "RemoteProtocolError" in err_str
                         or "ServerDisconnected" in err_str
-                        or "TimeoutError" in err_str
                     )
-                    is_quota_exhausted_stream = (
-                        is_rate_limit and "usage limit exceeded" in err_str.lower()
-                    )
-                    if (
-                        attempt < max_attempts - 1
-                        and not is_quota_exhausted_stream
-                        and ((is_rate_limit and not _is_azure) or is_transient)
+                    if attempt < max_attempts - 1 and (
+                        (is_rate_limit and not _is_azure) or is_transient
                     ):
                         import random
 
@@ -1532,22 +960,9 @@ class LLMClient:
                         use_model,
                         err_str[:200],
                     )
-                    # HTTP 4xx client errors shouldn't open the circuit breaker
-                    _is_client_err_s = any(
-                        f"HTTP {c}" in err_str for c in ("400", "401", "403", "404")
-                    )
-                    if not _is_client_err_s:
-                        self._cb_record_failure(prov)
+                    self._cb_record_failure(prov)
                     if is_rate_limit:
-                        is_quota_exhausted = "usage limit exceeded" in err_str.lower()
-                        cd = 3600 if is_quota_exhausted else 30
-                        self._provider_cooldown[prov] = time.monotonic() + cd
-                        logger.warning(
-                            "LLM %s stream → cooldown %ds (%s)",
-                            prov,
-                            cd,
-                            "quota exhausted" if is_quota_exhausted else "rate limited",
-                        )
+                        self._provider_cooldown[prov] = time.monotonic() + 30
                     break
 
         raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")
@@ -1571,13 +986,8 @@ class LLMClient:
         sys_content = system_prompt or ""
         for m in messages:
             d = {"role": m.role, "content": m.content or ""}
-            # MiniMax requires consistent name across all messages (error 2013).
-            # Strip name for MiniMax to avoid inconsistency between messages.
-            if m.name and provider != "minimax":
+            if m.name:
                 d["name"] = m.name
-            # MiniMax M2.5 supports native tool_calls/tool format.
-            # Only mangle for MiniMax M2.1 (legacy).
-            _is_minimax_legacy = provider == "minimax" and model == "MiniMax-M2.1"
             if provider == "minimax":
                 # MiniMax rejects system role in streaming
                 if d["role"] == "system":
@@ -1592,30 +1002,11 @@ class LLMClient:
                         d["content"] = f"[System instruction]: {d['content']}"
                         msgs.append(d)
                     continue
-                if _is_minimax_legacy:
-                    # M2.1 doesn't support tool role — convert to user messages
-                    if d["role"] == "tool":
-                        tool_name = m.name or "tool"
-                        d["role"] = "user"
-                        d["content"] = f"[Résultat de {tool_name}]:\n{d['content']}"
-                        msgs.append(d)
-                        continue
-                    if d["role"] == "assistant" and getattr(m, "tool_calls", None):
-                        tc_names = [
-                            tc.get("function", {}).get("name", "?")
-                            for tc in (m.tool_calls or [])
-                            if isinstance(tc, dict)
-                        ]
-                        d["content"] = f"[Appel outils: {', '.join(tc_names)}]"
-                        d.pop("tool_calls", None)
-                        msgs.append(d)
-                        continue
-                # M2.5: pass tool_calls/tool_call_id natively (same as OpenAI)
-                if m.tool_call_id:
-                    d["tool_call_id"] = m.tool_call_id
-                if m.tool_calls:
-                    d["tool_calls"] = m.tool_calls
-                    d.pop("content", None)
+                # MiniMax rejects tool messages — skip tool results and assistant tool_call messages
+                if d["role"] == "tool":
+                    continue
+                if d["role"] == "assistant" and getattr(m, "tool_calls", None):
+                    continue
             else:
                 if m.tool_call_id:
                     d["tool_call_id"] = m.tool_call_id
@@ -1647,45 +1038,33 @@ class LLMClient:
             else:
                 msgs.insert(0, {"role": "system", "content": sys_content})
 
-        # Strip orphaned tool result messages (no matching assistant tool_calls).
-        # This can happen on resume when conversation history is partially restored.
-        _stream_known_ids: set[str] = set()
-        for _m in msgs:
-            if _m.get("role") == "assistant":
-                for _tc in _m.get("tool_calls") or []:
-                    _cid = _tc.get("id") if isinstance(_tc, dict) else None
-                    if _cid:
-                        _stream_known_ids.add(_cid)
-        msgs = [
-            _m
-            for _m in msgs
-            if not (
-                _m.get("role") == "tool"
-                and _m.get("tool_call_id")
-                and _m.get("tool_call_id") not in _stream_known_ids
-            )
-        ]
+        effective_max = max_tokens
+        _reasoning_model_s = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
+        if provider == "minimax":
+            effective_max = max(max_tokens, 16000)
+        elif _reasoning_model_s:
+            effective_max = max(max_tokens, 8000)
 
-        _profile_s = _get_profile(model)
-        effective_max = max(max_tokens, _profile_s["min_completion_tokens"])
-        mt_param = _profile_s["max_tokens_param"]
+        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
         body = {
             "model": model,
             "messages": msgs,
             mt_param: effective_max,
             "stream": True,
         }
-        if _profile_s["supports_temperature"]:
+        # Reasoning models don't support temperature param
+        if not _reasoning_model_s:
             body["temperature"] = temperature
 
         # Use a separate client for streaming to avoid blocking the shared client
         stream_http = httpx.AsyncClient(
-            timeout=httpx.Timeout(
-                connect=_LLM_TIMEOUT_CONNECT,
-                read=_LLM_TIMEOUT_HTTP,
-                write=_LLM_TIMEOUT_CONNECT,
-                pool=_LLM_TIMEOUT_CONNECT,
-            )
+            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
         )
         try:
             async with stream_http.stream(
@@ -1693,29 +1072,21 @@ class LLMClient:
             ) as resp:
                 if resp.status_code != 200:
                     text = await resp.aread()
-                    if (
-                        resp.status_code == 400
-                        and b"content management policy" in text.lower()
-                    ):
-                        logger.warning(
-                            "LLM stream %s/%s HTTP 400 content policy — yielding synthetic neutral response",
-                            provider,
-                            model,
-                        )
-                        yield LLMStreamChunk(
-                            delta="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
-                            done=True,
-                            model=model,
-                            tokens_in=0,
-                            tokens_out=0,
-                        )
-                        return
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
                 logger.warning("LLM stream %s/%s connected", provider, model)
                 _stream_usage: dict = {}
+                import time as _time
+                _idle_deadline = _time.monotonic() + 60  # 60s to get first data: line
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
+                        # Keepalive/empty line — check idle timeout
+                        if _time.monotonic() > _idle_deadline:
+                            raise TimeoutError(
+                                f"Stream idle timeout: no data: line from {provider}/{model} "
+                                f"within deadline"
+                            )
                         continue
+                    _idle_deadline = _time.monotonic() + 90  # 90s between data: lines
                     payload = line[6:]
                     if payload.strip() == "[DONE]":
                         yield LLMStreamChunk(
