@@ -54,7 +54,7 @@ test.describe("RBAC: Missions/Epics", () => {
     admin  = await loginAs(browser, ADMIN.email,  ADMIN.password);
 
     // Admin seeds an epic for WSJF/delete/403 tests
-    const r = await admin.api.post(`${SF_URL}/api/epics`, {
+    const r = await admin.api.post(`${SF_URL}/api/missions`, {
       data: {
         name: `seed-epic-rbac-${Date.now()}`,
         description: "Seed epic for RBAC feature tests",
@@ -64,7 +64,7 @@ test.describe("RBAC: Missions/Epics", () => {
     });
     if (r.ok()) {
       const body = await r.json().catch(() => null);
-      seedEpicId = body?.id ?? body?.epic?.id ?? null;
+      seedEpicId = body?.mission?.id ?? body?.id ?? null;
     }
   });
 
@@ -80,17 +80,16 @@ test.describe("RBAC: Missions/Epics", () => {
   });
 
   test("R15 – viewer cannot create missions (403)", async () => {
-    const r = await viewer.api.post(`${SF_URL}/api/epics`, {
+    const r = await viewer.api.post(`${SF_URL}/api/missions`, {
       data: { name: `viewer-epic-${Date.now()}`, description: "Should be denied", type: "feature" },
       headers: { "Content-Type": "application/json" },
     });
-    if (r.status() === 404) { test.skip(); return; }
     expect(r.status(), "viewer must not create epics").toBeGreaterThanOrEqual(401);
     expect(r.status()).toBeLessThan(500);
   });
 
   test("R16 – developer CAN create missions (201/200)", async () => {
-    const r = await dev.api.post(`${SF_URL}/api/epics`, {
+    const r = await dev.api.post(`${SF_URL}/api/missions`, {
       data: {
         name: `dev-epic-${Date.now()}`,
         description: "Developer created epic",
@@ -101,23 +100,23 @@ test.describe("RBAC: Missions/Epics", () => {
     if (r.status() === 404) { test.skip(); return; }
     expect(r.status(), "developer should create epic").toBeLessThan(400);
     const body = await r.json().catch(() => null);
-    devEpicId = body?.id ?? body?.epic?.id ?? null;
+    devEpicId = body?.mission?.id ?? body?.id ?? null;
   });
 
   test("R17 – developer CAN read missions list (200)", async () => {
-    const r = await dev.api.get(`${SF_URL}/api/epics`);
+    const r = await dev.api.get(`${SF_URL}/api/missions`);
     if (r.status() === 404) { test.skip(); return; }
     expect(r.status()).toBe(200);
     const body = await r.json().catch(() => null);
     if (body) {
-      const epics = body.epics ?? body.items ?? (Array.isArray(body) ? body : []);
+      const epics = body?.epics ?? (Array.isArray(body) ? body : []);
       expect(Array.isArray(epics)).toBe(true);
     }
   });
 
   test("R18 – PM CAN update mission WSJF (200)", async () => {
     if (!seedEpicId) { test.skip(); return; }
-    const r = await pm.api.patch(`${SF_URL}/api/epics/${seedEpicId}/wsjf`, {
+    const r = await pm.api.post(`${SF_URL}/api/missions/${seedEpicId}/wsjf`, {
       data: { user_value: 3, time_criticality: 2, roe: 1, job_size: 2 },
       headers: { "Content-Type": "application/json" },
     });
@@ -127,7 +126,7 @@ test.describe("RBAC: Missions/Epics", () => {
 
   test("R19 – viewer cannot update WSJF (403)", async () => {
     const epicId = seedEpicId ?? "placeholder-id";
-    const r = await viewer.api.patch(`${SF_URL}/api/epics/${epicId}/wsjf`, {
+    const r = await viewer.api.post(`${SF_URL}/api/missions/${epicId}/wsjf`, {
       data: { user_value: 5, time_criticality: 5, roe: 5, job_size: 5 },
       headers: { "Content-Type": "application/json" },
     });
@@ -138,13 +137,13 @@ test.describe("RBAC: Missions/Epics", () => {
 
   test("R20 – admin CAN delete mission (200/204)", async () => {
     // Create a throwaway epic specifically for this delete test
-    const createR = await admin.api.post(`${SF_URL}/api/epics`, {
+    const createR = await admin.api.post(`${SF_URL}/api/missions`, {
       data: { name: `admin-del-epic-${Date.now()}`, description: "To be deleted by admin" },
       headers: { "Content-Type": "application/json" },
     });
     if (createR.status() === 404 || !createR.ok()) { test.skip(); return; }
     const body = await createR.json().catch(() => null);
-    const epicId = body?.id ?? body?.epic?.id;
+    const epicId = body?.mission?.id ?? body?.id;
     if (!epicId) { test.skip(); return; }
 
     const delR = await admin.api.delete(`${SF_URL}/api/epics/${epicId}`);
@@ -322,23 +321,23 @@ test.describe("RBAC: Backlog/Features/Stories", () => {
 
     const ts = Date.now();
 
-    const epicR = await admin.api.post(`${SF_URL}/api/epics`, {
+    const epicR = await admin.api.post(`${SF_URL}/api/missions`, {
       data: { name: `seed-bl-epic-${ts}`, description: "Seed backlog epic" },
       headers: { "Content-Type": "application/json" },
     });
     if (epicR.ok()) {
       const epicBody = await epicR.json().catch(() => null);
-      seedEpicId = epicBody?.id ?? epicBody?.epic?.id ?? null;
+      seedEpicId = epicBody?.mission?.id ?? epicBody?.id ?? null;
     }
 
     if (seedEpicId) {
       const featR = await admin.api.post(`${SF_URL}/api/epics/${seedEpicId}/features`, {
-        data: { name: `seed-feature-${ts}`, description: "Seed feature", priority: "medium" },
+        data: { name: `seed-feature-${ts}`, description: "Seed feature", priority: 5 },
         headers: { "Content-Type": "application/json" },
       });
       if (featR.ok()) {
         const featBody = await featR.json().catch(() => null);
-        seedFeatureId = featBody?.id ?? featBody?.feature?.id ?? null;
+        seedFeatureId = featBody?.feature?.id ?? featBody?.id ?? null;
       }
     }
 
@@ -397,14 +396,14 @@ test.describe("RBAC: Backlog/Features/Stories", () => {
       data: {
         name: `dev-feature-${Date.now()}`,
         description: "Dev created feature",
-        priority: "high",
+        priority: 8,
       },
       headers: { "Content-Type": "application/json" },
     });
     if (r.status() === 404) { test.skip(); return; }
     expect(r.status(), "developer should create feature").toBeLessThan(400);
     const body = await r.json().catch(() => null);
-    devFeatureId = body?.id ?? body?.feature?.id ?? null;
+    devFeatureId = body?.feature?.id ?? body?.id ?? null;
   });
 
   test("R32 – developer CAN create story under feature (200)", async () => {

@@ -385,18 +385,13 @@ test.describe("CRUD: Missions / Epics", () => {
     if (!createdMissionId) { test.skip(); return; }
     const newWsjf = 42;
 
-    let r = await adminApi.patch(`${SF_URL}/api/missions/${createdMissionId}`, {
-      data: { wsjf: newWsjf },
+    let r = await adminApi.post(`${SF_URL}/api/missions/${createdMissionId}/wsjf`, {
+      data: { business_value: 8, time_criticality: 5, risk_reduction: 3, job_duration: 2 },
     });
     if (r.status() === 404 || r.status() === 405) {
-      r = await adminApi.patch(`${SF_URL}/api/epics/${createdMissionId}`, {
-        data: { wsjf: newWsjf },
-      });
-    }
-    if (r.status() === 404 || r.status() === 405) {
-      // Try POST with update field
+      // Fallback: try legacy epics endpoint
       r = await adminApi.post(`${SF_URL}/api/epics/${createdMissionId}/wsjf`, {
-        data: { wsjf: newWsjf },
+        data: { business_value: 8, time_criticality: 5, risk_reduction: 3, job_duration: 2 },
       });
     }
     if (r.status() === 404 || r.status() === 405) { test.skip(); return; }
@@ -814,9 +809,9 @@ test.describe("CRUD: Users", () => {
   });
 
   // CU05 – Update user role
-  test("CU05 – update user role (PATCH /api/users/{id})", async () => {
+  test("CU05 – update user role (PUT /api/users/{id})", async () => {
     if (!createdUserId) { test.skip(); return; }
-    const r = await adminApi.patch(`${SF_URL}/api/users/${createdUserId}`, {
+    const r = await adminApi.put(`${SF_URL}/api/users/${createdUserId}`, {
       data: { role: "developer" },
     });
     if (r.status() === 404 || r.status() === 405) { test.skip(); return; }
@@ -1114,7 +1109,7 @@ test.describe("CRUD: Backlog", () => {
   });
 
   // CB06 – Reorder backlog if supported
-  test("CB06 – reorder backlog (POST /api/backlog/reorder) if supported", async () => {
+  test("CB06 – reorder backlog (PATCH /api/backlog/reorder) if supported", async () => {
     // First get some story IDs to reorder
     const listR = await adminApi.get(`${SF_URL}/api/stories`);
     if (!listR.ok()) { test.skip(); return; }
@@ -1128,7 +1123,7 @@ test.describe("CRUD: Backlog", () => {
       .filter(Boolean)
       .reverse(); // Reverse order = reorder
 
-    const r = await adminApi.post(`${SF_URL}/api/backlog/reorder`, {
+    const r = await adminApi.patch(`${SF_URL}/api/backlog/reorder`, {
       data: { ids },
     });
     if (r.status() === 404 || r.status() === 405) { test.skip(); return; }

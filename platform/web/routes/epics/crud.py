@@ -146,7 +146,7 @@ async def mission_detail_page(request: Request, epic_id: str):
     )
 
 
-@router.post("/api/missions", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
+@router.post("/api/missions", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("developer"))])
 async def create_mission(request: Request):
     """Create a new mission."""
     from fastapi import HTTPException
@@ -237,8 +237,8 @@ async def list_missions_api(request: Request):
     return JSONResponse({"epics": result, "total": len(result)})
 
 
-@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
-@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
+@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("admin"))])
+@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("admin"))])
 async def delete_mission(epic_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ....db.migrations import get_db

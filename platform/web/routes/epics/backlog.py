@@ -266,7 +266,7 @@ async def list_feature_deps(feature_id: str):
 # ── Sprint planning: assign stories to sprint ────────────────────
 
 
-@router.post("/api/missions/{epic_id}/wsjf", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
+@router.post("/api/missions/{epic_id}/wsjf", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("project_manager"))])
 async def compute_wsjf(epic_id: str, request: Request):
     """Compute and store WSJF score from components."""
     from ....db.migrations import get_db as _gdb

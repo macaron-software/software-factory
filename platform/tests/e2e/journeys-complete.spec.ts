@@ -189,17 +189,8 @@ test.describe("J01 – New Project Full Lifecycle", () => {
   test("J01-S6 – add feature to mission epic", async () => {
     if (!missionId) { test.skip(); return; }
 
-    // Resolve epicId: use missionId as epicId (some APIs treat them as the same)
-    // or find via GET /api/epics?mission_id=
-    let epicsResp = await api.get(`${SF_URL}/api/epics?mission_id=${missionId}`);
-    if (!epicsResp.ok()) epicsResp = await api.get(`${SF_URL}/api/epics`);
-    const epicsData = await tryJson(epicsResp);
-    const epics = Array.isArray(epicsData)
-      ? epicsData
-      : (epicsData as Record<string, unknown> | null)?.epics as unknown[] ?? [];
-    epicId = epics.length > 0
-      ? String((epics[0] as Record<string, unknown>).id ?? "")
-      : missionId; // fallback
+    // Use missionId directly as epicId (missions and epics share the same ID space)
+    epicId = missionId;
 
     const r = await api.post(`${SF_URL}/api/epics/${epicId}/features`, {
       data: { name: `e2e-j01-feature-${Date.now()}`, description: "E2E feature" },
@@ -210,9 +201,9 @@ test.describe("J01 – New Project Full Lifecycle", () => {
 
     const body = await tryJson(r) as Record<string, unknown> | null;
     const loc = r.headers()["location"] ?? "";
+    const locFeature = loc.split("/features/")[1]?.split("/")[0]?.split("?")[0] ?? "";
     featureId =
-      String(body?.id ?? body?.feature_id ?? "") ||
-      (loc.split("/features/")[1]?.split("/")[0]?.split("?")[0] ?? "");
+      String(body?.feature?.id ?? body?.id ?? body?.feature_id ?? "") || locFeature;
   });
 
   test("J01-S7 – add 2 user stories to feature", async () => {
@@ -222,7 +213,8 @@ test.describe("J01 – New Project Full Lifecycle", () => {
         data: {
           title: `e2e-j01-story-${i}-${Date.now()}`,
           description: `Story ${i} for J01`,
-          priority: i === 1 ? "high" : "medium",
+          priority: i === 1 ? 8 : 5,
+          story_points: i === 1 ? 5 : 3,
         },
         headers: { "Content-Type": "application/json" },
       });
@@ -282,16 +274,15 @@ test.describe("J02 – Full Backlog Refinement", () => {
   });
 
   test("J02-S2 – find a mission with epics/features", async () => {
-    const r = await api.get(`${SF_URL}/api/epics`);
+    const r = await api.get(`${SF_URL}/api/missions`);
     if (r.status() === 404) { test.skip(); return; }
     expect(r.status()).toBeLessThan(300);
     const data = await tryJson(r);
-    const epics = Array.isArray(data)
-      ? data
-      : (data as Record<string, unknown> | null)?.epics as unknown[] ?? [];
-    if ((epics as unknown[]).length === 0) { test.skip(); return; }
-    targetEpicId = String((epics[0] as Record<string, unknown>).id ?? "");
-    expect(targetEpicId, "has epicId").toBeTruthy();
+    const d = data as Record<string, unknown> | null;
+    const missions = Array.isArray(data) ? data : (Array.isArray(d?.epics) ? d?.epics : []) as unknown[];
+    if ((missions as unknown[]).length === 0) { test.skip(); return; }
+    targetEpicId = String((missions[0] as Record<string, unknown>).id ?? "");
+    expect(targetEpicId, "has missionId").toBeTruthy();
   });
 
   test("J02-S3 – add new feature to epic", async () => {
@@ -306,7 +297,7 @@ test.describe("J02 – Full Backlog Refinement", () => {
     const loc = r.headers()["location"] ?? "";
     const locFeature = loc.split("/features/")[1]?.split("/")[0]?.split("?")[0] ?? "";
     createdFeatureId =
-      String(body?.id ?? body?.feature_id ?? "") || locFeature;
+      String(body?.feature?.id ?? body?.id ?? body?.feature_id ?? "") || locFeature;
     expect(createdFeatureId, "featureId extracted").toBeTruthy();
   });
 
@@ -318,7 +309,7 @@ test.describe("J02 – Full Backlog Refinement", () => {
         data: {
           title: `e2e-j02-story-${priority}-${Date.now()}`,
           description: `J02 ${priority} priority story`,
-          priority,
+          priority: priority === "high" ? 8 : priority === "medium" ? 5 : 3,
           story_points: priority === "high" ? 8 : priority === "medium" ? 5 : 2,
         },
         headers: { "Content-Type": "application/json" },
@@ -328,7 +319,7 @@ test.describe("J02 – Full Backlog Refinement", () => {
       const body = await tryJson(r) as Record<string, unknown> | null;
       const loc = r.headers()["location"] ?? "";
       const id =
-        String(body?.id ?? body?.story_id ?? "") ||
+        String((body?.story as Record<string, unknown>)?.id ?? body?.id ?? body?.story_id ?? "") ||
         (loc.split("/stories/")[1]?.split("/")[0]?.split("?")[0] ?? "");
       if (id) storyIds.push(id);
     }
@@ -442,7 +433,7 @@ test.describe("J03 – User Management Lifecycle", () => {
 
   test("J03-S5 – admin updates user role to developer", async () => {
     if (!newUserId) { test.skip(); return; }
-    const r = await adminApi.patch(`${SF_URL}/api/users/${newUserId}`, {
+    const r = await adminApi.put(`${SF_URL}/api/users/${newUserId}`, {
       data: { role: "developer" },
       headers: { "Content-Type": "application/json" },
     });
@@ -551,7 +542,7 @@ test.describe("J04 – Multi-Role Project View", () => {
     const body = await tryJson(r) as Record<string, unknown> | null;
     const loc = r.headers()["location"] ?? "";
     const locMission = loc.split("/missions/")[1]?.split("/")[0]?.split("?")[0] ?? "";
-    missionId = String(body?.id ?? "") || locMission;
+    missionId = String((body?.mission as Record<string, unknown>)?.id ?? body?.id ?? "") || locMission;
   });
 
   test("J04-S4 – viewer reads mission list (200)", async () => {
@@ -561,8 +552,8 @@ test.describe("J04 – Multi-Role Project View", () => {
 
   test("J04-S5 – PM updates WSJF on mission", async () => {
     if (!missionId) { test.skip(); return; }
-    const r = await pmApi.patch(`${SF_URL}/api/missions/${missionId}`, {
-      data: { wsjf: 21 },
+    const r = await pmApi.post(`${SF_URL}/api/missions/${missionId}/wsjf`, {
+      data: { business_value: 7, time_criticality: 5, risk_reduction: 3, job_duration: 2 },
       headers: { "Content-Type": "application/json" },
     });
     if (r.status() === 404 || r.status() === 405) { test.skip(); return; }
@@ -591,7 +582,9 @@ test.describe("J04 – Multi-Role Project View", () => {
   test("J04-S8 – admin deletes project P", async () => {
     if (!projectId) { test.skip(); return; }
     const r = await adminApi.delete(`${SF_URL}/api/projects/${projectId}`);
-    if (r.status() === 404 || r.status() === 405) { test.skip(); return; }
+    // 404 is acceptable — project may already be deleted by J04-S7 (flat auth)
+    if (r.status() === 404) { return; } // already deleted = desired state
+    if (r.status() === 405) { test.skip(); return; }
     expect(r.status(), "admin deletes project").toBeLessThan(400);
   });
 });
