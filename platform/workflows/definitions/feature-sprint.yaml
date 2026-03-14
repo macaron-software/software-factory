@@ -5,6 +5,11 @@ description: Workflow réutilisable pour chaque Feature d'un Epic. Design → TD
 icon: repeat
 is_builtin: true
 pm_driven: true
+on_complete:
+  - workflow_id: documentation-pipeline
+    condition: completed
+  - workflow_id: knowledge-maintenance
+    condition: completed
 phases:
 - id: feature-design
   pattern_id: sequential

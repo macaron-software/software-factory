@@ -53,9 +53,11 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                 name=raw.get("name", ""),
                 description=raw.get("description", ""),
                 phases=phases,
-                config={**raw.get("config", {}), **({
-                    "pm_driven": True,
-                } if raw.get("pm_driven") else {})},
+                config={
+                    **raw.get("config", {}),
+                    **({"pm_driven": True} if raw.get("pm_driven") else {}),
+                    **({"on_complete": raw["on_complete"]} if raw.get("on_complete") else {}),
+                },
                 icon=raw.get("icon", "workflow"),
                 is_builtin=True,
             )
