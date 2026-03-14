@@ -10,72 +10,12 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
 import shutil
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
-
-from ..db.migrations import get_db  # noqa: E402 — placed after logger for readability
-
-
-def _run_lock_key(run_id: str) -> int:
-    """Convert run_id to a stable positive int64 for PG advisory lock."""
-    return int(hashlib.md5(run_id.encode()).hexdigest()[:16], 16) & 0x7FFFFFFFFFFFFFFF
-
-
-@asynccontextmanager
-async def pg_run_lock(run_id: str) -> AsyncGenerator[bool, None]:
-    """Try to acquire a PG session-advisory lock for this run.
-
-    Yields True if the lock was acquired (safe to proceed), False if another
-    node already holds it (caller should skip).  No-op (yields True) when not
-    using PostgreSQL so existing SQLite/test setups are unaffected.
-    """
-    from ..db.adapter import is_postgresql
-
-    if not is_postgresql():
-        yield True
-        return
-
-    lock_key = _run_lock_key(run_id)
-    loop = asyncio.get_event_loop()
-
-    from ..db.adapter import get_connection
-
-    conn = await loop.run_in_executor(None, get_connection)
-    acquired = False
-    try:
-        row = await loop.run_in_executor(
-            None,
-            lambda: conn.execute(
-                "SELECT pg_try_advisory_lock(?)", (lock_key,)
-            ).fetchone(),
-        )
-        acquired = bool(row and row[0])
-        if acquired:
-            logger.info("dist-lock: acquired run=%s key=%d", run_id, lock_key)
-        else:
-            logger.info("dist-lock: run=%s locked by another node — skip", run_id)
-        yield acquired
-    finally:
-        if acquired:
-            try:
-                await loop.run_in_executor(
-                    None,
-                    lambda: conn.execute("SELECT pg_advisory_unlock(?)", (lock_key,)),
-                )
-            except Exception:
-                pass
-        try:
-            conn.close()
-        except Exception:
-            pass
-
 
 # Mission name/type patterns that should always be running
 _CONTINUOUS_KEYWORDS = (
@@ -240,6 +180,7 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     if _os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
         return 0
+    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -252,7 +193,7 @@ async def _resume_batch(stagger: float = 3.0) -> int:
             LEFT JOIN epics m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
               AND COALESCE(mr.human_input_required, 0) = 0
-              AND mr.updated_at >= datetime('now', '-7 days')
+              AND mr.updated_at >= datetime('now', '-48 hours')
             ORDER BY mr.created_at DESC
             LIMIT 500
         """).fetchall()
@@ -298,10 +239,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     continuous_paused, others_paused, continuous_failed, stuck_pending = [], [], [], []
     # Map run_id → resume_attempts for backoff filtering
     _attempts: dict[str, int] = {}
+    _run_workflow: dict[str, str] = {}  # run_id → workflow_id for circuit breaker
     for run_id, wf_id, mname, mtype, mstatus, attempts in paused_rows:
         if mstatus not in ("active", None, ""):
             continue
         _attempts[run_id] = attempts
+        _run_workflow[run_id] = wf_id
         if _is_continuous(mname, mtype):
             continuous_paused.append(run_id)
         else:
@@ -310,10 +253,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     for run_id, wf_id, mname, mtype, mstatus in pending_rows:
         if mstatus in ("active", None, ""):
             stuck_pending.append(run_id)
+            _run_workflow[run_id] = wf_id
 
     for run_id, wf_id, mname, mtype, mstatus in failed_rows:
         if _is_continuous(mname, mtype):
             continuous_failed.append(run_id)
+            _run_workflow[run_id] = wf_id
 
     # Apply exponential backoff: skip missions with too many recent attempts
     # Attempt 0-2: always retry; attempt 3: skip 50% chance (use mod); attempt 4+: skip unless low load
@@ -325,17 +270,11 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         attempts = _attempts.get(run_id, 0)
         if attempts <= 2:
             return True
-        if attempts <= 10:
+        if attempts <= 5:
             # Retry every (2^attempts) minutes — skip if not on the right minute
-            interval = 2 ** (attempts - 2)  # 2, 4, 8, 16, 32, 64, 128, 256 min
-            if attempts >= 8:
-                logger.warning(
-                    "ESCALATION: run %s at attempt %d — needs attention",
-                    run_id,
-                    attempts,
-                )
+            interval = 2 ** (attempts - 2)  # 2, 4, 8, 16, 32 min
             return (_now_minute % interval) == 0
-        return False  # > 10 attempts → wait for manual review or human_input_required
+        return False  # > 5 attempts → wait for manual review or human_input_required
 
     candidates = [
         r
@@ -361,44 +300,9 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         len(continuous_failed),
     )
 
-    # Read max_active_projects once per batch (checked per-launch below)
-    try:
-        from ..config import get_config as _get_cfg_slots
-
-        _max_slots = _get_cfg_slots().orchestrator.max_active_projects
-    except Exception:
-        _max_slots = 0
-
-    def _count_active_containers() -> int:
-        """Count currently running macaron-app-* and proj-* containers."""
-        try:
-            import subprocess as _sp
-
-            r = _sp.run(
-                ["docker", "ps", "--format", "{{.Names}}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            return sum(
-                1
-                for ln in r.stdout.splitlines()
-                if ln.startswith("macaron-app-") or ln.startswith("proj-")
-            )
-        except Exception:
-            return 0
-
     resumed = 0
     skipped_load = 0
     for run_id in to_resume:
-        # Slot gate: don't exceed max_active_projects deployed containers
-        if _max_slots > 0 and _count_active_containers() >= _max_slots:
-            logger.warning(
-                "auto_resume: slot gate — %d active containers >= max_active_projects=%d — stopping batch",
-                _count_active_containers(),
-                _max_slots,
-            )
-            break
         # Backpressure: check CPU/RAM before each launch
         cpu, ram = _get_system_load()
         cpu_green, cpu_yellow, cpu_red, ram_red = _get_backpressure_config()
@@ -421,6 +325,20 @@ async def _resume_batch(stagger: float = 3.0) -> int:
                 effective_stagger,
             )
         try:
+            # Circuit breaker: skip if workflow has too many recent failures
+            wf_id = _run_workflow.get(run_id, "")
+            if wf_id:
+                from ..db.migrations import get_db as _get_db
+                _cb_db = _get_db()
+                try:
+                    if _is_circuit_open(wf_id, _cb_db):
+                        logger.warning(
+                            "auto_resume: circuit OPEN for workflow=%s (>=%d fails in %dmin) — skipping run %s",
+                            wf_id, _CB_MAX_FAILS, _CB_WINDOW_MINUTES, run_id,
+                        )
+                        continue
+                finally:
+                    _cb_db.close()
             # Try to dispatch to a less-loaded worker node first
             dispatched = await _try_dispatch_to_worker(run_id)
             if not dispatched:
@@ -503,6 +421,27 @@ async def _try_dispatch_to_worker(run_id: str) -> bool:
     return False
 
 
+# Circuit breaker: skip workflow if N consecutive failures in last WINDOW
+_CB_MAX_FAILS = int(os.environ.get("CIRCUIT_BREAKER_MAX_FAILS", "5"))
+_CB_WINDOW_MINUTES = int(os.environ.get("CIRCUIT_BREAKER_WINDOW_MINUTES", "60"))
+
+
+def _is_circuit_open(workflow_id: str, db) -> bool:
+    """Return True if this workflow_id has too many recent failures (circuit open)."""
+    try:
+        row = db.execute(
+            """SELECT COUNT(*) as cnt FROM epic_runs
+               WHERE workflow_id = ? AND status IN ('failed', 'abandoned')
+               AND updated_at >= datetime('now', ?)""",
+            (workflow_id, f"-{_CB_WINDOW_MINUTES} minutes"),
+        ).fetchone()
+        if row and int(row["cnt"] or 0) >= _CB_MAX_FAILS:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 async def _launch_run(run_id: str) -> None:
     """Launch a single epic_run via the orchestrator."""
     from ..agents.store import get_agent_store
@@ -529,7 +468,9 @@ async def _launch_run(run_id: str) -> None:
 
     # Ensure a session row exists for this epic_run (needed for messages FK)
     if mission.session_id:
-        _db = get_db()
+        from ..db.migrations import get_db as _get_db
+
+        _db = _get_db()
         try:
             exists = _db.execute(
                 "SELECT id FROM sessions WHERE id=?", (mission.session_id,)
@@ -566,9 +507,10 @@ async def _launch_run(run_id: str) -> None:
         try:
             import json as _json
 
+            from ..db.migrations import get_db as _get_db2
             from ..models import PhaseStatus as _PhaseStatus
 
-            _db2 = get_db()
+            _db2 = _get_db2()
             try:
                 _scfg_row = _db2.execute(
                     "SELECT config_json FROM sessions WHERE id=?", (mission.session_id,)
@@ -629,36 +571,26 @@ async def _launch_run(run_id: str) -> None:
     )
 
     async def _safe_run():
-        async with pg_run_lock(run_id) as acquired:
-            if not acquired:
-                # Another node is running this — revert status to paused so it
-                # doesn't linger as RUNNING if the other node crashes first.
-                try:
-                    mission.status = EpicStatus.PAUSED
-                    run_store.update(mission)
-                except Exception:
-                    pass
-                return
-            try:
-                async with get_mission_semaphore():
-                    logger.warning(
-                        "auto_resume: epic_run=%s acquired semaphore", run_id
-                    )
-                    await orchestrator.run_phases()
-            except Exception as exc:
-                import traceback
+        try:
+            async with get_mission_semaphore():
+                logger.warning("auto_resume: epic_run=%s acquired semaphore", run_id)
+                await orchestrator.run_phases()
+        except Exception as exc:
+            import traceback
 
-                logger.error(
-                    "auto_resume: run=%s CRASHED: %s\n%s",
-                    run_id,
-                    exc,
-                    traceback.format_exc(),
-                )
-                try:
-                    mission.status = EpicStatus.FAILED
-                    run_store.update(mission)
-                except Exception:
-                    pass
+            err_summary = f"{type(exc).__name__}: {exc}"
+            logger.error(
+                "auto_resume: run=%s CRASHED: %s\n%s",
+                run_id,
+                exc,
+                traceback.format_exc(),
+            )
+            try:
+                mission.status = EpicStatus.FAILED
+                mission.cancel_reason = err_summary[:500]
+                run_store.update(mission)
+            except Exception:
+                pass
 
     mission.status = EpicStatus.RUNNING
     run_store.update(mission)
@@ -683,6 +615,7 @@ async def handle_failed_runs() -> int:
     Called once at startup (before the watchdog loop starts retrying paused runs).
     Returns number of runs repaired.
     """
+    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -815,6 +748,7 @@ async def _create_tma_incident(
 ) -> None:
     """Create a TMA incident epic_run for a failed execution phase."""
     import uuid
+    from ..db.migrations import get_db
 
     incident_id = str(uuid.uuid4())[:8] + "-tma-incident"
     brief = (
@@ -863,6 +797,7 @@ async def auto_launch_continuous_missions() -> int:
     and launch them. Called by the watchdog loop after handling paused/failed.
     Returns count of missions launched.
     """
+    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -1007,6 +942,7 @@ async def check_ga_health() -> None:
     """P1 watchdog: if all GA proposals are pending for > 1h with none approved,
     auto-approve the best per workflow (bootstrap) and log a P1 warning.
     Runs every watchdog cycle (~5 min) but only acts once per stall episode."""
+    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -1062,6 +998,7 @@ async def check_ga_health() -> None:
 
 async def _cleanup_disk() -> None:
     """Hourly cleanup: orphaned workspaces + old LLM traces + stale cancelled runs."""
+    from ..db.migrations import get_db
 
     db = None
     try:
@@ -1083,16 +1020,19 @@ async def _cleanup_disk() -> None:
                 ).fetchall()
             }
             removed_ws = 0
+            ws_ttl = int(os.environ.get("WORKSPACE_TTL_DAYS", "7"))
+            cutoff_mtime = time.time() - ws_ttl * 86400
             for ws_name in os.listdir(ws_dir):
-                if ws_name not in active_sessions:
+                ws_path = os.path.join(ws_dir, ws_name)
+                if ws_name not in active_sessions or os.path.getmtime(ws_path) < cutoff_mtime:
                     try:
-                        shutil.rmtree(os.path.join(ws_dir, ws_name))
+                        shutil.rmtree(ws_path)
                         removed_ws += 1
                     except Exception:
                         pass
             if removed_ws:
                 logger.warning(
-                    "cleanup_disk: removed %d orphaned workspaces", removed_ws
+                    "cleanup_disk: removed %d orphaned/expired workspaces (ttl=%dd)", removed_ws, ws_ttl
                 )
 
         # 2. Purge LLM traces older than 14 days (keep recent for observability)
@@ -1117,6 +1057,22 @@ async def _cleanup_disk() -> None:
                 "cleanup_disk: VACUUM done after %d deletes",
                 deleted_traces + deleted_runs,
             )
+
+        # 4. Cost alert: warn if 24h LLM cost exceeds threshold
+        try:
+            cost_threshold_usd = float(os.environ.get("COST_ALERT_THRESHOLD_USD", "5.0"))
+            cost_row = db.execute(
+                "SELECT COALESCE(SUM(llm_cost_usd), 0) AS total"
+                " FROM epic_runs WHERE created_at >= NOW() - INTERVAL '24 hours'"
+                " AND llm_cost_usd IS NOT NULL"
+            ).fetchone()
+            if cost_row and float(cost_row["total"] or 0) > cost_threshold_usd:
+                logger.error(
+                    "cleanup_disk: COST ALERT — 24h LLM spend $%.2f > threshold $%.2f",
+                    float(cost_row["total"]), cost_threshold_usd,
+                )
+        except Exception:
+            pass
     except Exception:
         pass
     finally:
@@ -1208,16 +1164,23 @@ async def _enforce_container_ttl_and_slots() -> None:
         if not (name.startswith("macaron-app-") or name.startswith("proj-")):
             continue
         try:
-            # Docker format: "2026-01-15 10:23:45 +0000 UTC" or "2026-01-15T10:23:45Z"
-            created_str = re.sub(r"\s+UTC$", "", created_str.strip())
-            dt = datetime.fromisoformat(
-                created_str.replace(" ", "T").replace(" +0000", "+00:00")
-            )
+            # Docker CreatedAt formats vary by locale/timezone:
+            #   "2026-01-15 10:23:45 +0000 UTC"   (UTC)
+            #   "2026-03-13 22:02:41 +0100 CET"   (local TZ — macOS)
+            #   "2026-01-15T10:23:45Z"             (ISO)
+            # Strategy: strip trailing TZ name (letters), normalise offset to +HH:MM
+            s = created_str.strip()
+            s = re.sub(r"\s+[A-Z]{2,5}$", "", s)   # strip " CET", " UTC", " EST" etc.
+            s = s.replace(" ", "T")                  # space → T separator
+            # Normalise +HHMM → +HH:MM  (fromisoformat requires colon in offset)
+            s = re.sub(r"([+-])(\d{2})(\d{2})$", r"\1\2:\3", s)
+            dt = datetime.fromisoformat(s)
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             app_containers.append((name, dt))
         except Exception:
-            app_containers.append((name, now))  # unknown age → treat as fresh
+            # Fallback: use epoch so age is maximised → will be caught by TTL/slot logic
+            app_containers.append((name, datetime(2000, 1, 1, tzinfo=timezone.utc)))
 
     if not app_containers:
         return
@@ -1245,22 +1208,5 @@ async def _enforce_container_ttl_and_slots() -> None:
             logger.warning(
                 "auto_resume: stopped deployed container %s (%s)", name, reason
             )
-            # Pause any still-running SF run whose mission maps to this container
-            try:
-                prefix = name.removeprefix("macaron-app-").removeprefix("proj-")
-
-                _db2 = get_db()
-                try:
-                    _db2.execute(
-                        """UPDATE epic_runs SET status='paused', updated_at=datetime('now')
-                           WHERE status='running'
-                             AND session_id LIKE ? || '%'""",
-                        (prefix,),
-                    )
-                    _db2.commit()
-                finally:
-                    _db2.close()
-            except Exception as _e2:
-                logger.debug("auto_resume: could not pause run for %s: %s", name, _e2)
         except Exception as e:
             logger.warning("auto_resume: failed to stop %s: %s", name, e)
