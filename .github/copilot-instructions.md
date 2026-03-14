@@ -52,7 +52,7 @@ platform/                    375py 148KLOC
   web/static/css/            main.css components.css(.sk shimmer) agents.css ...
   web/templates/partials/    skeleton.html(20 macros) . agent_cards.html ...
 skills/                      139 YAML
-projects/                    baby.yaml . factory.yaml (per-project config+git_url)
+projects/                    sienna.yaml . factory.yaml (per-project config+git_url)
 ```
 
 ## DB — LIVE = PostgreSQL
@@ -63,7 +63,7 @@ psql: PGPASSWORD=macaron /opt/homebrew/bin/psql -h localhost -U macaron -d macar
 ## Projects
 | proj | repo | path | stack |
 |------|------|------|-------|
-| Baby | macaron-software/baby | _BABY | Rust/WASM+SvelteKit+iOS/Android |
+| Sienna | macaron-software/sienna (priv) | _BABY | Rust/WASM+SvelteKit+iOS/Android |
 | ADA-NDIS | macaron-software/ada-ndis | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC |
 | SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
 | FLO | macaron-software/luna | _FLO | TBD |
@@ -165,7 +165,7 @@ MiniMax quirks: no temp . no mangle . `<think>` stripped . json fences stripped 
 ## Deploy
 OVH: blue-green Docker slots/{blue,green,factory}/ --force-recreate
 Azure: systemd sf-platform -> az vm run-command . Innovation: 3-node nginx lb
-CI: deploy-demo.yml . deploy-baby.yml
+CI: deploy-demo.yml . deploy-sienna.yml
 
 ## Skeleton Loading
 CSS: .sk shimmer gradient . .sk-line .sk-circle .sk-badge .sk-card .sk-loaded(fade-in)
