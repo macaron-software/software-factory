@@ -291,6 +291,50 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     if not to_resume:
         return 0
 
+    # --- Tiered slot gate ---------------------------------------------------
+    # max_running_slots  : hard cap on concurrent *running* epic_runs (Docker ON)
+    # max_queued_slots   : soft cap on running+paused in-flight buffer
+    try:
+        from ..config import get_config as _gc
+        _oc = _gc().orchestrator
+        _max_run = _oc.max_running_slots    # default 2
+        _max_q   = _oc.max_queued_slots     # default 6
+    except Exception:
+        _max_run, _max_q = 2, 6
+
+    try:
+        _slot_db = get_db()
+        _counts = _slot_db.execute(
+            "SELECT status, COUNT(*) FROM epic_runs WHERE status IN ('running','paused') GROUP BY status"
+        ).fetchall()
+        _slot_db.close()
+    except Exception:
+        _counts = []
+
+    _currently_running = sum(n for s, n in _counts if s == "running")
+    _currently_inflight = sum(n for _, n in _counts)   # running + paused
+
+    if _max_run > 0 and _currently_running >= _max_run:
+        logger.info(
+            "auto_resume: slot gate — running=%d >= max_running=%d, deferring",
+            _currently_running, _max_run,
+        )
+        return 0
+
+    if _max_q > 0 and _currently_inflight >= _max_q:
+        logger.info(
+            "auto_resume: slot gate — inflight=%d >= max_queued=%d, deferring",
+            _currently_inflight, _max_q,
+        )
+        return 0
+
+    # How many launches are allowed this cycle?
+    _launch_budget = min(
+        (_max_run - _currently_running) if _max_run > 0 else len(to_resume),
+        (_max_q   - _currently_inflight) if _max_q  > 0 else len(to_resume),
+    )
+    to_resume = to_resume[:_launch_budget]
+    # ------------------------------------------------------------------------
     logger.warning(
         "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, stuck-pending=%d, failed-continuous=%d)",
         len(to_resume),

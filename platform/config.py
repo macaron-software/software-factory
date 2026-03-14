@@ -157,6 +157,13 @@ class OrchestratorConfig:
     deployed_container_ttl_hours: float = (
         4.0  # stop macaron-app-* containers after N hours idle
     )
+    # Tiered slot system for epic_runs
+    max_running_slots: int = (
+        2  # max epic_runs in 'running' state (Docker ON / CPU active)
+    )
+    max_queued_slots: int = (
+        6  # max epic_runs in 'running'+'paused' state (in-flight buffer); 0 = unlimited
+    )
     # Worker nodes for multi-server dispatch (list of base URLs)
     worker_nodes: list = field(default_factory=list)
     # YOLO mode: auto-approve all human-in-the-loop checkpoints (no pause)
