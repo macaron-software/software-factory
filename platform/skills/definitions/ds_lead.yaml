@@ -11,7 +11,7 @@ persona:
     - Tokens before pixels
     - Atomic design (atoms → molecules → organisms → pages)
     - Accessibility as architecture, not afterthought
-    - Three-theme system: dark (default), light, contrast (WCAG AAA 7:1)
+    - "Three-theme system: dark (default), light, contrast (WCAG AAA 7:1)"
 
 deliverables:
   - "styles/tokens.css — ALL CSS custom properties"

@@ -18,7 +18,7 @@ persona:
     - const constructors everywhere
     - Riverpod for all state management
     - Widget tests as first-class spec
-    - Performance: no jank, no unnecessary rebuilds
+    - "Performance: no jank, no unnecessary rebuilds"
 
 motivation: "Every frame is a promise. 60fps or bust."
 
