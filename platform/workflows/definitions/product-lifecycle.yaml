@@ -36,8 +36,11 @@ phases:
 - id: project-setup
   pattern_id: sequential
   name: Constitution du Projet
-  description: Le Dir. Programme alloue les ressources → le Product Manager décompose en épics → le Chef de Projet planifie
+  description: Le Dir. Programme alloue les ressources → le Product Manager décompose en épics, crée les
+    features (create_feature) et user stories (create_story) avec UUID dans le backlog → le Chef de Projet planifie
     les sprints → le Scrum Master configure les cérémonies. Chaque sortie alimente l'entrée du suivant.
+    MANDATORY — Le PM DOIT appeler create_feature() pour chaque feature identifiée et create_story() pour chaque
+    user story avec critères d'acceptance Gherkin (Given/When/Then).
   gate: always
   config:
     agents:
@@ -76,7 +79,9 @@ phases:
   pattern_id: hierarchical
   name: Sprints de Développement
   description: 'Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les
-    tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.'
+    tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.
+    MANDATORY — Chaque fichier source DOIT commencer par: // Ref: feat-XXXX — Feature Name  // Story: us-XXXX — Story Title.
+    Chaque test DOIT référencer le AC qu il valide: // Verify: ac-XXXX.'
   gate: always
   config:
     agents:
@@ -162,6 +167,19 @@ phases:
     - pipeline_engineer
     - chef_projet
     leader: chef_projet
+- id: traceability-check
+  pattern_id: sequential
+  name: Vérification Traçabilité E2E
+  description: 'Le trace-auditor scanne tous les fichiers pour les headers # Ref: manquants et les orphelins.
+    Le trace-writer ajoute les headers manquants, crée les features/stories dans le backlog, et met à jour
+    SPECS.md avec les AC UUID. Le trace-lead valide la couverture ≥ 80% et VETO si insuffisante.'
+  gate: no_veto
+  config:
+    agents:
+    - trace-auditor
+    - trace-writer
+    - trace-lead
+    leader: trace-lead
 - id: tma-router
   pattern_id: router
   name: Routage Incidents TMA
@@ -325,6 +343,21 @@ config:
       x: 100
       y: 120
       label: Lean Portfolio
+    - id: n28
+      agent_id: trace-auditor
+      x: 100
+      y: 920
+      label: Trace Auditor
+    - id: n29
+      agent_id: trace-writer
+      x: 300
+      y: 920
+      label: Trace Writer
+    - id: n30
+      agent_id: trace-lead
+      x: 500
+      y: 920
+      label: Trace Lead
     edges:
     - from: n1
       to: n3
@@ -462,6 +495,26 @@ config:
       to: n24
       label: hotfix
       color: '#ef4444'
+    - from: n15
+      to: n28
+      label: code review
+      color: '#a855f7'
+    - from: n16
+      to: n28
+      label: code review
+      color: '#a855f7'
+    - from: n28
+      to: n29
+      label: gaps
+      color: '#f59e0b'
+    - from: n29
+      to: n30
+      label: coverage
+      color: '#10b981'
+    - from: n30
+      to: n10
+      label: traçabilité OK
+      color: '#10b981'
   agents_permissions:
     dsi:
       can_veto: true
@@ -497,6 +550,10 @@ config:
       can_delegate: true
       can_approve: true
     devops:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    trace-lead:
       can_veto: true
       veto_level: STRONG
       can_approve: true
