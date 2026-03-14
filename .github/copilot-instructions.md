@@ -170,6 +170,63 @@ CI: deploy-demo.yml . deploy-baby.yml
 ## Skeleton Loading
 CSS: .sk shimmer gradient . .sk-line .sk-circle .sk-badge .sk-card .sk-loaded(fade-in)
 Macros: partials/skeleton.html — 20 variants. Pattern: hx-get="/partial/X" hx-trigger="load".
+Tiered: L0=skeleton(instant) . L1=summary gzip(fast) . L2=full detail(on-demand)
+
+## Design Tokens (CSS custom props — single source of truth)
+Colors dark: --bg-primary=#0f0a1a . --bg-secondary=#1a1225 . --bg-tertiary=#251d33
+  --border=#352d45 . --text-primary=#e6edf3 . --text-secondary=#9e95b0
+  --purple=#a78bfa(accent) . --green=#34d399 . --red=#f87171 . --yellow=#fbbf24 . --blue=#60a5fa . --cyan=#22d3ee
+Colors light: --bg-primary=#fff . --bg-secondary=#f8f9fa . --text-primary=#1a1a2e
+Type: system-ui,-apple-system,sans-serif(0 ext deps) . --font-mono=ui-monospace
+  xs=.75rem sm=.875rem base=1rem lg=1.125rem xl=1.25rem 2xl=1.5rem 3xl=2rem
+Space(4px grid): 1=.25rem 2=.5rem 3=.75rem 4=1rem 5=1.5rem 6=2rem 8=3rem 10=4rem
+Radius: sm=4px default=10px lg=16px full=9999px
+Shadow: sm=0 1px 2px . default=0 4px 12px . lg=0 8px 24px
+Z: dropdown=100 modal=200 toast=300 tooltip=400
+
+## UI Components (60 — atomic design)
+Atoms(29): avatar badge button checkbox color-picker date-input file heading icon image label link
+  progress-bar quote radio rating select separator skeleton skip-link slider spacer spinner
+  stepper text-input textarea toggle tooltip visually-hidden
+Molecules(20): accordion alert breadcrumb button-group card combobox date-picker dropdown
+  empty-state fieldset file-upload list pagination popover progress-tracker search segmented tabs toast tree-view
+Organisms(11): carousel drawer footer form header hero modal navigation rich-text-editor table video
+Icons: Feather SVG ONLY (stroke round-linecap 2px). No emoji anywhere.
+
+## UX Laws (27 — lawsofux.com)
+Perf: Doherty(<400ms) . Fitts(size/dist) . Goal-Gradient(progress)
+Decision: Hicks(log2 choices) . Choice-Overload . Occam(simplest)
+Memory: Miller(7±2) . Cognitive-Load(intrinsic/extraneous) . Chunking . Working-Memory . Mental-Model
+Gestalt: Proximity . Similarity . Common-Region . Pragnanz . Uniform-Connectedness
+Behavior: Jakob(familiarity) . Aesthetic-Usability . Active-User(no manuals) . Peak-End . Von-Restorff(isolation) . Serial-Position . Zeigarnik(incomplete) . Selective-Attention . Flow
+Strategic: Pareto(80/20) . Parkinson(fill time) . Tesler(irreducible) . Postel(liberal accept)
+
+## Patterns (DO) / Anti-Patterns (DON'T)
+DO: skeleton-loading . progressive-disclosure . SSE-streaming . tiered-ctx(L0/L1/L2) . feature-ref-headers
+  RBAC-as-dependency . CSS-custom-props . feather-svg . htmx-partial-swap . SAFe-hierarchy
+  gzip-compress . system-font . dark-first . multi-step-form . empty-state-CTA
+DON'T: gradient-bg . emoji . inline-styles . hardcoded-colors . websocket . --reload . import-platform
+  spinner-no-context . wall-of-text . deep-nav(>3) . modal-abuse . no-feedback
+
+## Compliance
+SOC2: CC1-CC9+A1 — 76% (19/25 pass, 6 warn). Key: CC6 access=PASS, A1 availability=WARN
+ISO27001: Annex A — 88% (22/25 pass, 3 warn). Key: A.9 access=PASS, A.12.6 vuln-mgmt=WARN
+OWASP Top10: 7/10 pass, 3 warn (A05 miscfg, A06 deps, A10 SSRF)
+
+## Security — White Hat
+PASS: RBAC(54/54) . SQL-inject(param) . path-traversal . secrets(Infisical) . TLS . session-mgmt
+WARN: CSRF(no tokens) . XSS(|safe audit) . 4 dep CVEs . missing CSP/X-Frame . SSRF-tools . RCE-sandbox . prompt-inject . rate-limit . CORS-permissive
+Priority: 1.sandbox-RCE 2.security-headers 3.URL-allowlist 4.dep-CVEs 5.rate-limit
+
+## E2E Traceability (100% all layers)
+Chain: Persona(16) -> Feature(44,feat-*) -> Story(172,us-{uuid8}) -> AC(154,ac-{uuid8})
+  -> IHM(124/124) -> Code(379/382) -> TU(36/36) -> E2E(23/23) -> CRUD(645) -> RBAC(54/54)
+Annotations: .py=`# Ref: feat-*` . .html=`<!-- Ref: feat-* -->` . .ts=`// Ref: feat-*`
+Wiki: 54+ pages — 8 traceability + 7 DS/UX + 3 compliance + 1 LEAN audit
+
+## Annotation Studio (sf-annotate.js)
+Agentation-inspired. Types: comment/bug/move/area/text. Click element→annotate→export markdown.
+Drag-drop markers. Pause animations. CSS selector + component path capture.
 
 ## Gotchas
 - `platform/` shadows stdlib — NEVER `import platform`

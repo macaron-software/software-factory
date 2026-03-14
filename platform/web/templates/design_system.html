@@ -58,6 +58,14 @@
 </style>
 
 <div class="main-area">
+<!-- IHM Context: persona/feature/RBAC/CRUD/stories -->
+<div class="ihm-ctx" style="display:flex;gap:1rem;flex-wrap:wrap;padding:0.5rem 1rem;background:var(--bg-secondary);border-bottom:1px solid var(--border);font-size:var(--font-xs);color:var(--text-secondary);align-items:center">
+  <span title="Persona"><svg class="icon" width="14" height="14"><use href="#icon-user"/></svg> UX Designer / Tech Lead</span>
+  <span title="Feature"><svg class="icon" width="14" height="14"><use href="#icon-tag"/></svg> feat-design-system</span>
+  <span title="RBAC"><svg class="icon" width="14" height="14"><use href="#icon-shield"/></svg> all (viewer+)</span>
+  <span title="CRUD"><svg class="icon" width="14" height="14"><use href="#icon-database"/></svg> GET /design-system</span>
+  <span title="Stories"><svg class="icon" width="14" height="14"><use href="#icon-file-text"/></svg> 6 stories / 5 AC</span>
+</div>
 <div class="ds">
     <!-- Sub-navigation -->
     <nav class="ds-nav">
@@ -74,6 +82,7 @@
         <button class="ds-nav__item" onclick="showDsPanel('kanban',this)">Kanban</button>
         <button class="ds-nav__item" onclick="showDsPanel('backlog',this)">Backlog</button>
         <button class="ds-nav__item" onclick="showDsPanel('skeleton',this)">Skeleton</button>
+        <button class="ds-nav__item" onclick="showDsPanel('uxlaws',this)">UX Laws</button>
     </nav>
 
     <!-- ═══════════ TOKENS ═══════════ -->
@@ -1394,6 +1403,82 @@ GET /auth/me &rarr; user profile + roles
             </div>
         </div>
     </div>
+
+    <!-- ═══════════ UX LAWS ═══════════ -->
+    <div id="ds-uxlaws" class="ds-panel">
+        <div class="ds-section">
+            <h3 class="ds-section-title"><svg class="icon"><use href="#icon-book"/></svg> UX Laws (27 — lawsofux.com)</h3>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem">Psychological laws applied to SF Platform UI design decisions.</p>
+
+            <div class="ds-grid ds-grid--components">
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-zap"/></svg> Doherty Threshold</div>
+                    <div class="ds-showcase__desc">Response &lt;400ms = addictive productivity. Use skeleton loading, SSE streaming, gzip.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-target"/></svg> Fitts's Law</div>
+                    <div class="ds-showcase__desc">Target time = f(distance, size). Buttons min 44x44px, action bars in easy-reach zones.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-filter"/></svg> Hick's Law</div>
+                    <div class="ds-showcase__desc">Decision time = log2(n+1). Nav &le;7 items, progressive disclosure, highlight recommended.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-layers"/></svg> Miller's Law</div>
+                    <div class="ds-showcase__desc">7&plusmn;2 items in working memory. Chunk content into cards, sections, tab groups.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-eye"/></svg> Jakob's Law</div>
+                    <div class="ds-showcase__desc">Users expect familiar patterns. Standard nav, form layouts, modal behavior.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-scissors"/></svg> Occam's Razor</div>
+                    <div class="ds-showcase__desc">Simplest solution wins. No decorative elements, minimal chrome, LEAN UI.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-heart"/></svg> Aesthetic-Usability</div>
+                    <div class="ds-showcase__desc">Beautiful = perceived as more usable. Consistent DS tokens, clean dark theme.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-alert-circle"/></svg> Von Restorff Effect</div>
+                    <div class="ds-showcase__desc">Different item = most remembered. CTA buttons, alert badges, primary actions.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-bar-chart-2"/></svg> Zeigarnik Effect</div>
+                    <div class="ds-showcase__desc">Incomplete tasks remembered better. Sprint progress bars, phase indicators.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-trending-up"/></svg> Goal-Gradient</div>
+                    <div class="ds-showcase__desc">Effort increases near goal. Progress bars, milestone markers, onboarding steps.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-cpu"/></svg> Cognitive Load</div>
+                    <div class="ds-showcase__desc">Minimize extraneous load. Tiered context (L0/L1/L2), progressive data loading.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-shield"/></svg> Postel's Law</div>
+                    <div class="ds-showcase__desc">Liberal accept, conservative send. Flexible form validation, forgiving search.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-git-merge"/></svg> Tesler's Law</div>
+                    <div class="ds-showcase__desc">Irreducible complexity exists. System absorbs complexity, not the user.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-pie-chart"/></svg> Pareto Principle</div>
+                    <div class="ds-showcase__desc">80% effects from 20% causes. Optimize the 5 core views first.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-star"/></svg> Peak-End Rule</div>
+                    <div class="ds-showcase__desc">Experience judged by peak + end. Mission completion animation, error recovery.</div>
+                </div>
+                <div class="ds-showcase">
+                    <div class="ds-showcase__title"><svg class="icon" width="14" height="14"><use href="#icon-grid"/></svg> Gestalt Laws</div>
+                    <div class="ds-showcase__desc">Proximity, Similarity, Common Region, Pragnanz, Uniform Connectedness. Cards, groups, edges.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 </div><!-- /main-area -->
 
