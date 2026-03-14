@@ -53,6 +53,8 @@
 .cb-ux{background:rgba(244,114,182,.1);color:#f9a8d4;border-color:rgba(244,114,182,.18)}
 .cb-gov{background:rgba(251,146,60,.1);color:#fb923c;border-color:rgba(251,146,60,.18)}
 .cb-formal{background:rgba(52,211,153,.12);color:#34d399;border-color:rgba(52,211,153,.2)}
+.cb-agent{background:rgba(99,102,241,.12);color:#818cf8;border-color:rgba(99,102,241,.2)}
+.cb-obs{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.2)}
 
 /* Projects */
 .proj-list{display:flex;flex-direction:column;gap:0.5rem}
@@ -2365,6 +2367,12 @@
           <span class="concept-badge cb-ai">Skill Broker</span>
           <span class="concept-badge cb-ai">Deep Bench</span>
           <span class="concept-badge cb-ai">CoVe</span>
+          <span class="concept-badge cb-ai">Context Tiers (L0/L1/L2)</span>
+          <span class="concept-badge cb-ai">Prompt Compression</span>
+          <span class="concept-badge cb-ai">BM25 Tool Selection</span>
+          <span class="concept-badge cb-ai">Instinct Learning</span>
+          <span class="concept-badge cb-ai">Convergence Detection</span>
+          <span class="concept-badge cb-ai">RLM (arXiv:2512.24601)</span>
         </div>
       </div>
 
@@ -2450,6 +2458,7 @@
           <span class="concept-badge cb-ops">SSE</span>
           <span class="concept-badge cb-ops">A2A Bus</span>
           <span class="concept-badge cb-ops">MCP</span>
+          <span class="concept-badge cb-ops">Provider Fallback Chain</span>
         </div>
       </div>
 
@@ -2464,6 +2473,7 @@
           <span class="concept-badge cb-data">TTL Cache</span>
           <span class="concept-badge cb-data">Multi-Tenant</span>
           <span class="concept-badge cb-data">Migrations</span>
+          <span class="concept-badge cb-data">Async Job Queue</span>
         </div>
       </div>
 
@@ -2496,6 +2506,25 @@
       </div>
 
       <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Agent Protocols</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-agent">A2A Negotiation</span>
+          <span class="concept-badge cb-agent">Hierarchical Veto</span>
+          <span class="concept-badge cb-agent">PM Checkpoint</span>
+          <span class="concept-badge cb-agent">Phase Queue</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Observability</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-obs">Semantic Error Clustering</span>
+          <span class="concept-badge cb-obs">LLM Cost Tracing</span>
+          <span class="concept-badge cb-obs">Endurance Watchdog</span>
+        </div>
+      </div>
+
+      <div>
         <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Formal Methods</div>
         <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
           <span class="concept-badge cb-formal">TLA+</span>
@@ -2507,7 +2536,7 @@
 
     </div>
     <div style="margin-top:0.75rem;text-align:right;font-size:0.6rem;color:var(--text-secondary)">
-      <span id="concept-count">110+</span> concepts · 1091 skills · 26 patterns · 218 agents · 375 files · 148K LOC
+      <span id="concept-count">125+</span> concepts · 13 categories · 1091 skills · 26 patterns · 218 agents
     </div>
   </div>
 
