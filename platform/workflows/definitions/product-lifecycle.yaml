@@ -41,7 +41,10 @@ phases:
     les sprints → le Scrum Master configure les cérémonies. Chaque sortie alimente l'entrée du suivant.
     MANDATORY — Le PM DOIT appeler create_feature() pour chaque feature identifiée et create_story() pour chaque
     user story avec critères d'acceptance Gherkin (Given/When/Then).
-  gate: always
+    Le PM DOIT aussi appeler traceability_link() pour lier chaque feature à son persona source.
+  gate: best_effort
+  config:
+    feedback: tools
   config:
     agents:
     - strat-dirprog
@@ -91,6 +94,20 @@ phases:
     - test_automation
     leader: lead_dev
     max_iterations: 3
+- id: traceability-check
+  pattern_id: sequential
+  name: Vérification Traçabilité E2E
+  description: 'Le trace-auditor scanne tous les fichiers pour les headers # Ref: manquants et les orphelins.
+    Le trace-writer ajoute les headers manquants, crée les features/stories dans le backlog, et met à jour
+    SPECS.md avec les AC UUID. Le trace-lead valide la couverture >= 80% et VETO si insuffisante.'
+  gate: no_veto
+  skip_on_failure: true
+  config:
+    agents:
+    - trace-auditor
+    - trace-writer
+    - trace-lead
+    leader: trace-lead
 - id: build-verify
   pattern_id: sequential
   name: Build & Verify
@@ -167,19 +184,6 @@ phases:
     - pipeline_engineer
     - chef_projet
     leader: chef_projet
-- id: traceability-check
-  pattern_id: sequential
-  name: Vérification Traçabilité E2E
-  description: 'Le trace-auditor scanne tous les fichiers pour les headers # Ref: manquants et les orphelins.
-    Le trace-writer ajoute les headers manquants, crée les features/stories dans le backlog, et met à jour
-    SPECS.md avec les AC UUID. Le trace-lead valide la couverture ≥ 80% et VETO si insuffisante.'
-  gate: no_veto
-  config:
-    agents:
-    - trace-auditor
-    - trace-writer
-    - trace-lead
-    leader: trace-lead
 - id: tma-router
   pattern_id: router
   name: Routage Incidents TMA

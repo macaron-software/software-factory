@@ -133,6 +133,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_component_gallery_get",
         "lrm_component_gallery_search",
         "lrm_component_gallery_ds",
+        "traceability_link",
+        "traceability_coverage",
     ],
     "architecture": [
         "code_read",
@@ -212,6 +214,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "memory_store",
         "deep_search",
         "get_project_context",
+        # Traceability (devs must link code to features)
+        "traceability_link",
     ],
     "qa": [
         "code_read",

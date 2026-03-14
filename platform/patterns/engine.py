@@ -429,21 +429,52 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     except Exception:
         return
 
-    # Extract epics — two formats:
+    # Extract epics — multiple formats:
     # Format 1: | **E1** | Title | Priority |
     # Format 2: | **E1** Title | Desc | Status |  (title in same cell as Exx)
+    # Format 3: **Feature 1: Title** (numbered list with bold)
+    # Format 4: - E1 — Title (priority) (dashed list)
+    # Format 5: 1. **Title** — Description (numbered bold)
     epic_pattern = re.compile(
-        r"\|\s*\*\*(?:E\d+|Epic\s*\d*)\*\*\s*(?:\|?\s*)(.+?)\s*\|\s*(.+?)\s*\|",
-        re.IGNORECASE,
+        r"\|\s*\*\*(?:E\d+|Epic\s*\d*|Feature\s*\d*|F\d+)\*\*\s*(?:[:\|—–-]\s*)(.+?)\s*\|\s*(.+?)\s*\|"
+        r"|"
+        r"\*\*(?:E\d+|Feature\s*\d+|F\d+)\s*[:\|—–-]\s*(.+?)\*\*"
+        r"|"
+        r"(?:^|\n)\s*[-•]\s*(?:E\d+|F\d+)\s*[—–:-]\s*(.+?)(?:\s*\((\w+)\))?\s*$",
+        re.IGNORECASE | re.MULTILINE,
     )
-    # Extract stories: | US-E1-01 : Title | Estimation | Dependency |
+    # Extract stories — multiple formats:
+    # Format 1: | US-E1-01 : Title | Estimation | Dependency |
+    # Format 2: - US-01: Title (3 pts)
+    # Format 3: | Story: Title | Points |
     story_pattern = re.compile(
-        r"\|\s*(US-[\w-]+)\s*[:\s]+(.+?)\s*\|\s*(\d+)\s*\|",
-        re.IGNORECASE,
+        r"\|\s*(US-[\w-]+)\s*[:\s]+(.+?)\s*\|\s*(\d+)\s*\|"
+        r"|"
+        r"(?:^|\n)\s*[-•]\s*(US-[\w-]+)\s*[:\s]+(.+?)\s*\((\d+)\s*(?:pts?|points?)?\)",
+        re.IGNORECASE | re.MULTILINE,
     )
 
-    epics_found = epic_pattern.findall(result)
-    stories_found = story_pattern.findall(result)
+    epics_found_raw = epic_pattern.findall(result)
+    stories_found_raw = story_pattern.findall(result)
+
+    # Normalize alternation groups: pick first non-empty group pair
+    epics_found = []
+    for groups in epics_found_raw:
+        # groups can be (name, extra, alt_name, list_name, list_prio)
+        if groups[0]:  # table format
+            epics_found.append((groups[0], groups[1]))
+        elif groups[2]:  # bold format
+            epics_found.append((groups[2], ""))
+        elif groups[3]:  # list format
+            epics_found.append((groups[3], groups[4] if len(groups) > 4 else ""))
+
+    stories_found = []
+    for groups in stories_found_raw:
+        # groups can be (table_id, table_title, table_pts, list_id, list_title, list_pts)
+        if groups[0]:  # table format
+            stories_found.append((groups[0], groups[1], groups[2]))
+        elif groups[3]:  # list format
+            stories_found.append((groups[3], groups[4], groups[5]))
 
     if not epics_found and not stories_found:
         return
