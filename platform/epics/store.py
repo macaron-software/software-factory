@@ -881,7 +881,7 @@ class EpicRunStore:
                     run.project_id,
                     run.workspace_path,
                     run.parent_epic_id or "",
-                    run.status.value,
+                    run.status.value if hasattr(run.status, 'value') else str(run.status),
                     run.current_phase,
                     json.dumps([p.model_dump() for p in run.phases]),
                     run.brief,
@@ -952,7 +952,7 @@ class EpicRunStore:
                    session_id=?, workspace_path=?, updated_at=?, completed_at=?,
                    llm_cost_usd=?, cancel_reason=?, started_at=COALESCE(started_at, ?) WHERE id=?""",
                 (
-                    run.status.value,
+                    run.status.value if hasattr(run.status, 'value') else str(run.status),
                     run.current_phase,
                     json.dumps([p.model_dump() for p in run.phases], default=str),
                     run.session_id or "",

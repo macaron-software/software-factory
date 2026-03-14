@@ -1128,7 +1128,7 @@ async def api_mission_resume(request: Request, epic_id: str):
         - Resumes orchestration from the target phase
     """
     from ....epics.store import get_epic_run_store, get_epic_store
-    from ....models import PhaseStatus
+    from ....models import EpicStatus, PhaseStatus
 
     body = {}
     try:
@@ -1185,7 +1185,8 @@ async def api_mission_resume(request: Request, epic_id: str):
     reset_count = 0
     for idx, p in enumerate(run.phases):
         if idx < target_idx:
-            if p.status in ("pending", "running"):
+            _st = p.status.value if hasattr(p.status, 'value') else str(p.status)
+            if _st in ("pending", "running"):
                 p.status = PhaseStatus.DONE
         elif idx >= target_idx:
             p.status = PhaseStatus.PENDING
@@ -1193,7 +1194,7 @@ async def api_mission_resume(request: Request, epic_id: str):
 
     # Update run status
     if run.status in ("completed", "failed", "paused", "gated", "escalated"):
-        run.status = "running"
+        run.status = EpicStatus.RUNNING
     run_store.update(run)
 
     # Update session checkpoint
