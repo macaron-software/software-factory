@@ -2952,4 +2952,1065 @@ Five tabs accessible at `/teams`:
 - [Metrics Guide](metrics-guide) — DORA and quality metrics
 """,
     },
+
+    # ── Traceability Space (owner RBAC) ──
+    {
+        "slug": "traceability-overview",
+        "title": "Traceability Model",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 10,
+        "parent_slug": None,
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Traceability Model
+
+## UUID Format
+All artifacts use `{prefix}-{uuid4.hex[:8]}` format:
+| Prefix | Artifact | Example |
+|--------|----------|---------|
+| `feat-` | Feature | `feat-cockpit` |
+| `us-` | User Story | `us-47d6b39b` |
+| `ac-` | Acceptance Criterion | `ac-f4fbb5f3` |
+| `pers-` | Persona | `pers-a1b2c3d4` |
+| `jour-` | User Journey | `jour-5e6f7a8b` |
+| `sprint-` | Sprint | `sprint-c9d0e1f2` |
+
+## Chain Model
+```
+Persona --> Feature (feat-*) --> User Story (us-*) --> AC (ac-*)
+                |                      |                    |
+                v                      v                    v
+            IHM/Screen             Code (# Ref:)      Tests (TU/E2E)
+```
+
+## Coverage Summary
+| Layer | Count | Status |
+|-------|-------|--------|
+| Epics | 10 | In PG |
+| Features | 44 | In PG (feat-*) |
+| User Stories | 172 | In PG (us-*) |
+| Acceptance Criteria | 154 | In PG (ac-*) |
+| IHM Annotations | 0 | Planned |
+| Code # Ref: | 14/384 (3.6%) | In progress |
+| TU linked | 0/35 | Planned |
+| E2E linked | 0/23 | Planned |
+
+## RBAC
+Traceability pages are **owner-protected** (`visibility: owner`).
+Only the page owner or admin can edit. All users can read.
+
+## Related Pages
+- [Personas](traceability-personas)
+- [Features Registry](traceability-features)
+- [User Stories](traceability-stories)
+- [Acceptance Criteria](traceability-acceptance)
+- [IHM / Screens](traceability-ihm)
+- [Code References](traceability-code-refs)
+- [Test Traceability](traceability-tests)
+""",
+    },
+    {
+        "slug": "traceability-personas",
+        "title": "Personas",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 20,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Personas
+
+| Persona | Features | Stories |
+|---------|----------|---------|
+| **Admin Plateforme** | 4 (`feat-org`, `feat-rbac`, `feat-settings`, `feat-workspaces`) | 16 |
+| **Architecte** | 2 (`feat-mcps`, `feat-patterns`) | 6 |
+| **Business Analyst** | 1 (`feat-metier`) | 3 |
+| **CTO** | 1 (`feat-cto`) | 3 |
+| **DSI** | 1 (`feat-dsi`) | 3 |
+| **Data Scientist** | 2 (`feat-evals`, `feat-metrics`) | 9 |
+| **Designer** | 1 (`feat-design-system`) | 3 |
+| **Développeur** | 9 (`feat-agent-chat`, `feat-agents-create`, `feat-agents-list`, `feat-marketplace`, `feat-tool-builder`, `feat-toolbox`, `feat-jarvis`, `feat-mission-detail`, `feat-mission-replay`) | 31 |
+| **Marketing Manager** | 1 (`feat-mkt-ideation`) | 3 |
+| **Nouveau Utilisateur** | 1 (`feat-onboarding`) | 3 |
+| **Ops Engineer** | 2 (`feat-monitoring`, `feat-ops`) | 7 |
+| **Product Manager** | 4 (`feat-portfolio`, `feat-projects`, `feat-ideation`, `feat-product-line`) | 14 |
+| **Product Owner** | 2 (`feat-annotate`, `feat-backlog`) | 10 |
+| **Release Train Engineer** | 2 (`feat-pi-board`, `feat-art`) | 7 |
+| **Scrum Master** | 2 (`feat-ceremonies`, `feat-live`) | 6 |
+| **Tech Lead** | 8 (`feat-skills`, `feat-workflows`, `feat-mercato`, `feat-memory`, `feat-wiki`, `feat-quality`, `feat-cockpit`, `feat-mission-control`) | 30 |
+
+**Total**: 16 personas across 44 features""",
+    },
+    {
+        "slug": "traceability-features",
+        "title": "Features Registry",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 30,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Features Registry
+
+
+## e03ab032 (`e03ab032`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-35792a` | Core Gameplay MVP |  | 2 | 0 | backlog |
+
+## Configuration & Administration (`epic-admin`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-org` | Organisation & Équipes | Admin Plateforme | 4 | 4 | backlog |
+| `feat-rbac` | RBAC — Gestion des Rôles | Admin Plateforme | 4 | 4 | backlog |
+| `feat-settings` | Paramètres Plateforme | Admin Plateforme | 4 | 4 | backlog |
+| `feat-workspaces` | Workspaces | Admin Plateforme | 4 | 4 | backlog |
+
+## Agent Management (`epic-agents`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-agent-chat` | Chat Agent | Développeur | 3 | 3 | backlog |
+| `feat-agents-create` | Création d'Agent | Développeur | 4 | 4 | backlog |
+| `feat-agents-list` | Catalogue d'Agents | Développeur | 3 | 3 | backlog |
+| `feat-marketplace` | Marketplace d'Agents | Développeur | 4 | 4 | backlog |
+| `feat-skills` | Skills & Compétences | Tech Lead | 3 | 3 | backlog |
+
+## Annotation & Traceability (`epic-annotation`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-annotate` | Annotation Studio | Product Owner | 5 | 5 | backlog |
+
+## Automation & Workflows (`epic-automation`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-mcps` | MCP Servers | Architecte | 3 | 3 | backlog |
+| `feat-patterns` | Patterns d'Orchestration | Architecte | 3 | 3 | backlog |
+| `feat-tool-builder` | Tool Builder | Développeur | 4 | 4 | backlog |
+| `feat-workflows` | Workflows | Tech Lead | 5 | 5 | backlog |
+
+## SAFe Backlog & Planning (`epic-backlog`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-backlog` | Product Backlog | Product Owner | 5 | 5 | backlog |
+| `feat-ceremonies` | Cérémonies SAFe | Scrum Master | 3 | 3 | backlog |
+| `feat-pi-board` | PI Board — Program Increment | Release Train Engineer | 4 | 4 | backlog |
+| `feat-portfolio` | Portfolio | Product Manager | 3 | 3 | backlog |
+| `feat-projects` | Projets | Product Manager | 4 | 4 | backlog |
+
+## Ideation & Innovation (`epic-ideation`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-design-system` | Design System | Designer | 3 | 3 | backlog |
+| `feat-ideation` | Idéation Projet | Product Manager | 4 | 4 | backlog |
+| `feat-metier` | Domaine Métier | Business Analyst | 3 | 3 | backlog |
+| `feat-mkt-ideation` | Idéation Marketing | Marketing Manager | 3 | 3 | backlog |
+| `feat-product-line` | Product Line | Product Manager | 3 | 3 | backlog |
+
+## Integrations & Partners (`epic-integrations`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-cto` | Vue CTO | CTO | 3 | 3 | backlog |
+| `feat-dsi` | Vue DSI | DSI | 3 | 3 | backlog |
+| `feat-mercato` | Mercato Agents | Tech Lead | 3 | 3 | backlog |
+| `feat-onboarding` | Onboarding | Nouveau Utilisateur | 3 | 3 | backlog |
+| `feat-toolbox` | Toolbox | Développeur | 2 | 2 | backlog |
+
+## Knowledge & Memory (`epic-knowledge`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-evals` | Évaluations LLM | Data Scientist | 4 | 4 | backlog |
+| `feat-jarvis` | Jarvis — Assistant IA | Développeur | 3 | 3 | backlog |
+| `feat-memory` | Memory Agent | Tech Lead | 4 | 4 | backlog |
+| `feat-wiki` | Wiki SF | Tech Lead | 3 | 3 | backlog |
+
+## Observability & Ops (`epic-observability`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-metrics` | Métriques & Analytics | Data Scientist | 5 | 5 | backlog |
+| `feat-monitoring` | Monitoring Temps Réel | Ops Engineer | 3 | 3 | backlog |
+| `feat-ops` | Opérations Plateforme | Ops Engineer | 4 | 4 | backlog |
+| `feat-quality` | Qualité Code | Tech Lead | 3 | 3 | backlog |
+
+## Orchestration & Missions (`epic-orchestration`)
+
+| ID | Name | Persona | Stories | AC | Status |
+|-----|------|---------|---------|-----|--------|
+| `feat-art` | ART — Agile Release Train | Release Train Engineer | 3 | 3 | backlog |
+| `feat-cockpit` | Dashboard / Cockpit | Tech Lead | 4 | 4 | backlog |
+| `feat-live` | Sessions Live | Scrum Master | 3 | 3 | backlog |
+| `feat-mission-control` | Mission Control | Tech Lead | 5 | 5 | backlog |
+| `feat-mission-detail` | Détail Mission | Développeur | 4 | 4 | backlog |
+| `feat-mission-replay` | Sessions & Replay | Développeur | 4 | 4 | backlog |
+
+**Total**: 44 features across 11 epics""",
+    },
+    {
+        "slug": "traceability-stories",
+        "title": "User Stories",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 40,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# User Stories
+
+**Total**: 172 stories with `us-{uuid8}` IDs
+
+
+### Core Gameplay MVP (`feat-35792a`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-d049b5` | US-E1: à US-E2 + US-U2 (Conditions fin) |
+| `us-f7f257` | US-E1: | **Win condition** | Mario atteint DK (haut) = Victory |
+
+### Organisation & Équipes (`feat-org`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-0900e9a6` | Gérer les groupes utilisateurs |
+| `us-dd995131` | Assigner des agents et utilisateurs à une équipe |
+| `us-e592e464` | Créer une nouvelle équipe dans l'organisation |
+| `us-f2bfa4a7` | Visualiser l'organigramme de l'organisation |
+
+### RBAC — Gestion des Rôles (`feat-rbac`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-15f0225e` | Créer un rôle personnalisé avec des permissions spécifiques |
+| `us-27c29a39` | Assigner un rôle à un utilisateur |
+| `us-44321768` | Consulter le journal d'audit des actions utilisateurs |
+| `us-447c47ed` | Gérer les accès par projet |
+
+### Paramètres Plateforme (`feat-settings`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-0d38f9ae` | Gérer les clés API des intégrations tierces |
+| `us-8d3564da` | Configurer les limites de rate limiting |
+| `us-9f042499` | Configurer le fournisseur LLM par défaut |
+| `us-d2316b10` | Activer ou désactiver les notifications Slack/Email |
+
+### Workspaces (`feat-workspaces`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-67574311` | Configurer les ressources allouées à un workspace |
+| `us-aa162b7e` | Archiver un workspace inactif |
+| `us-f492769d` | Inviter des membres dans un workspace |
+| `us-ff580d89` | Créer un nouveau workspace pour une équipe |
+
+### Chat Agent (`feat-agent-chat`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-4147308b` | Envoyer un message et recevoir une réponse en streaming |
+| `us-917150b3` | Démarrer une conversation avec un agent depuis son profil |
+| `us-ab6a4187` | Consulter l'historique de conversation avec un agent |
+
+### Création d'Agent (`feat-agents-create`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-28e84baa` | Définir les instructions système d'un agent |
+| `us-b23ce69a` | Créer un nouvel agent avec son persona et ses skills |
+| `us-d03a1814` | Tester un agent depuis l'interface d'édition |
+| `us-d925f84a` | Configurer le modèle LLM d'un agent |
+
+### Catalogue d'Agents (`feat-agents-list`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-5e1e5369` | Filtrer les agents par rôle, compétence ou statut |
+| `us-a6ee2bd8` | Accéder au profil d'un agent depuis le catalogue |
+| `us-d7bb4fd7` | Parcourir la liste des agents disponibles |
+
+### Marketplace d'Agents (`feat-marketplace`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-2ac311d6` | Publier un agent dans la marketplace |
+| `us-73fb26af` | Évaluer et noter un agent de la marketplace |
+| `us-a37f7139` | Importer un agent de la marketplace dans son catalogue |
+| `us-ca4a9997` | Parcourir la marketplace d'agents communautaires |
+
+### Skills & Compétences (`feat-skills`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-88dad1d2` | Versionner et rollback un skill |
+| `us-91b93cb5` | Assigner un skill à un ou plusieurs agents |
+| `us-e444416d` | Créer un nouveau skill agent (prompt, tool, workflow) |
+
+### Annotation Studio (`feat-annotate`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-307ac0dd` | Créer un ticket TMA depuis une annotation |
+| `us-78a52813` | Consulter toutes les annotations d'un projet |
+| `us-94809bbf` | Filtrer les annotations par type (bug, feature, question) |
+| `us-aa93df2b` | Annoter un élément UI en cliquant dessus |
+| `us-c76aa9ea` | Exporter les annotations en markdown |
+
+### MCP Servers (`feat-mcps`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-084bc4f2` | Lister les serveurs MCP disponibles |
+| `us-b2b1d5c5` | Configurer les paramètres d'un serveur MCP |
+| `us-c8f3de69` | Activer ou désactiver un serveur MCP |
+
+### Patterns d'Orchestration (`feat-patterns`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-22d0f438` | Parcourir la bibliothèque des patterns d'orchestration |
+| `us-7bcd3de8` | Instancier un pattern dans un projet |
+| `us-98fe50be` | Créer un nouveau pattern personnalisé |
+
+### Tool Builder (`feat-tool-builder`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-409bccb0` | Documenter un outil avec sa spec OpenAPI |
+| `us-633d0b74` | Versionner et déployer un outil |
+| `us-d0810d81` | Créer un nouvel outil pour agent (fonction Python/API REST) |
+| `us-e5ea9a32` | Tester un outil depuis l'interface builder |
+
+### Workflows (`feat-workflows`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-06b42bc5` | Déclencher un workflow manuellement |
+| `us-06d0e8ec` | Voir l'évolution des workflows dans le temps |
+| `us-1328e134` | Créer un nouveau workflow d'automatisation |
+| `us-3561ddab` | Consulter l'historique des exécutions d'un workflow |
+| `us-f69eaa7c` | Visualiser la liste des workflows actifs |
+
+### Product Backlog (`feat-backlog`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-72e2d803` | Lier une story à une feature SAFe |
+| `us-af7da823` | Affecter un story points à une user story |
+| `us-cd4bc004` | Créer une nouvelle user story depuis le backlog |
+| `us-e9e21236` | Prioriser les items du backlog par drag-and-drop |
+| `us-f76fbac3` | Filtrer le backlog par epic, feature ou sprint |
+
+### Cérémonies SAFe (`feat-ceremonies`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-33f70f3b` | Consulter l'agenda des cérémonies de l'ART |
+| `us-922e5132` | Planifier une nouvelle cérémonie (sprint review, retro) |
+| `us-b64042dd` | Enregistrer les décisions d'une cérémonie |
+
+### PI Board — Program Increment (`feat-pi-board`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-6a5d1ae0` | Visualiser les objectifs du PI en cours |
+| `us-aac74b8e` | Identifier les dépendances inter-équipes sur le PI board |
+| `us-bca96c00` | Marquer un risque ou un impediment sur le PI board |
+| `us-e674f1fc` | Suivre l'avancement des features du PI |
+
+### Portfolio (`feat-portfolio`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-2aba9879` | Visualiser les epics du portfolio avec leur statut et budget |
+| `us-b4ce4b0b` | Suivre l'avancement des programmes dans le portfolio |
+| `us-b7da91c2` | Créer et prioriser un nouvel epic depuis le portfolio |
+
+### Projets (`feat-projects`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-17ea58ca` | Archiver un projet terminé |
+| `us-287a4e7a` | Accéder rapidement à un projet depuis la liste |
+| `us-6fa36606` | Assigner des membres à un projet |
+| `us-748a03d5` | Créer un nouveau projet sur la plateforme |
+
+### Design System (`feat-design-system`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-719e11ad` | Télécharger les assets du design system |
+| `us-bbb46fed` | Consulter les tokens de couleur et typographie |
+| `us-d9674c23` | Parcourir la bibliothèque de composants du design system |
+
+### Idéation Projet (`feat-ideation`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-42644521` | Générer automatiquement un backlog initial depuis une idée |
+| `us-60c7147c` | Consulter l'historique des idéations précédentes |
+| `us-c0724a89` | Décrire une idée de projet et obtenir un brief structuré |
+| `us-c1c33e1b` | Exporter une idéation en PDF |
+
+### Domaine Métier (`feat-metier`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-016d8073` | Importer un référentiel métier existant |
+| `us-d7b7f88b` | Définir les règles métier d'un domaine |
+| `us-de14a443` | Cartographier un processus métier avec les agents |
+
+### Idéation Marketing (`feat-mkt-ideation`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-109d6ee2` | Générer des personas utilisateurs depuis un brief produit |
+| `us-7d702e6d` | Créer un user journey map assisté par IA |
+| `us-be24050f` | Générer des idées de campagnes marketing |
+
+### Product Line (`feat-product-line`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-62a2efb6` | Créer une nouvelle ligne de produit |
+| `us-8061301a` | Visualiser la roadmap produit |
+| `us-a2ee4899` | Définir les variantes d'un produit |
+
+### Vue CTO (`feat-cto`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-707ca4f0` | Consulter le tableau de bord technique du CTO |
+| `us-8695ac07` | Suivre la vélocité d'innovation de l'équipe |
+| `us-ae034dbd` | Analyser la dette technique globale |
+
+### Vue DSI (`feat-dsi`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-3ab2cee5` | Suivre les coûts d'infrastructure et LLM |
+| `us-49b87adf` | Vérifier la conformité sécurité de la plateforme |
+| `us-58fb2f82` | Consulter le tableau de bord de gouvernance DSI |
+
+### Mercato Agents (`feat-mercato`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-04bb0e38` | Proposer un agent sur le mercato |
+| `us-5de43b7b` | Trouver et acquérir un agent depuis le mercato |
+| `us-74a6c645` | Négocier les conditions d'utilisation d'un agent |
+
+### Onboarding (`feat-onboarding`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-136afcc7` | Créer son premier projet lors de l'onboarding |
+| `us-1941c362` | Suivre le tutoriel d'onboarding pas à pas |
+| `us-20e4e89b` | Configurer son profil lors de l'onboarding |
+
+### Toolbox (`feat-toolbox`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-7921d0b0` | Partager un outil avec l'équipe |
+| `us-d7f6ea0c` | Accéder aux utilitaires partagés de la plateforme |
+
+### Évaluations LLM (`feat-evals`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-2b2263cc` | Consulter l'historique des évaluations |
+| `us-71090532` | Exporter les résultats d'évaluation en CSV |
+| `us-7409e5ea` | Comparer les scores de deux modèles LLM |
+| `us-e03946af` | Lancer un benchmark d'évaluation sur un agent |
+
+### Jarvis — Assistant IA (`feat-jarvis`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-847b14fc` | Poser une question à Jarvis sur la plateforme |
+| `us-c9f7c6af` | Obtenir des suggestions contextuelles depuis n'importe quelle page |
+| `us-e5f1da02` | Générer du code avec l'assistant IA |
+
+### Memory Agent (`feat-memory`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-31017884` | Filtrer la mémoire par scope (global, projet, session) |
+| `us-4bf433e0` | Ajouter manuellement une entrée en mémoire |
+| `us-8910a4b6` | Consulter les entrées mémoire d'un agent |
+| `us-efb253fd` | Effacer ou archiver des entrées mémoire |
+
+### Wiki SF (`feat-wiki`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-b32f6354` | Rechercher dans le wiki par mot-clé |
+| `us-dbc20525` | Créer ou éditer une page wiki |
+| `us-ed1003a8` | Consulter la documentation de la plateforme depuis le wiki |
+
+### Métriques & Analytics (`feat-metrics`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-046781a4` | Consulter les métriques DORA (lead time, MTTR, deployment frequency) |
+| `us-389091a6` | Visualiser les coûts LLM par agent et par projet |
+| `us-91cbc95c` | Analyser les performances du pipeline CI/CD |
+| `us-b5ddeb24` | Exporter les métriques en CSV ou JSON |
+| `us-cb58a4d5` | Suivre la qualité du code sur le dashboard qualité |
+
+### Monitoring Temps Réel (`feat-monitoring`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-4546292c` | Voir le statut de tous les agents en temps réel |
+| `us-64d85c8b` | Consulter les files d'attente et la charge du système |
+| `us-b244b26c` | Recevoir des alertes en cas d'erreur critique |
+
+### Opérations Plateforme (`feat-ops`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-561129fc` | Consulter les résultats des tests d'endurance |
+| `us-ad3e8b9a` | Déclencher un auto-heal sur un service dégradé |
+| `us-c41f43db` | Lancer un test de chaos engineering |
+| `us-e0672015` | Effectuer un backup de la base de données |
+
+### Qualité Code (`feat-quality`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-7a642ea5` | Suivre l'évolution de la couverture de tests |
+| `us-94e176eb` | Identifier les fichiers avec le plus de dette technique |
+| `us-f409f61c` | Consulter le score de qualité global du codebase |
+
+### ART — Agile Release Train (`feat-art`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-417125f6` | Assigner des rôles et capacités aux équipes |
+| `us-5015432f` | Suivre la vélocité de l'ART par PI |
+| `us-50973372` | Visualiser la composition de l'ART (équipes, agents) |
+
+### Dashboard / Cockpit (`feat-cockpit`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-47d6b39b` | Voir les missions actives en temps réel sur le cockpit |
+| `us-504dc0af` | Naviguer vers une mission depuis le cockpit en un clic |
+| `us-7d44de4d` | Accéder aux métriques clés de la plateforme depuis la page d'accueil |
+| `us-93ac9fe5` | Consulter le nombre d'agents actifs et les erreurs récentes |
+
+### Sessions Live (`feat-live`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-3e8ad464` | Envoyer un message dans une session live |
+| `us-6e6b0975` | Rejoindre une cérémonie live (PI Planning, sprint review) |
+| `us-e80561b1` | Voir la conversation en cours d'un agent en temps réel |
+
+### Mission Control (`feat-mission-control`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-00c7e56b` | Annuler ou interrompre une mission depuis l'interface |
+| `us-1d2a7899` | Filtrer les missions par statut, projet ou agent |
+| `us-660f2bc9` | Consulter les détails d'une mission (logs, artefacts, durée) |
+| `us-69704608` | Lancer une mission avec un prompt libre |
+| `us-d49f05a0` | Surveiller l'avancement d'une mission en cours |
+
+### Détail Mission (`feat-mission-detail`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-654a711f` | Consulter les artefacts produits par une mission |
+| `us-65b54e84` | Voir le graphe d'exécution d'une mission |
+| `us-70f858f5` | Contrôler manuellement les étapes d'une mission |
+| `us-8c707eed` | Lier une mission à un ticket du backlog |
+
+### Sessions & Replay (`feat-mission-replay`)
+
+| Story ID | Title |
+|----------|-------|
+| `us-200d742a` | Exporter les logs d'une session en markdown |
+| `us-2dc56c62` | Rejouer une session agent précédente étape par étape |
+| `us-48ce4600` | Créer une nouvelle session de travail collaboratif |
+| `us-cfae88ce` | Consulter l'historique complet des messages d'une session |""",
+    },
+    {
+        "slug": "traceability-acceptance",
+        "title": "Acceptance Criteria",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 50,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Acceptance Criteria
+
+**Total**: 154 AC with `ac-{uuid8}` IDs in Gherkin GIVEN/WHEN/THEN
+
+
+### Organisation & Équipes (`feat-org`)
+
+**`ac-0aac3e2e`** (pending)
+- **GIVEN** un utilisateur sur la page Organisation & Équipes
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Gérer les groupes utilisateurs
+
+**`ac-26274837`** (pending)
+- **GIVEN** un utilisateur sur la page Organisation & Équipes
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Assigner des agents et utilisateurs à une équipe
+
+**`ac-78578588`** (pending)
+- **GIVEN** un utilisateur sur la page Organisation & Équipes
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer une nouvelle équipe dans l'organisation
+
+**`ac-8d9df802`** (pending)
+- **GIVEN** un utilisateur sur la page Organisation & Équipes
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Visualiser l'organigramme de l'organisation
+
+
+### RBAC — Gestion des Rôles (`feat-rbac`)
+
+**`ac-c68ca87a`** (pending)
+- **GIVEN** un utilisateur sur la page RBAC — Gestion des Rôles
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un rôle personnalisé avec des permissions spécifiques
+
+**`ac-2296627b`** (pending)
+- **GIVEN** un utilisateur sur la page RBAC — Gestion des Rôles
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Assigner un rôle à un utilisateur
+
+**`ac-5677fbde`** (pending)
+- **GIVEN** un utilisateur authentifie sur la page RBAC — Gestion des Rôles
+- **WHEN** la page se charge
+- **THEN** Consulter le journal d'audit des actions utilisateurs
+
+**`ac-cea00bd2`** (pending)
+- **GIVEN** un utilisateur sur la page RBAC — Gestion des Rôles
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Gérer les accès par projet
+
+
+### Paramètres Plateforme (`feat-settings`)
+
+**`ac-6cb3dfdf`** (pending)
+- **GIVEN** un utilisateur sur la page Paramètres Plateforme
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Gérer les clés API des intégrations tierces
+
+**`ac-168e8b56`** (pending)
+- **GIVEN** un administrateur sur la page Paramètres Plateforme
+- **WHEN** l'utilisateur modifie la configuration
+- **THEN** Configurer les limites de rate limiting
+
+**`ac-b803f4ca`** (pending)
+- **GIVEN** un administrateur sur la page Paramètres Plateforme
+- **WHEN** l'utilisateur modifie la configuration
+- **THEN** Configurer le fournisseur LLM par défaut
+
+**`ac-6aaca744`** (pending)
+- **GIVEN** un utilisateur sur la page Paramètres Plateforme
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Activer ou désactiver les notifications Slack/Email
+
+
+### Workspaces (`feat-workspaces`)
+
+**`ac-8b305d4a`** (pending)
+- **GIVEN** un administrateur sur la page Workspaces
+- **WHEN** l'utilisateur modifie la configuration
+- **THEN** Configurer les ressources allouées à un workspace
+
+**`ac-520a8c74`** (pending)
+- **GIVEN** un utilisateur sur la page Workspaces
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Archiver un workspace inactif
+
+**`ac-c2c73418`** (pending)
+- **GIVEN** un utilisateur sur la page Workspaces
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Inviter des membres dans un workspace
+
+**`ac-7f1a2d66`** (pending)
+- **GIVEN** un utilisateur sur la page Workspaces
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouveau workspace pour une équipe
+
+
+### Chat Agent (`feat-agent-chat`)
+
+**`ac-d44998f8`** (pending)
+- **GIVEN** un utilisateur sur la page Chat Agent
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Envoyer un message et recevoir une réponse en streaming
+
+**`ac-a937583a`** (pending)
+- **GIVEN** un utilisateur sur la page Chat Agent
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Démarrer une conversation avec un agent depuis son profil
+
+**`ac-b308f23c`** (pending)
+- **GIVEN** un utilisateur authentifie sur la page Chat Agent
+- **WHEN** la page se charge
+- **THEN** Consulter l'historique de conversation avec un agent
+
+
+### Création d'Agent (`feat-agents-create`)
+
+**`ac-4ac92ddb`** (pending)
+- **GIVEN** un utilisateur sur la page Création d'Agent
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Définir les instructions système d'un agent
+
+**`ac-d473c3c7`** (pending)
+- **GIVEN** un utilisateur sur la page Création d'Agent
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouvel agent avec son persona et ses skills
+
+**`ac-8b6eff57`** (pending)
+- **GIVEN** un utilisateur sur la page Création d'Agent
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Tester un agent depuis l'interface d'édition
+
+**`ac-2ab2f23c`** (pending)
+- **GIVEN** un administrateur sur la page Création d'Agent
+- **WHEN** l'utilisateur modifie la configuration
+- **THEN** Configurer le modèle LLM d'un agent
+
+
+### Catalogue d'Agents (`feat-agents-list`)
+
+**`ac-b61dafd9`** (pending)
+- **GIVEN** une liste affichee sur la page Catalogue d'Agents
+- **WHEN** l'utilisateur applique un filtre ou une recherche
+- **THEN** Filtrer les agents par rôle, compétence ou statut
+
+**`ac-93e4ee98`** (pending)
+- **GIVEN** un utilisateur sur le cockpit ou la navigation
+- **WHEN** l'utilisateur clique sur le lien
+- **THEN** Accéder au profil d'un agent depuis le catalogue
+
+**`ac-23f2a94d`** (pending)
+- **GIVEN** un utilisateur sur la page Catalogue d'Agents
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Parcourir la liste des agents disponibles
+
+
+### Marketplace d'Agents (`feat-marketplace`)
+
+**`ac-2f4e1d1a`** (pending)
+- **GIVEN** un utilisateur sur la page Marketplace d'Agents
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Publier un agent dans la marketplace
+
+**`ac-e74da44f`** (pending)
+- **GIVEN** un utilisateur sur la page Marketplace d'Agents
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Évaluer et noter un agent de la marketplace
+
+**`ac-1f18b61f`** (pending)
+- **GIVEN** un utilisateur sur la page Marketplace d'Agents
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Importer un agent de la marketplace dans son catalogue
+
+**`ac-2e793898`** (pending)
+- **GIVEN** un utilisateur sur la page Marketplace d'Agents
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Parcourir la marketplace d'agents communautaires
+
+
+### Skills & Compétences (`feat-skills`)
+
+**`ac-9670e7ba`** (pending)
+- **GIVEN** un utilisateur sur la page Skills & Compétences
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Versionner et rollback un skill
+
+**`ac-ff90fae5`** (pending)
+- **GIVEN** un utilisateur sur la page Skills & Compétences
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Assigner un skill à un ou plusieurs agents
+
+**`ac-99eae97f`** (pending)
+- **GIVEN** un utilisateur sur la page Skills & Compétences
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouveau skill agent (prompt, tool, workflow)
+
+
+### Annotation Studio (`feat-annotate`)
+
+**`ac-23458abc`** (pending)
+- **GIVEN** un utilisateur sur la page Annotation Studio
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un ticket TMA depuis une annotation
+
+**`ac-49186240`** (pending)
+- **GIVEN** un utilisateur authentifie sur la page Annotation Studio
+- **WHEN** la page se charge
+- **THEN** Consulter toutes les annotations d'un projet
+
+**`ac-41be2fb1`** (pending)
+- **GIVEN** une liste affichee sur la page Annotation Studio
+- **WHEN** l'utilisateur applique un filtre ou une recherche
+- **THEN** Filtrer les annotations par type (bug, feature, question)
+
+**`ac-2e371fb2`** (pending)
+- **GIVEN** un utilisateur sur la page Annotation Studio
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Annoter un élément UI en cliquant dessus
+
+**`ac-a7e384ff`** (pending)
+- **GIVEN** des donnees disponibles sur la page Annotation Studio
+- **WHEN** l'utilisateur clique sur exporter
+- **THEN** Exporter les annotations en markdown
+
+
+### MCP Servers (`feat-mcps`)
+
+**`ac-f9bf5498`** (pending)
+- **GIVEN** un utilisateur sur la page MCP Servers
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Lister les serveurs MCP disponibles
+
+**`ac-2a84f361`** (pending)
+- **GIVEN** un administrateur sur la page MCP Servers
+- **WHEN** l'utilisateur modifie la configuration
+- **THEN** Configurer les paramètres d'un serveur MCP
+
+**`ac-d9ecde72`** (pending)
+- **GIVEN** un utilisateur sur la page MCP Servers
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Activer ou désactiver un serveur MCP
+
+
+### Patterns d'Orchestration (`feat-patterns`)
+
+**`ac-daba7df2`** (pending)
+- **GIVEN** un utilisateur sur la page Patterns d'Orchestration
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Parcourir la bibliothèque des patterns d'orchestration
+
+**`ac-a9b1c393`** (pending)
+- **GIVEN** un utilisateur sur la page Patterns d'Orchestration
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Instancier un pattern dans un projet
+
+**`ac-e16d337b`** (pending)
+- **GIVEN** un utilisateur sur la page Patterns d'Orchestration
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouveau pattern personnalisé
+
+
+### Tool Builder (`feat-tool-builder`)
+
+**`ac-765fe0b6`** (pending)
+- **GIVEN** un utilisateur sur la page Tool Builder
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Documenter un outil avec sa spec OpenAPI
+
+**`ac-1cace2f5`** (pending)
+- **GIVEN** un utilisateur sur la page Tool Builder
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Versionner et déployer un outil
+
+**`ac-ba0c0700`** (pending)
+- **GIVEN** un utilisateur sur la page Tool Builder
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouvel outil pour agent (fonction Python/API REST)
+
+**`ac-0fcb5bb5`** (pending)
+- **GIVEN** un utilisateur sur la page Tool Builder
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Tester un outil depuis l'interface builder
+
+
+### Workflows (`feat-workflows`)
+
+**`ac-41b33fbc`** (pending)
+- **GIVEN** un utilisateur sur la page Workflows
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Déclencher un workflow manuellement
+
+**`ac-b9cd214a`** (pending)
+- **GIVEN** un utilisateur authentifie sur la page Workflows
+- **WHEN** la page se charge
+- **THEN** Voir l'évolution des workflows dans le temps
+
+**`ac-0b7cfd5c`** (pending)
+- **GIVEN** un utilisateur sur la page Workflows
+- **WHEN** l'utilisateur clique sur le bouton d'action
+- **THEN** Créer un nouveau workflow d'automatisation
+
+**`ac-de89ee71`** (pending)
+- **GIVEN** un utilisateur authentifie sur la page Workflows
+- **WHEN** la page se charge
+- **THEN** Consulter l'historique des exécutions d'un workflow
+
+**`ac-2b471c67`** (pending)
+- **GIVEN** un utilisateur sur la page Workflows
+- **WHEN** l'utilisateur interagit avec l'interface
+- **THEN** Visualiser la liste des workflows actifs
+
+
+*Showing first 15 features. Full data via `/projects/sf-platform/product` traceability tab.*""",
+    },
+    {
+        "slug": "traceability-ihm",
+        "title": "IHM / Screens",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 60,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# IHM / Screen Annotations
+
+## Status: Planned
+
+Screen-to-feature mapping is the next traceability layer.
+
+### Target Format
+```html
+<!-- Ref: feat-cockpit -->
+<div class="cockpit-dashboard">...</div>
+```
+
+### Screens to Annotate
+| Page | Route | Features |
+|------|-------|----------|
+| Cockpit | `/cockpit` | feat-cockpit |
+| Missions | `/missions` | feat-mission-control, feat-mission-detail |
+| Agents | `/agents` | feat-agents-list, feat-agents-create |
+| Backlog | `/backlog` | feat-backlog, feat-portfolio |
+| Workflows | `/workflows` | feat-workflows, feat-patterns |
+| Metrics | `/metrics` | feat-metrics, feat-monitoring |
+| Settings | `/settings` | feat-settings, feat-rbac |
+| Wiki | `/toolbox` > Wiki | feat-wiki |
+| Skills | `/toolbox` > Skills | feat-skills |
+| Memory | `/toolbox` > Memory | feat-memory |
+| Design System | `/design-system` | feat-design-system |
+| PI Board | `/pi-board` | feat-pi-board |
+| Art / Teams | `/art` | feat-art |
+| Evaluations | `/evals` | feat-evals |
+""",
+    },
+    {
+        "slug": "traceability-code-refs",
+        "title": "Code References",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 70,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Code Reference Headers
+
+## Format
+Every Python file in `platform/` should include a `# Ref:` header:
+```python
+# Ref: feat-cockpit, feat-live
+# Description: Real-time cockpit dashboard WebSocket handler
+```
+
+## Current Coverage
+- **14 / 384** files have `# Ref:` headers (**3.6%**)
+- Target: **80%** of platform/ files
+
+## Priority Files
+| File | Expected Ref |
+|------|-------------|
+| `web/routes/pages.py` | feat-cockpit, feat-portfolio |
+| `web/routes/missions.py` | feat-mission-control, feat-mission-detail |
+| `web/routes/projects.py` | feat-projects, feat-backlog |
+| `agents/loop.py` | feat-agents-list, feat-agent-chat |
+| `agents/executor.py` | feat-agents-list |
+| `agents/prompt_builder.py` | feat-skills |
+| `missions/product.py` | feat-backlog, feat-portfolio |
+| `llm/client.py` | feat-metrics |
+| `web/routes/wiki.py` | feat-wiki |
+| `web/routes/api/memory.py` | feat-memory |
+| `web/routes/api/rbac.py` | feat-rbac |
+| `patterns/engine.py` | feat-patterns |
+| `workflows/registry.py` | feat-workflows |
+| `tools/code_tools.py` | feat-tool-builder |
+| `mcps/manager.py` | feat-mcps |
+
+## Automation
+Scheduled scan of `platform/` reports:
+- Missing `# Ref:` headers
+- Stale references (feat-xxx not in DB)
+- Coverage % by directory
+""",
+    },
+    {
+        "slug": "traceability-tests",
+        "title": "Test Traceability",
+        "category": "Traceability",
+        "icon": "",
+        "sort_order": 80,
+        "parent_slug": "traceability-overview",
+        "owner": "system",
+        "visibility": "owner",
+        "content": """# Test Traceability
+
+## Status: In Progress
+
+### Unit Tests (TU)
+- **35 test functions** in `tests/`
+- **0** currently linked to feature IDs
+- Target: each test references `feat-xxx` or `us-xxx` in docstring
+
+#### Format
+```python
+def test_cockpit_loads():
+    # Ref: feat-cockpit, us-47d6b39b
+    ...
+```
+
+### E2E Tests (Playwright)
+- **23 spec files** in `platform/tests/e2e/`
+- **0** currently linked to feature IDs
+
+#### Format
+```typescript
+test.describe('Cockpit Dashboard', () => {
+    // Ref: feat-cockpit, feat-live
+    test('shows active missions', async ({ page }) => {
+        // Ref: us-47d6b39b, ac-f4fbb5f3
+        ...
+    });
+});
+```
+
+### Coverage Matrix (sample)
+| Feature | TU | E2E | AC pass/total |
+|---------|-----|------|--------------|
+| feat-cockpit | 0 | 1 | 0/4 |
+| feat-agents-list | 2 | 1 | 0/3 |
+| feat-workflows | 1 | 2 | 0/5 |
+| feat-metrics | 3 | 1 | 0/5 |
+| feat-settings | 0 | 1 | 0/4 |
+| feat-rbac | 1 | 1 | 0/4 |
+
+### Automation Plan
+1. Add `# Ref:` to existing test files
+2. `traceability_report.py` scans tests + code + templates
+3. Coverage matrix per feature in CI
+4. Gate: new feature must have >= 1 test
+""",
+    },
 ]

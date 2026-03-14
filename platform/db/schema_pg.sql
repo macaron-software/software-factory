@@ -939,6 +939,8 @@ CREATE TABLE IF NOT EXISTS wiki_pages (
     icon TEXT DEFAULT '',
     sort_order INTEGER DEFAULT 100,
     parent_slug TEXT,
+    owner TEXT DEFAULT NULL,
+    visibility TEXT DEFAULT 'public',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

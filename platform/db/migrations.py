@@ -694,6 +694,13 @@ def _migrate_pg(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_journey_project ON user_journeys(project_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_journey_persona ON user_journeys(persona_id)")
+
+    # --- Wiki pages: owner RBAC columns ---
+    for col, default in [("owner", "NULL"), ("visibility", "'public'")]:
+        try:
+            conn.execute(f"ALTER TABLE wiki_pages ADD COLUMN {col} TEXT DEFAULT {default}")
+        except Exception:
+            pass
     conn.commit()
 
 
