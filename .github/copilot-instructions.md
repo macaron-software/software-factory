@@ -222,7 +222,54 @@ Priority: 1.sandbox-RCE 2.security-headers 3.URL-allowlist 4.dep-CVEs 5.rate-lim
 Chain: Persona(16) -> Feature(44,feat-*) -> Story(172,us-{uuid8}) -> AC(154,ac-{uuid8})
   -> IHM(124/124) -> Code(379/382) -> TU(36/36) -> E2E(23/23) -> CRUD(645) -> RBAC(54/54)
 Annotations: .py=`# Ref: feat-*` . .html=`<!-- Ref: feat-* -->` . .ts=`// Ref: feat-*`
-Wiki: 54+ pages — 8 traceability + 7 DS/UX + 3 compliance + 1 LEAN audit
+Wiki: 63 pages — 8 traceability + 10 DS/UX + 6 compliance + 3 devops + 1 LEAN
+
+## A11Y — WCAG AA (W3C ARIA APG)
+30 patterns: accordion alert alertdialog breadcrumb button carousel checkbox combobox dialog
+  disclosure feed grid landmarks link listbox menubar menubutton meter radio slider
+  slider-multi spinbutton switch table tabs toolbar tooltip treeview treegrid splitter
+Required: skip-link . focus-visible(:focus-visible 2px solid --purple) . ARIA landmarks(banner/nav/main)
+  semantic HTML . kbd nav(Tab/Enter/Space/Arrow/Esc) . contrast 4.5:1 . Cmd+K palette
+IHM header: partials/ihm_context.html macro → persona/feature/RBAC/CRUD/stories context bar
+
+## i18n — 40 Languages + RTL
+Active: en,fr. Planned: es,de,it,pt,ar,zh,ja,ko,ru,tr + 28 more
+RTL(4): ar,he,fa,ur → `<html dir="rtl">` + CSS logical properties (margin-inline-start)
+Keys: `{{ t('nav.home') }}` via platform/i18n/ locales/*.json
+Detection: URL?lang= > Cookie(sf_lang) > Accept-Language > en
+
+## SecureByDesign (25 controls, v1.1)
+L1-Input(3): SBD-01 validation=PASS . SBD-02 prompt-inject=PASS . SBD-03 CSP=WARN
+L2-Auth(3): SBD-04 auth=PASS . SBD-05 authz=PASS . SBD-06 least-priv=PASS
+L3-Data(3): SBD-07 secrets=PASS . SBD-08 crypto=PASS . SBD-09 minimize=WARN
+L4-Resilience(4): SBD-10 logging=PASS . SBD-11 rate-limit=WARN . SBD-12 SSRF=WARN . SBD-13 errors=PASS
+L5-Supply(12): 9 PASS, 3 WARN (SBD-14 deps, SBD-20 CORS, SBD-24 IRP)
+Score: 72% (18/25 pass, 7 warn)
+
+## Observability (OTEL)
+Traces: Jaeger :16686 — agent exec, LLM calls, DB queries, HTTP
+Metrics: /metrics — sf_llm_calls_total, sf_llm_cost_usd, sf_agent_executions, sf_http_requests
+Health: /api/health(liveness) . /api/readiness(PG+Redis) . /api/metrics(prometheus)
+Alerts: auto-heal 60s . app-down(restart) . high-latency(p99>5s) . LLM-errors(>10%) . agent-stuck(>10min)
+Dashboard: :8080 real-time SSE
+
+## API
+Auth: JWT access(15min) + refresh(7d) . OAuth GitHub/Azure . Demo mode
+Rate: auth=5/60s . read=100/60s . write=30/60s . LLM=10/60s . SSE=5 concurrent
+Headers: X-RateLimit-Limit/Remaining/Reset . Retry-After(429)
+Versioning: v1 implicit . v2 prefix planned . Sunset header for deprecation
+Errors: {"error":"code","message":"text","status":NNN,"request_id":"req-*"}
+
+## GDPR (33% — 4/12 pass)
+PASS: Art.6(lawful) . Art.25(privacy-by-design) . Art.32(security) . Art.30(partial)
+WARN: Art.5(no DPR) . Art.7(no consent UI) . Art.12(no privacy page) . Art.15(no export)
+  Art.17(no erasure) . Art.20(no portability) . Art.33(no breach proc) . Art.35(no DPIA)
+Retention: PII=lifetime+30d . sessions=90d . security-logs=90d(pseudonymize@30d) . metrics=1y
+
+## DR (Disaster Recovery)
+RTO/RPO: app=4h/1h . PG=4h/1h . Redis=15min/0 . LLM=5min/0 . full-site=8h/4h
+Failover: Azure→OVH→local . PG=pg_dump daily+WAL . LLM=multi-provider auto
+Backup: pg_dump 02:00 daily(30d) . Redis RDB 15min . Git=continuous . Infisical=cloud HA
 
 ## Annotation Studio (sf-annotate.js)
 Agentation-inspired. Types: comment/bug/move/area/text. Click element→annotate→export markdown.

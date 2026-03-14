@@ -4960,4 +4960,700 @@ done
 ## KISS Score: 88% (no critical violations)
 """,
     },
+    # ── A11Y — ARIA APG Patterns ─────────────────────────────────
+    {
+        "slug": "a11y-aria-patterns",
+        "title": "A11Y — ARIA APG Patterns",
+        "category": "Design System",
+        "icon": "",
+        "sort_order": 204,
+        "owner": "system",
+        "visibility": "owner",
+        "content": """\
+# A11Y — ARIA APG Patterns
+
+30 W3C ARIA Authoring Practices patterns applied to SF Platform.
+Source: [w3.org/WAI/ARIA/apg/patterns](https://www.w3.org/WAI/ARIA/apg/patterns/)
+
+## WCAG AA Requirements (mandatory)
+
+1. **Skip to content** — `<a href="#main" class="skip-link">Skip to main</a>`
+2. **Focus visible** — `:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px }`
+3. **ARIA landmarks** — banner, nav, main, complementary, contentinfo, search
+4. **Semantic HTML** — `<nav>`, `<main>`, `<header>`, `<footer>`, `<section>`, `<article>`
+5. **Keyboard navigation** — All interactive elements reachable via Tab, operable via Enter/Space
+6. **Color contrast** — min 4.5:1 (text), 3:1 (large text, UI components)
+7. **Cmd+K** — Global command palette with keyboard shortcut
+
+## Widget Patterns
+
+### Accordion
+```html
+<div role="region" aria-labelledby="heading-1">
+  <h3 id="heading-1">
+    <button aria-expanded="false" aria-controls="panel-1">Section</button>
+  </h3>
+  <div id="panel-1" role="region" hidden>Content</div>
+</div>
+```
+Keyboard: Enter/Space=toggle, Up/Down=navigate headers
+
+### Button
+```html
+<button type="button" aria-pressed="false">Toggle</button>
+```
+Keyboard: Enter/Space=activate. Toggle buttons use `aria-pressed`.
+
+### Checkbox
+```html
+<div role="checkbox" aria-checked="false" tabindex="0">Option</div>
+```
+Keyboard: Space=toggle. Tri-state: `aria-checked="mixed"`.
+
+### Combobox (Search/Autocomplete)
+```html
+<input role="combobox" aria-expanded="false" aria-autocomplete="list"
+       aria-controls="listbox-1" aria-activedescendant="">
+<ul id="listbox-1" role="listbox" hidden>
+  <li role="option" id="opt-1">Option 1</li>
+</ul>
+```
+Keyboard: Type=filter, Arrow=navigate, Enter=select, Esc=close
+
+### Dialog (Modal)
+```html
+<div role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+  <h2 id="dialog-title">Confirm</h2>
+  <!-- Tab trap: focus cycles within dialog -->
+</div>
+```
+Keyboard: Tab=cycle within, Esc=close, focus first interactive element on open
+
+### Tabs
+```html
+<div role="tablist" aria-label="Mission Detail">
+  <button role="tab" aria-selected="true" aria-controls="panel-1">Overview</button>
+  <button role="tab" aria-selected="false" aria-controls="panel-2">Logs</button>
+</div>
+<div role="tabpanel" id="panel-1">Content</div>
+```
+Keyboard: Arrow=switch tab, Tab=into panel
+
+### Table (Data Grid)
+```html
+<table role="table" aria-label="Agents">
+  <thead><tr><th scope="col">Name</th></tr></thead>
+  <tbody><tr><td>Agent-1</td></tr></tbody>
+</table>
+```
+For interactive: `role="grid"`, Arrow keys for cell navigation
+
+### Tree View
+```html
+<ul role="tree" aria-label="Agent Hierarchy">
+  <li role="treeitem" aria-expanded="true">
+    <span>Team Alpha</span>
+    <ul role="group">
+      <li role="treeitem">Agent-1</li>
+    </ul>
+  </li>
+</ul>
+```
+Keyboard: Arrow Up/Down=navigate, Right=expand, Left=collapse
+
+## Live Regions
+
+### Alert
+```html
+<div role="alert" aria-live="assertive">Mission failed — check logs</div>
+```
+Auto-announced by screen readers immediately.
+
+### Feed (Activity Stream)
+```html
+<div role="feed" aria-busy="false" aria-label="Activity">
+  <article aria-posinset="1" aria-setsize="50">...</article>
+</div>
+```
+
+## Navigation
+
+### Breadcrumb
+```html
+<nav aria-label="Breadcrumb">
+  <ol><li><a href="/">Home</a></li><li aria-current="page">Agents</li></ol>
+</nav>
+```
+
+### Landmarks
+```html
+<header role="banner">...</header>
+<nav role="navigation" aria-label="Main">...</nav>
+<main role="main" id="main">...</main>
+<aside role="complementary">...</aside>
+<footer role="contentinfo">...</footer>
+```
+
+## SF Platform A11Y Checklist
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Skip link | PASS | In base.html |
+| Focus visible | PASS | CSS :focus-visible rule |
+| ARIA landmarks | PASS | base.html structure |
+| Semantic HTML | PASS | nav/main/header/footer |
+| Keyboard nav | WARN | Some custom widgets need audit |
+| Color contrast | PASS | Dark theme 7:1+ ratio |
+| Cmd+K palette | PASS | Global search shortcut |
+| aria-live regions | WARN | Toast needs role=alert |
+| Tab trap in modals | WARN | Manual audit needed |
+| aria-expanded on accordions | WARN | Some missing |
+""",
+    },
+    # ── i18n — 40 Languages ─────────────────────────────────────
+    {
+        "slug": "i18n-languages",
+        "title": "i18n — 40 Languages + RTL",
+        "category": "Design System",
+        "icon": "",
+        "sort_order": 205,
+        "owner": "system",
+        "visibility": "owner",
+        "content": """\
+# i18n — 40 Languages + RTL Support
+
+## Architecture
+
+```
+platform/i18n/
+  __init__.py        # get_text(key, lang) + load_translations()
+  locales/
+    en.json          # English (default, complete)
+    fr.json          # French (complete)
+    es.json ... ar.json ... zh.json  # 38 other languages
+```
+
+### Translation Key Format
+```json
+{
+  "nav.home": "Home",
+  "nav.agents": "Agents",
+  "nav.missions": "Missions",
+  "btn.save": "Save",
+  "btn.cancel": "Cancel",
+  "status.running": "Running",
+  "status.completed": "Completed",
+  "error.generic": "Something went wrong. Please try again."
+}
+```
+
+### Jinja2 Integration
+```html
+{{ t('nav.home') }}  {# resolved from current locale #}
+```
+
+### Language Detection
+1. URL param: `?lang=fr`
+2. Cookie: `sf_lang=fr`
+3. Accept-Language header
+4. Default: `en`
+
+## RTL Support (4 languages)
+
+| Code | Language | Direction |
+|------|----------|-----------|
+| ar | Arabic | RTL |
+| he | Hebrew | RTL |
+| fa | Persian | RTL |
+| ur | Urdu | RTL |
+
+### CSS RTL Strategy
+```html
+<html dir="{{ 'rtl' if lang in ['ar','he','fa','ur'] else 'ltr' }}" lang="{{ lang }}">
+```
+```css
+/* Logical properties (auto-RTL) */
+.card { margin-inline-start: var(--space-4); padding-inline-end: var(--space-2); }
+/* Physical fallback where needed */
+[dir="rtl"] .sidebar { right: 0; left: auto; }
+```
+
+## 40 Languages
+
+### Active (2)
+| Code | Language | Native | Coverage |
+|------|----------|--------|----------|
+| en | English | English | 100% |
+| fr | French | Francais | 100% |
+
+### European (18)
+es, de, it, pt, nl, pl, ro, cs, sv, da, fi, el, hu, bg, hr, sk, sl, lt
+
+### RTL (4)
+ar (Arabic), he (Hebrew), fa (Persian), ur (Urdu)
+
+### CJK + Asian (8)
+zh (Simplified), zh-TW (Traditional), ja, ko, vi, th, id, ms
+
+### South Asian (2)
+hi (Hindi), bn (Bengali)
+
+### Other (6)
+tr, ru, uk, ka, sw, am
+
+## Implementation Status
+
+| Phase | Languages | Status |
+|-------|-----------|--------|
+| Phase 1 | en, fr | Active |
+| Phase 2 | es, de, it, pt, ar | Planned |
+| Phase 3 | zh, ja, ko, ru, tr | Planned |
+| Phase 4 | Remaining 25 | Planned |
+
+## Translation Rules
+1. No emoji in any language
+2. Technical terms (API, SSE, RBAC) stay in English
+3. Date/number formatting via `Intl` API
+4. Pluralization rules per locale
+5. RTL: use CSS logical properties (margin-inline-start, not margin-left)
+""",
+    },
+    # ── SecureByDesign — 25 Controls ─────────────────────────────
+    {
+        "slug": "security-sbd-controls",
+        "title": "SecureByDesign — 25 Controls",
+        "category": "Compliance",
+        "icon": "",
+        "sort_order": 303,
+        "owner": "system",
+        "visibility": "admin",
+        "content": """\
+# SecureByDesign v1.1 — 25 Controls
+
+Source: [securebydesign/skill](https://github.com/Yems221/securebydesign-llmskill)
+Standards: OWASP Top 10:2021, OWASP LLM Top 10:2025, NIST CSF 2.0, ISO 27001:2022, CIS v8
+
+## Layer 1 — Input & Output Integrity
+
+| Control | Name | Standards | SF Status | Implementation |
+|---------|------|-----------|-----------|----------------|
+| SBD-01 | Input Validation | OWASP A03 | PASS | adapter.py parameterized, Pydantic |
+| SBD-02 | Prompt Injection Defense | LLM01 | PASS | safety_agent, prompt_guard |
+| SBD-03 | Output Encoding & CSP | A03+A05 | WARN | Jinja2 autoescaping, missing CSP |
+
+## Layer 2 — Identity & Access Control
+
+| Control | Name | Standards | SF Status | Implementation |
+|---------|------|-----------|-----------|----------------|
+| SBD-04 | Auth Integrity | OWASP A07 | PASS | bcrypt, JWT, rate limit 5/60s |
+| SBD-05 | Authorization | OWASP A01 | PASS | require_auth(), 54/54 routes |
+| SBD-06 | Least Privilege | A01+LLM06 | PASS | 5-level roles, tool ACL |
+
+## Layer 3 — Data Protection & Cryptography
+
+| Control | Name | Standards | SF Status | Implementation |
+|---------|------|-----------|-----------|----------------|
+| SBD-07 | Secrets Management | OWASP A02 | PASS | Infisical, .env, pre-commit |
+| SBD-08 | Crypto Standards | OWASP A02 | PASS | TLS 1.3, bcrypt, secrets module |
+| SBD-09 | Data Minimization | A02+LLM02 | WARN | No auto-purge schedule |
+
+## Layer 4 — Resilience & Monitoring
+
+| Control | Name | Standards | SF Status | Implementation |
+|---------|------|-----------|-----------|----------------|
+| SBD-10 | Security Logging | OWASP A09 | PASS | OTEL, LLM logs, /metrics |
+| SBD-11 | Rate Limiting | A07+LLM10 | WARN | Login only, API missing |
+| SBD-12 | SSRF Prevention | OWASP A10 | WARN | Tool URL validation needed |
+| SBD-13 | Error Handling | OWASP A05 | PASS | Generic errors, detailed server log |
+
+## Layer 5 — Supply Chain & Architecture
+
+| Control | Name | Standards | SF Status | Implementation |
+|---------|------|-----------|-----------|----------------|
+| SBD-14 | Dependency Security | A06+LLM03 | WARN | Pinned, 4 CVEs open |
+| SBD-15 | CI/CD Integrity | OWASP A08 | PASS | Pre-push hooks, gates |
+| SBD-16 | LLM Model Integrity | LLM03+04 | PASS | Provider config, no local |
+| SBD-17 | System Prompt Protection | LLM07 | PASS | safety_agent guard |
+| SBD-18 | RAG & Embedding Security | LLM08 | PASS | Per-project isolation |
+| SBD-19 | LLM Output Validation | LLM05+09 | PASS | output_validator, sanitize |
+| SBD-20 | Network & CORS | OWASP A05 | WARN | Permissive dev CORS |
+| SBD-21 | Secure Design | OWASP A04 | PASS | Fail secure, deny default |
+| SBD-22 | Security Governance | A04 | PASS | Wiki, hooks, gates |
+| SBD-23 | Asset Inventory | NIST ID.AM | PASS | 221 agents PG, IaC |
+| SBD-24 | Incident Response | NIST RS | WARN | Auto-heal, no formal IRP |
+| SBD-25 | Privacy by Design | GDPR | WARN | No data processing register |
+
+## Summary
+
+| Layer | Total | Pass | Warn |
+|-------|-------|------|------|
+| L1 Input | 3 | 2 | 1 |
+| L2 Auth | 3 | 3 | 0 |
+| L3 Data | 3 | 2 | 1 |
+| L4 Resilience | 4 | 2 | 2 |
+| L5 Supply | 12 | 9 | 3 |
+| **Total** | **25** | **18** | **7** |
+| **Score** | **72%** | | |
+
+## Priority Remediations
+1. SBD-03: Add CSP + X-Frame-Options + HSTS headers (middleware)
+2. SBD-11: Add rate limiting middleware (token bucket)
+3. SBD-12: URL allowlisting for web_search/browser tools
+4. SBD-14: Fix 4 dependency CVEs via dependabot
+5. SBD-20: Restrict CORS origins in production
+6. SBD-24: Write incident response playbook
+7. SBD-25: Create data processing register
+""",
+    },
+    # ── Observability ────────────────────────────────────────────
+    {
+        "slug": "observability-otel",
+        "title": "Observability — OTEL + Metrics + Alerts",
+        "category": "DevOps",
+        "icon": "",
+        "sort_order": 501,
+        "owner": "system",
+        "visibility": "owner",
+        "content": """\
+# Observability — OTEL Traces + Metrics + Alerts
+
+## Architecture
+
+```
+Platform App (FastAPI)
+  ├─ OTEL SDK → Jaeger Collector (:16686)
+  ├─ /metrics endpoint → Prometheus scrape
+  ├─ /api/health → Health checks
+  └─ Auto-heal module → Self-monitoring (60s)
+
+Instruments:
+  traces:  agent execution spans, LLM calls, DB queries
+  metrics: request count, latency p50/p95/p99, LLM usage, error rate
+  logs:    structured JSON, uvicorn access, agent execution
+```
+
+## Traces (OTEL/Jaeger)
+
+| Span | Attributes | Destination |
+|------|-----------|-------------|
+| agent.execute | agent_id, pattern, session_id | Jaeger |
+| llm.call | provider, model, tokens_in/out, latency | Jaeger + /metrics |
+| db.query | table, operation, duration | Jaeger |
+| http.request | method, path, status, latency | Jaeger |
+
+## Metrics (/metrics)
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| sf_llm_calls_total | counter | Total LLM API calls |
+| sf_llm_tokens_total | counter | Total tokens (in + out) |
+| sf_llm_cost_usd | counter | Total LLM spend in USD |
+| sf_llm_latency_seconds | histogram | LLM response latency |
+| sf_agent_executions_total | counter | Agent execution count |
+| sf_mission_duration_seconds | histogram | Mission execution time |
+| sf_http_requests_total | counter | HTTP request count by status |
+| sf_active_sessions | gauge | Current active sessions |
+
+## Health Checks
+
+| Endpoint | Purpose | Interval |
+|----------|---------|----------|
+| /api/health | App alive check | 10s (k8s liveness) |
+| /api/readiness | Deps ready (PG, Redis) | 10s (k8s readiness) |
+| /api/metrics | Prometheus metrics | 15s scrape |
+
+## Alerts
+
+| Alert | Condition | Severity | Action |
+|-------|-----------|----------|--------|
+| App down | /health fails 3x | CRITICAL | Auto-restart (systemd) |
+| High latency | p99 > 5s for 5min | HIGH | Auto-heal check |
+| LLM errors | Error rate > 10% | HIGH | Provider failover |
+| Disk full | > 90% usage | HIGH | Log rotation |
+| Memory leak | RSS > 4GB | MEDIUM | Process restart |
+| Agent stuck | Execution > 10min | MEDIUM | Auto-cancel + alert |
+
+## Auto-Heal Module (ops/auto_heal.py)
+
+Every 60s:
+1. Check health endpoints
+2. Verify DB connectivity
+3. Monitor agent execution queue
+4. Clear stuck missions (> timeout)
+5. Restart failed background tasks
+
+## Dashboard (:8080)
+
+Real-time monitoring via SSE:
+- Active missions, agent status
+- LLM usage (calls/24h, cost/24h)
+- System health (CPU, memory, disk)
+- Error log stream
+""",
+    },
+    # ── API Specification ────────────────────────────────────────
+    {
+        "slug": "api-specification",
+        "title": "API — OpenAPI + Versioning + Rate Limits",
+        "category": "DevOps",
+        "icon": "",
+        "sort_order": 502,
+        "owner": "system",
+        "visibility": "owner",
+        "content": """\
+# API Specification
+
+## Versioning Strategy
+
+- **Current**: v1 (implicit, no prefix)
+- **Future**: `/api/v2/` prefix when breaking changes needed
+- **Headers**: `X-API-Version: 1` response header
+- **Deprecation**: 6-month notice via `Sunset` header
+
+## Rate Limits
+
+| Endpoint Group | Limit | Window | Scope |
+|----------------|-------|--------|-------|
+| Auth (login/register) | 5 | 60s | Per IP |
+| API read (GET) | 100 | 60s | Per user |
+| API write (POST/PUT/DELETE) | 30 | 60s | Per user |
+| LLM endpoints | 10 | 60s | Per user |
+| SSE streams | 5 concurrent | - | Per user |
+| File upload | 10 | 60s | Per user |
+
+Headers returned:
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 97
+X-RateLimit-Reset: 1710425400
+Retry-After: 42  (on 429)
+```
+
+## Authentication
+
+| Method | Endpoint | Token |
+|--------|----------|-------|
+| Login | POST /api/auth/login | Returns JWT access (15min) + refresh (7d) |
+| Refresh | POST /api/auth/refresh | Returns new access token |
+| OAuth | GET /auth/github | GitHub OAuth redirect |
+| OAuth | GET /auth/azure | Azure AD redirect |
+| Demo | POST /api/auth/demo | Demo mode (PLATFORM_LLM_PROVIDER=demo) |
+
+## Major Endpoint Groups
+
+| Group | Prefix | Methods | Auth | RBAC |
+|-------|--------|---------|------|------|
+| Agents | /api/agents/ | CRUD + search + score | JWT | viewer+ |
+| Missions | /api/missions/ | CRUD + start + cancel | JWT | developer+ |
+| Sessions | /api/sessions/ | CRUD + replay | JWT | developer+ |
+| Projects | /api/projects/ | CRUD + chat + memory | JWT | PM+ |
+| Wiki | /api/wiki/ | CRUD + seed | JWT | owner RBAC |
+| Patterns | /api/patterns/ | list + detail | JWT | viewer+ |
+| Workflows | /api/workflows/ | list + detail + trigger | JWT | developer+ |
+| Auth | /api/auth/ | login + register + refresh | none/JWT | public |
+| Health | /api/health | GET | none | public |
+| Metrics | /api/metrics | GET | none | public |
+
+## Error Response Format
+
+```json
+{
+  "error": "not_found",
+  "message": "Agent with ID 'abc' not found",
+  "status": 404,
+  "request_id": "req-a1b2c3d4"
+}
+```
+
+## Content Types
+
+| Format | Use |
+|--------|-----|
+| application/json | API responses (default) |
+| text/html | Page renders (HTMX partials) |
+| text/event-stream | SSE streaming |
+| multipart/form-data | File uploads |
+""",
+    },
+    # ── GDPR Data Lifecycle ──────────────────────────────────────
+    {
+        "slug": "gdpr-data-lifecycle",
+        "title": "GDPR Data Lifecycle + Backup/Restore",
+        "category": "Compliance",
+        "icon": "",
+        "sort_order": 304,
+        "owner": "system",
+        "visibility": "admin",
+        "content": """\
+# GDPR Data Lifecycle + Backup/Restore
+
+## Data Classification
+
+| Category | Data Types | Sensitivity | Retention |
+|----------|-----------|-------------|-----------|
+| User PII | name, email, password hash | HIGH | Account lifetime + 30d |
+| Agent data | configs, prompts, responses | MEDIUM | Indefinite (platform data) |
+| Session logs | execution traces, LLM calls | MEDIUM | 90 days |
+| Security logs | auth events, access logs | HIGH | 90 days (pseudonymize at 30d) |
+| Metrics | aggregated usage stats | LOW | 1 year |
+| Wiki content | documentation, pages | LOW | Indefinite |
+
+## GDPR Article Compliance
+
+| Article | Requirement | Status | Implementation |
+|---------|-------------|--------|----------------|
+| Art.5 | Processing principles | WARN | Minimization in code, no formal DPR |
+| Art.6 | Lawful basis | PASS | Legitimate interest documented |
+| Art.7 | Consent | WARN | No consent management UI |
+| Art.12-14 | Transparency | WARN | No public privacy policy |
+| Art.15 | Right of access | WARN | No self-service data export |
+| Art.17 | Right to erasure | WARN | No automated deletion |
+| Art.20 | Data portability | WARN | No export-to-JSON |
+| Art.25 | Privacy by design | PASS | RBAC, encryption, parameterized SQL |
+| Art.30 | Processing records | WARN | No formal register |
+| Art.32 | Security | PASS | TLS, bcrypt, access controls |
+| Art.33 | Breach notification | WARN | No formal procedure |
+| Art.35 | DPIA | WARN | Not conducted |
+
+**Score: 33% (4/12 pass)**
+
+## Backup Strategy
+
+| Component | Method | Frequency | Retention | RTO |
+|-----------|--------|-----------|-----------|-----|
+| PostgreSQL | pg_dump --format=custom | Daily 02:00 | 30 days | 1h |
+| Redis | RDB snapshot | Every 15min | 24h | 5min |
+| Config files | Git repository | Every commit | Indefinite | 15min |
+| Secrets | Infisical cloud backup | Continuous | 90 days | 1h |
+
+### Backup Commands
+```bash
+# PG backup
+pg_dump -Fc -f /backups/sf_$(date +%Y%m%d).dump sf_platform
+
+# PG restore
+pg_restore -d sf_platform /backups/sf_20260314.dump
+
+# Full backup script (ops/backup.py)
+python3 -m platform.ops.backup --all --dest /backups/
+```
+
+## Remediation Plan
+1. Create privacy policy page (/privacy)
+2. Add data export API (GET /api/me/export)
+3. Add account deletion API (DELETE /api/me)
+4. Create data processing register document
+5. Implement consent management for optional features
+6. Add data retention automation (cron for purge)
+7. Write breach notification procedure
+8. Conduct DPIA for LLM data processing
+""",
+    },
+    # ── DR Plan ──────────────────────────────────────────────────
+    {
+        "slug": "dr-plan",
+        "title": "DR — RTO/RPO + Failover",
+        "category": "DevOps",
+        "icon": "",
+        "sort_order": 503,
+        "owner": "system",
+        "visibility": "admin",
+        "content": """\
+# Disaster Recovery Plan
+
+## RTO/RPO Targets
+
+| Component | RTO | RPO | Priority |
+|-----------|-----|-----|----------|
+| Application | 4h | 1h | P1 |
+| PostgreSQL | 4h | 1h | P1 |
+| Redis | 15min | 0 (cache) | P2 |
+| LLM Provider | 5min | 0 (stateless) | P1 |
+| DNS | 30min | 0 | P2 |
+| TLS Certs | 1h | 0 | P2 |
+| Monitoring | 30min | 0 | P3 |
+| Full Site | 8h | 4h | P1 |
+
+## Failover Strategies
+
+### Application Server
+```
+Primary: Azure VM (sf-platform systemd)
+  ↓ fails
+Secondary: OVH VPS (blue-green Docker)
+  ↓ fails
+Tertiary: Local dev (uvicorn :8099)
+
+Procedure:
+1. systemctl restart sf-platform (auto via systemd)
+2. If persistent: az vm run-command invoke --command-id RunShellScript
+3. If Azure down: switch DNS to OVH VPS
+4. OVH: docker-compose up --force-recreate -d (blue/green slot)
+```
+
+### Database (PostgreSQL)
+```
+Primary: PG16 on Azure VM (WAL archiving)
+  ↓ fails
+Recovery: pg_restore from latest pg_dump (daily at 02:00)
+  ↓ total loss
+Rebuild: schema_pg.sql + migrations.py + seed scripts
+
+WAL archiving:
+  archive_mode = on
+  archive_command = 'cp %p /archive/%f'
+  Max data loss: since last WAL segment (~5min)
+```
+
+### LLM Provider
+```
+Primary: Azure OpenAI (gpt-5-mini, gpt-5.2, gpt-5.2-codex)
+  ↓ fails
+Failover 1: MiniMax M2.5 (OVH)
+  ↓ fails
+Failover 2: Local MLX (Qwen3.5, dev only)
+
+Auto-failover: LLM client retries with next provider
+Config: PLATFORM_LLM_PROVIDER env var
+```
+
+### Redis
+```
+Ephemeral cache — rebuild from PG on restart
+No persistence required (sessions in PG, not Redis)
+RTO: time to restart container (~15s)
+```
+
+## DR Drill Schedule
+
+| Drill | Frequency | Last Run | Next |
+|-------|-----------|----------|------|
+| App restart | Monthly | - | TBD |
+| DB restore | Quarterly | - | TBD |
+| Provider failover | Monthly | - | TBD |
+| Full site failover | Bi-annually | - | TBD |
+
+## Runbooks
+
+### R1 — App Won't Start
+1. Check logs: `journalctl -u sf-platform -n 100`
+2. Verify PG: `psql -c "SELECT 1"`
+3. Verify env: `cat /etc/sf-platform/secrets`
+4. Restart: `systemctl restart sf-platform`
+5. If stuck: kill process, restart
+
+### R2 — Database Corruption
+1. Stop app: `systemctl stop sf-platform`
+2. Check PG: `pg_isready`
+3. If corruption: restore from backup
+4. Verify: `psql -c "SELECT count(*) FROM agents"`
+5. Restart app
+
+### R3 — LLM Provider Down
+1. Check provider status page
+2. Switch provider: update PLATFORM_LLM_PROVIDER
+3. Restart: `systemctl restart sf-platform`
+4. Verify: `curl localhost:8090/api/health`
+""",
+    },
 ]
