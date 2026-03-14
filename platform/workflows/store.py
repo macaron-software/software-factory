@@ -609,6 +609,13 @@ _PHASE_TEMPLATES = [
      "team_roles": ["developer", "developer", "developer"], "gate": "best_effort"},
     {"id": "tdd-sprint", "name": "TDD Sprint", "pattern": "loop",
      "team_roles": ["developer", "qa"], "gate": "all_approved"},
+    {"id": "adversarial-review", "name": "Adversarial Review & Fix", "pattern": "loop",
+     "team_roles": ["critic", "developer"], "gate": "all_approved",
+     "feedback": ["adversarial", "tools"],
+     "description": "Adversarial critic identifies bugs, security issues, and quality gaps. "
+                    "Developer applies fixes using code_write. Loop until critic approves. "
+                    "CRITICAL: After identifying issues, you MUST use the code_write tool to apply the fixes. "
+                    "Discussing fixes without writing code = phase failed."},
     {"id": "code-review", "name": "Code Review", "pattern": "loop",
      "team_roles": ["reviewer", "developer"], "gate": "all_approved"},
     {"id": "qa-acceptance", "name": "QA & Acceptance", "pattern": "loop",
@@ -810,6 +817,7 @@ Pick the pattern that matches the situation:
 - WCAG AA: no skip-to-content, no focus-visible, no aria landmarks, no keyboard nav
 - Web/mobile with data: missing loading/empty/error/offline/stale states on any data component
 - Error states show raw technical copy (HTTP codes, "Network Error", "Request failed", "You are offline")
+- adversarial-review phase must use code_write to apply fixes (not just discuss them)
 
 ─── TRACEABILITY TEAM ───
 A dedicated traceability team (trace-lead, trace-auditor, trace-writer, trace-monitor) is available.
