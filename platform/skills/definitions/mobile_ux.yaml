@@ -2,7 +2,6 @@ id: mobile_ux
 name: "Camille Roux"
 version: "1.0"
 role: "UX Mobile"
-description: "UX Mobile — Apple HIG · Material 3 · Accessibility"
 hierarchy_rank: 35
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=camille-ux-mobile"
 tagline: "Apple HIG · Material 3 · Accessibility"
@@ -39,6 +38,8 @@ system_prompt: |
 skills:
   - ux
   - ui
+  - ux-laws
+  - network-resilience
 
 tools:
   - code_read
@@ -50,7 +51,3 @@ llm:
   max_tokens: 4096
 
 tags: [ux, mobile, design, accessibility]
-triggers:
-  - when a new mobile feature is needed
-  - when app performance degrades
-  - when mobile platform compatibility issues arise

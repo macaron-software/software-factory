@@ -96,6 +96,7 @@ tools:
 
 skills:
   - design_system_enforcer
+  - ux-laws
 
 permissions:
   can_veto: true

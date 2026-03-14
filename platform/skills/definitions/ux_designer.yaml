@@ -40,6 +40,7 @@ system_prompt: |
 
 skills:
   - ux-best-practices
+  - ux-laws
   - accessibility-audit
   - frontend-design
   - figma-design-sync
