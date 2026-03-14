@@ -848,7 +848,7 @@ BEFORE dev phases, check if toolchain matches stack needs. If missing → compos
 - ios-native → needs: Xcode, swift, xctest
 - ANY web frontend → needs: Playwright (npx playwright install --with-deps)
 If QA/test agents report "missing tool", "permission denied", or "command not found":
-  → compose phase(infra-provision) with task="install {missing_tool}" THEN loop the failed phase.
+  → compose phase(infra-provision) with task="install the missing tool" THEN loop the failed phase.
 Do NOT skip QA because tools are missing. Fix the environment first.
 
 ─── DESIGN SYSTEM RULES ───

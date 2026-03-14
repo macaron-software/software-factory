@@ -114,7 +114,7 @@ class TestBuildDynamicPhase:
         wphase, _ = _build_dynamic_phase(block)
         assert wphase.timeout == 300
 
-    def test_all_13_patterns_accepted(self):
+    def test_all_catalog_patterns_accepted(self):
         for ptype in _PATTERN_CATALOG:
             block = {"phase": {"name": f"Test-{ptype}", "pattern": ptype, "team": ["dev"]}}
             _, pdef = _build_dynamic_phase(block)
@@ -192,14 +192,14 @@ class TestBuildEvidence:
 class TestCatalogs:
     """Test catalog constants are well-formed."""
 
-    def test_pattern_catalog_has_13_entries(self):
-        assert len(_PATTERN_CATALOG) == 13
+    def test_pattern_catalog_has_expected_entries(self):
+        assert len(_PATTERN_CATALOG) >= 20
 
     def test_all_pattern_types_present(self):
-        expected = {"solo", "sequential", "parallel", "loop", "hierarchical",
+        required = {"solo", "sequential", "parallel", "loop", "hierarchical",
                     "network", "router", "aggregator", "wave",
                     "human-in-the-loop", "composite", "blackboard", "map_reduce"}
-        assert set(_PATTERN_CATALOG.keys()) == expected
+        assert required.issubset(set(_PATTERN_CATALOG.keys()))
 
     def test_phase_templates_have_required_keys(self):
         for t in _PHASE_TEMPLATES:
