@@ -1452,7 +1452,7 @@ class EpicOrchestrator:
             # treated as a soft-failure: log prominently and trigger the reloop mechanism
             _critical_phase = any(
                 k in (phase.phase_id or "").lower()
-                for k in ("env-setup", "tdd-sprint", "dev-sprint")
+                for k in ("env-setup", "tdd-sprint", "dev-sprint", "adversarial-review", "feature-e2e")
             )
             if phase.status == PhaseStatus.DONE_WITH_ISSUES and _critical_phase:
                 logger.warning(
@@ -2276,6 +2276,13 @@ class EpicOrchestrator:
             except Exception as chain_err:
                 logger.warning(f"on_complete chain failed: {chain_err}")
 
+        # Workspace cleanup: remove build artifacts after run completes
+        if mission.status == EpicStatus.COMPLETED:
+            try:
+                _cleanup_workspace(mission.workspace_path or "")
+            except Exception as cleanup_err:
+                logger.warning(f"Workspace cleanup failed: {cleanup_err}")
+
     def _build_edges(self, pattern_type: str, aids: list, leader: str) -> list:
         """Build edges for the pattern graph."""
         edges = []
@@ -2354,6 +2361,35 @@ class EpicOrchestrator:
         return edges
 
 
+def _cleanup_workspace(workspace: str) -> None:
+    """Remove build artifacts and temp files from workspace after run completes."""
+    import shutil, glob as _glob
+    if not workspace or not os.path.isdir(workspace):
+        return
+    patterns_to_remove = [
+        "**/*.bak",
+        "**/node_modules",
+        "**/__pycache__",
+        "**/*.pyc",
+        "**/dist",
+        "**/.cache",
+        "**/target/debug",   # Rust debug builds (keep release)
+    ]
+    removed = 0
+    for pattern in patterns_to_remove:
+        for path in _glob.glob(os.path.join(workspace, pattern), recursive=True):
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                removed += 1
+            except Exception:
+                pass
+    if removed:
+        logger.info("ORCH workspace cleanup: removed %d items from %s", removed, workspace[-20:])
+
+
 async def _on_complete_chain(mission) -> None:
     """Auto-launch companion workflows defined in the workflow's on_complete config.
 
@@ -2362,7 +2398,8 @@ async def _on_complete_chain(mission) -> None:
     Used to auto-trigger documentation-pipeline, knowledge-maintenance, etc.
     """
     import json as _json
-    from ..db.migrations import get_db as _get_db
+    import psycopg2
+    import psycopg2.extras
     from ..services.auto_resume import _launch_new_run
 
     wf_id = getattr(mission, "workflow_id", None) or getattr(mission, "config", {}).get("workflow_id")
@@ -2372,73 +2409,66 @@ async def _on_complete_chain(mission) -> None:
     if not wf_id:
         return
 
-    db = _get_db()
+    _db_url = os.environ.get(
+        "DATABASE_URL", "postgresql://macaron:macaron@localhost:5432/macaron_platform"
+    )
+    conn = psycopg2.connect(_db_url)
     try:
-        row = db.execute(
-            "SELECT config_json FROM workflows WHERE id=?", (wf_id,)
-        ).fetchone()
-    finally:
-        db.close()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    if not row or not row[0]:
-        return
+        cur.execute("SELECT config_json FROM workflows WHERE id = %s", (wf_id,))
+        row = cur.fetchone()
 
-    try:
-        cfg = _json.loads(row[0]) if isinstance(row[0], str) else row[0]
-    except Exception:
-        return
+        if not row or not row["config_json"]:
+            return
 
-    on_complete = cfg.get("on_complete")
-    if not on_complete:
-        return
-    # Support list or single dict
-    chains = on_complete if isinstance(on_complete, list) else [on_complete]
-
-    for chain in chains:
-        next_wf_id = chain.get("workflow_id")
-        condition = chain.get("condition", "completed")
-        if not next_wf_id:
-            continue
-        if condition not in ("always", "completed"):
-            continue
-
-        # Avoid duplicate: skip if a run for this workflow+project already running/pending
-        db2 = _get_db()
         try:
-            existing = db2.execute(
+            cfg = _json.loads(row["config_json"]) if isinstance(row["config_json"], str) else row["config_json"]
+        except Exception:
+            return
+
+        on_complete = cfg.get("on_complete")
+        if not on_complete:
+            return
+        # Support list or single dict
+        chains = on_complete if isinstance(on_complete, list) else [on_complete]
+
+        for chain in chains:
+            next_wf_id = chain.get("workflow_id")
+            condition = chain.get("condition", "completed")
+            if not next_wf_id:
+                continue
+            if condition not in ("always", "completed"):
+                continue
+
+            # Avoid duplicate: skip if a run for this workflow+project already running/pending
+            cur.execute(
                 """SELECT id FROM epic_runs
-                   WHERE workflow_id=? AND project_id=? AND status IN ('running','pending')
+                   WHERE workflow_id = %s AND project_id = %s AND status IN ('running','pending')
                    ORDER BY created_at DESC LIMIT 1""",
                 (next_wf_id, project_id),
-            ).fetchone()
-        finally:
-            db2.close()
+            )
+            existing = cur.fetchone()
 
-        if existing:
-            logger.info("on_complete chain: %s already running for project %s — skip", next_wf_id, project_id[:8])
-            continue
+            if existing:
+                logger.info("on_complete chain: %s already running for project %s — skip", next_wf_id, project_id[:8])
+                continue
 
-        try:
-            # Find or create a companion epic for this workflow
-            db3 = _get_db()
             try:
-                companion = db3.execute(
-                    "SELECT id FROM epics WHERE project_id=? AND workflow_id=? AND status='active' LIMIT 1",
+                # Find or create a companion epic for this workflow
+                cur.execute(
+                    "SELECT id FROM epics WHERE project_id = %s AND workflow_id = %s AND status='active' LIMIT 1",
                     (project_id, next_wf_id),
-                ).fetchone()
+                )
+                companion = cur.fetchone()
                 companion_id = companion["id"] if companion else None
-            finally:
-                db3.close()
 
-            if not companion_id:
-                # Create a lightweight companion epic
-                import uuid as _uuid
-                companion_id = _uuid.uuid4().hex[:8]
-                db4 = _get_db()
-                try:
-                    db4.execute(
+                if not companion_id:
+                    import uuid as _uuid
+                    companion_id = _uuid.uuid4().hex[:8]
+                    cur.execute(
                         """INSERT INTO epics (id, name, description, project_id, workflow_id, status, created_at)
-                           VALUES (?, ?, ?, ?, ?, 'active', datetime('now'))""",
+                           VALUES (%s, %s, %s, %s, %s, 'active', NOW())""",
                         (
                             companion_id,
                             f"Auto: {next_wf_id} ← {wf_id}",
@@ -2447,23 +2477,23 @@ async def _on_complete_chain(mission) -> None:
                             next_wf_id,
                         ),
                     )
-                    db4.commit()
-                finally:
-                    db4.close()
+                    conn.commit()
 
-            await _launch_new_run(
-                mission_id=companion_id,
-                workflow_id=next_wf_id,
-                project_id=project_id,
-                brief=brief,
-                mission_name=f"Auto: {next_wf_id} ← {wf_id}",
-            )
-            logger.warning(
-                "on_complete chain: launched %s for project=%s (triggered by %s)",
-                next_wf_id, project_id[:8], wf_id,
-            )
-        except Exception as e:
-            logger.warning("on_complete chain %s → %s failed: %s", wf_id, next_wf_id, e)
+                await _launch_new_run(
+                    mission_id=companion_id,
+                    workflow_id=next_wf_id,
+                    project_id=project_id,
+                    brief=brief,
+                    mission_name=f"Auto: {next_wf_id} ← {wf_id}",
+                )
+                logger.warning(
+                    "on_complete chain: launched %s for project=%s (triggered by %s)",
+                    next_wf_id, project_id[:8], wf_id,
+                )
+            except Exception as e:
+                logger.warning("on_complete chain %s → %s failed: %s", wf_id, next_wf_id, e)
+    finally:
+        conn.close()
 
 
 def _promote_mission_to_global(mission) -> None:

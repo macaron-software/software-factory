@@ -1,0 +1,75 @@
+id: rust-game-sprint
+name: Rust Game Sprint
+description: >
+  Feature sprint for Rust/macroquad game projects.
+  Phases adapted for game dev: design → env → game-dev → test → build → adversarial → deploy.
+version: "1.0"
+pm_driven: true
+phases:
+  - id: game-design
+    name: Game Design
+    pattern_id: sequential
+    description: >
+      Define game mechanics, user controls, level structure, and visual style.
+      Produce: GDD (Game Design Document) with acceptance criteria per feature.
+      Agents discuss and produce SPEC.md + Architecture.md.
+    config:
+      agents: [system-architect-art, lead_backend, ux_lead]
+    retry_count: 2
+
+  - id: env-setup
+    name: Environment Setup
+    pattern_id: solo
+    description: >
+      Set up Rust toolchain, macroquad dependency, Cargo.toml, project structure.
+      Verify: cargo check passes. Create docker-compose.project.yml for CI.
+    config:
+      agents: [lead_backend]
+    retry_count: 2
+
+  - id: game-dev
+    name: Game Development Sprint
+    pattern_id: tdd
+    description: >
+      Implement game features in Rust/macroquad: rendering, game loop, input handling,
+      collision detection, scoring, levels. Write unit tests with #[cfg(test)].
+      Use cargo test to verify. MUST use code_write for every change.
+    config:
+      agents: [lead_backend, dev_rust, testeur]
+    retry_count: 3
+
+  - id: game-build
+    name: Game Build & Test
+    pattern_id: sequential
+    description: >
+      Run: cargo build --release. Run: cargo test. Fix any compilation errors.
+      Produce: binary in target/release/. Verify no warnings with cargo clippy.
+    config:
+      agents: [lead_backend, testeur]
+    retry_count: 2
+
+  - id: adversarial-review
+    name: Adversarial Review
+    pattern_id: sequential
+    description: >
+      Review game code quality: memory safety, performance, game loop efficiency.
+      CRITICAL: Must use code_write to apply all identified fixes. No fix = phase fails.
+    config:
+      agents: [system-architect-art, code-critic, code-reviewer]
+    retry_count: 1
+
+  - id: game-deploy
+    name: Game Deploy
+    pattern_id: solo
+    description: >
+      Build release binary. Create deployment package (zip with binary + assets).
+      Docker: FROM rust:alpine, COPY target/release/game /usr/local/bin/
+    config:
+      agents: [lead_backend]
+    retry_count: 1
+
+on_complete:
+  - workflow_id: documentation-pipeline
+    condition: completed
+  - workflow_id: knowledge-maintenance
+    condition: completed

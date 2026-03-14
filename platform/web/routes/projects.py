@@ -1115,6 +1115,22 @@ async def create_project(request: Request):
     # Auto-load vision
     if p.exists:
         p.vision = p.load_vision_from_file()
+
+    # Fuzzy dedup: reject if a project with very similar name+description exists
+    from difflib import SequenceMatcher
+    existing_projects = store.list_all()
+    _new_sig = f"{p.name.lower().strip()} {p.description.lower().strip()[:100]}"
+    for _ep in existing_projects:
+        _ex_sig = f"{_ep.name.lower().strip()} {(_ep.description or '').lower().strip()[:100]}"
+        _sim = SequenceMatcher(None, _new_sig, _ex_sig).ratio()
+        if _sim >= 0.80 and _ep.id != p.id:
+            if _is_json_request(request):
+                return JSONResponse(
+                    {"error": f"Project too similar to existing '{_ep.name}' (id={_ep.id}, similarity={_sim:.0%}). Use that project or choose a distinct name."},
+                    status_code=409,
+                )
+            return RedirectResponse(f"/projects/{_ep.id}?warn=duplicate", status_code=303)
+
     store.create(p)
 
     # Auto-provision TMA, Security, Tech Debt missions

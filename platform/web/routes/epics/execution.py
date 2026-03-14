@@ -265,6 +265,12 @@ async def api_mission_start(request: Request):
     jd = max(float(data.get("job_duration", 3)), 0.1)
     wsjf_score = round((bv + tc + rr) / jd, 1)
 
+    # Stack detection: Rust/game projects → rust-game-sprint
+    _brief_lower = (brief or "").lower()
+    _rust_keywords = {"rust", "macroquad", "cargo", "game", "arcade", "platformer", "shooter"}
+    if len(_rust_keywords & set(_brief_lower.split())) >= 2:
+        workflow_id = workflow_id or "rust-game-sprint"
+
     wf = get_workflow_store().get(workflow_id)
     if not wf:
         return JSONResponse({"error": "Workflow not found"}, status_code=404)
