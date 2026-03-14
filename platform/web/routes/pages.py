@@ -50,6 +50,15 @@ async def login_page(request: Request):
     )
 
 
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    """Privacy policy — GDPR Art. 12-14."""
+    templates = _templates(request)
+    return templates.TemplateResponse(
+        "privacy.html", {"request": request, "page_title": "Privacy Policy"}
+    )
+
+
 @router.get("/onboarding", response_class=HTMLResponse)
 async def onboarding_page(request: Request):
     """SAFe onboarding wizard — choose perspective + project."""

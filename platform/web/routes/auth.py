@@ -561,3 +561,65 @@ async def reset_password(request: Request):
         return JSONResponse({"ok": True, "message": "Password reset successfully."})
     except service.AuthError as e:
         return JSONResponse({"error": str(e), "code": e.code}, status_code=400)
+
+
+# ── GDPR Data Rights ────────────────────────────────────────────────
+
+
+@router.get("/api/me/export", dependencies=[Depends(require_auth())])
+async def export_my_data(request: Request):
+    """GDPR Art. 15+20 — Export all user data as JSON."""
+    from ...db.adapter import get_db
+
+    user = getattr(request.state, "user", None)
+    if not user:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    db = get_db()
+    user_id = user.id
+    email = user.email
+
+    data = {"user": {"id": user_id, "email": email, "username": getattr(user, "username", "")}}
+
+    try:
+        rows = db.execute("SELECT id, started_at, status FROM sessions WHERE user_id = %s ORDER BY started_at DESC LIMIT 100", (user_id,))
+        data["sessions"] = [{"id": r[0], "started_at": str(r[1]), "status": r[2]} for r in rows]
+    except Exception:
+        data["sessions"] = []
+
+    try:
+        rows = db.execute("SELECT slug, title, updated_at FROM wiki_pages WHERE owner = %s LIMIT 100", (email,))
+        data["wiki_pages"] = [{"slug": r[0], "title": r[1], "updated_at": str(r[2])} for r in rows]
+    except Exception:
+        data["wiki_pages"] = []
+
+    return JSONResponse(data, headers={
+        "Content-Disposition": f"attachment; filename=sf_export_{user_id}.json"
+    })
+
+
+@router.delete("/api/me", dependencies=[Depends(require_auth())])
+async def delete_my_account(request: Request):
+    """GDPR Art. 17 — Right to erasure. Delete account + associated data."""
+    from ...db.adapter import get_db
+
+    user = getattr(request.state, "user", None)
+    if not user:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    if getattr(user, "role", "") == "admin":
+        return JSONResponse({"error": "Admin accounts cannot self-delete. Contact another admin."}, status_code=403)
+
+    db = get_db()
+    user_id = user.id
+
+    try:
+        db.execute("UPDATE wiki_pages SET owner = 'deleted' WHERE owner = %s", (user.email,))
+        db.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        resp = JSONResponse({"ok": True, "message": "Account deleted."})
+        resp.delete_cookie("access_token", path="/")
+        resp.delete_cookie("refresh_token", path="/api/auth")
+        return resp
+    except Exception as e:
+        logger.error("Account deletion failed for %s: %s", user_id, e)
+        return JSONResponse({"error": "Deletion failed. Contact admin."}, status_code=500)

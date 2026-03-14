@@ -235,6 +235,7 @@
                     <span class="ws-dot" style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:{{ request.state.workspace_color | default('#6366f1') }}"></span>
                     <span class="ws-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ request.state.workspace_name | default('Default') }}</span>
                 </div>
+                <a href="/privacy" style="display:block;padding:2px 16px 6px;font-size:0.65rem;color:var(--text-secondary);opacity:.6;text-decoration:none" title="Privacy Policy">Privacy</a>
             </div>
             {% endif %}
         </nav>

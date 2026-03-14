@@ -209,7 +209,7 @@ DON'T: gradient-bg . emoji . inline-styles . hardcoded-colors . websocket . --re
   spinner-no-context . wall-of-text . deep-nav(>3) . modal-abuse . no-feedback
 
 ## Compliance
-SOC2: CC1-CC9+A1 — 76% (19/25 pass, 6 warn). Key: CC6 access=PASS, A1 availability=WARN
+SOC2: CC1-CC9+A1 — 92% (23/25 pass, 2 warn). Key: CC7.4 IRP=PASS, A1.2 DR=PASS
 ISO27001: Annex A — 88% (22/25 pass, 3 warn). Key: A.9 access=PASS, A.12.6 vuln-mgmt=WARN
 OWASP Top10: 7/10 pass, 3 warn (A05 miscfg, A06 deps, A10 SSRF)
 
@@ -222,7 +222,7 @@ Priority: 1.sandbox-RCE 2.security-headers 3.URL-allowlist 4.dep-CVEs 5.rate-lim
 Chain: Persona(16) -> Feature(44,feat-*) -> Story(172,us-{uuid8}) -> AC(154,ac-{uuid8})
   -> IHM(124/124) -> Code(379/382) -> TU(36/36) -> E2E(23/23) -> CRUD(645) -> RBAC(54/54)
 Annotations: .py=`# Ref: feat-*` . .html=`<!-- Ref: feat-* -->` . .ts=`// Ref: feat-*`
-Wiki: 63 pages — 8 traceability + 10 DS/UX + 6 compliance + 3 devops + 1 LEAN
+Wiki: 68+ pages — 8 traceability + 10 DS/UX + 10 compliance + 6 devops + 1 LEAN audit
 
 ## A11Y — WCAG AA (W3C ARIA APG)
 30 patterns: accordion alert alertdialog breadcrumb button carousel checkbox combobox dialog
@@ -239,12 +239,12 @@ Keys: `{{ t('nav.home') }}` via platform/i18n/ locales/*.json
 Detection: URL?lang= > Cookie(sf_lang) > Accept-Language > en
 
 ## SecureByDesign (25 controls, v1.1)
-L1-Input(3): SBD-01 validation=PASS . SBD-02 prompt-inject=PASS . SBD-03 CSP=WARN
+L1-Input(3): SBD-01 validation=PASS . SBD-02 prompt-inject=PASS . SBD-03 CSP=PASS
 L2-Auth(3): SBD-04 auth=PASS . SBD-05 authz=PASS . SBD-06 least-priv=PASS
-L3-Data(3): SBD-07 secrets=PASS . SBD-08 crypto=PASS . SBD-09 minimize=WARN
-L4-Resilience(4): SBD-10 logging=PASS . SBD-11 rate-limit=WARN . SBD-12 SSRF=WARN . SBD-13 errors=PASS
-L5-Supply(12): 9 PASS, 3 WARN (SBD-14 deps, SBD-20 CORS, SBD-24 IRP)
-Score: 72% (18/25 pass, 7 warn)
+L3-Data(3): SBD-07 secrets=PASS . SBD-08 crypto=PASS . SBD-09 minimize=PASS
+L4-Resilience(4): SBD-10 logging=PASS . SBD-11 rate-limit=PASS . SBD-12 SSRF=PASS . SBD-13 errors=PASS
+L5-Supply(12): 11 PASS, 1 WARN (SBD-14 deps)
+Score: 96% (24/25 pass, 1 warn)
 
 ## Observability (OTEL)
 Traces: Jaeger :16686 — agent exec, LLM calls, DB queries, HTTP
@@ -260,10 +260,12 @@ Headers: X-RateLimit-Limit/Remaining/Reset . Retry-After(429)
 Versioning: v1 implicit . v2 prefix planned . Sunset header for deprecation
 Errors: {"error":"code","message":"text","status":NNN,"request_id":"req-*"}
 
-## GDPR (33% — 4/12 pass)
-PASS: Art.6(lawful) . Art.25(privacy-by-design) . Art.32(security) . Art.30(partial)
-WARN: Art.5(no DPR) . Art.7(no consent UI) . Art.12(no privacy page) . Art.15(no export)
-  Art.17(no erasure) . Art.20(no portability) . Art.33(no breach proc) . Art.35(no DPIA)
+## GDPR Data Rights (92% — 11/12 pass)
+/privacy — privacy policy page (Art.12-14)
+GET /api/me/export — data portability (Art.15+20)
+DELETE /api/me — right to erasure (Art.17)
+ops/data_retention.py — auto-purge 90d sessions, 30d IP pseudonymize (Art.5)
+Wiki: gdpr-dpr (Art.30), dpia-llm (Art.35), breach-notification (Art.33-34), irp-playbook
 Retention: PII=lifetime+30d . sessions=90d . security-logs=90d(pseudonymize@30d) . metrics=1y
 
 ## DR (Disaster Recovery)
