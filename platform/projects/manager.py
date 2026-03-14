@@ -973,6 +973,27 @@ class ProjectStore:
                     "docs": ["security.md"],
                 },
             ),
+            # ── Build MVP: the main product build mission ──
+            MissionDef(
+                name=f"Build MVP — {proj.name}",
+                description=(
+                    f"Construire le MVP de {proj.name} : setup projet, dev sprints, "
+                    "tests, CI/CD, QA, accessibilité, déploiement. Workflow complet product-lifecycle."
+                ),
+                goal="MVP fonctionnel déployé avec tests, CI/CD, accessibilité WCAG AA.",
+                status="active" if is_mvp_phase else ("planning" if is_early_phase else "completed"),
+                type="build",
+                project_id=proj.id,
+                workflow_id="product-lifecycle",
+                wsjf_score=20,
+                created_by="product_owner",
+                category="product",
+                active_phases=["mvp", "v1"],
+                config={
+                    "auto_provisioned": True,
+                    "requires": "architecture",
+                },
+            ),
             # ── TMA / Sécu / Dette : opérationnel (v1+) ──
             MissionDef(
                 name=f"TMA — {proj.name}",
