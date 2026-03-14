@@ -17,6 +17,9 @@ PSY remote=github (not origin).
 - `--reload` (same shadow) . `*_API_KEY=dummy` — Infisical/.env
 - change LLM models . emoji in UI . WebSocket — SSE only (`--ws none`) . SVG Feather icons only
 - gradient bg . inline styles . hardcoded hex colors in UI
+- fake/mock/stub data — LIVE DATA ONLY . no test libs that cheat (fake pass)
+- no slop (hallucinated code, placeholder "TODO", stub impl) . no fallback anywhere
+- no `return {}` / `return None` / `pass` as impl — real logic or raise NotImplementedError
 
 ## Stack
 Py3.11 . FastAPI . Jinja2 . HTMX . SSE . PG16(62tbl WAL+FTS5) . SQLite fb . Redis7 . Infisical . zero build
@@ -153,6 +156,10 @@ L2+: [PERSONAL ACCOUNTABILITY] hook. QA=REVIEWER not IMPLEMENTER.
 10-12: CI ruff.compile.pytest HARD . 13: complexity(radon) SOFT
 14-17: sonar SOFT . deploy canary HARD . output_validator SOFT . stale_prune SOFT
 CC>10err>5warn . LOC>500err>300warn . MI<10err<20warn
+DATA RULE: no mock/fake/stub/dummy data anywhere — live PG queries, real API calls.
+  Tests use real DB (test schema), real LLM (MiniMax M2.5), real file I/O.
+  No `unittest.mock.patch` to skip real behavior. No fallback `return {}`.
+  If ext svc unavailable → skip test w/ reason, don't fake it.
 
 ## Bg Tasks
 auto_resume(5min) . traceability(6h) . evolution(02:00) . auto_heal(60s)
