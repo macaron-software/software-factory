@@ -7,6 +7,7 @@ Each agent runs as an independent asyncio.Task:
   4. Parse structured actions from LLM output
   5. Route actions through the MessageBus
 """
+# Ref: feat-agents-list, feat-agent-chat
 
 from __future__ import annotations
 

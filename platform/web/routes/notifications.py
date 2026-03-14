@@ -1,10 +1,12 @@
 """Web routes — In-app notifications (bell icon, list, mark-read)."""
+# Ref: feat-monitoring
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ...auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...services.notifications import get_notification_store
@@ -47,13 +49,13 @@ async def api_notifications_badge(request: Request):
     return HTMLResponse("")
 
 
-@router.post("/api/notifications/{nid}/read")
+@router.post("/api/notifications/{nid}/read", dependencies=[Depends(require_auth())])
 async def api_notification_mark_read(nid: str, request: Request):
     get_notification_store().mark_read(nid)
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/notifications/read-all")
+@router.post("/api/notifications/read-all", dependencies=[Depends(require_auth())])
 async def api_notification_mark_all_read(request: Request):
     count = get_notification_store().mark_all_read()
     return JSONResponse({"ok": True, "marked": count})
@@ -88,7 +90,7 @@ async def notifications_page(request: Request):
     )
 
 
-@router.post("/api/notifications/test")
+@router.post("/api/notifications/test", dependencies=[Depends(require_auth())])
 async def test_notification_channel(request: Request):
     """Test a notification channel with a sample payload."""
     from ...services.notification_service import get_notification_service, NotificationPayload

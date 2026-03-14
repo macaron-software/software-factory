@@ -7,6 +7,7 @@ Handles:
     - Connection pooling for PostgreSQL
     - PRAGMA skip for PostgreSQL
 """
+# Ref: feat-settings
 
 import os
 import re

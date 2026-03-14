@@ -1,3 +1,4 @@
+// Ref: feat-cockpit, feat-metrics
 import { test, expect } from "@playwright/test";
 import { collectErrors, assertNoErrors, safeGoto } from "./helpers";
 

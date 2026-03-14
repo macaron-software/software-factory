@@ -6,10 +6,11 @@ import json
 import logging
 import os
 
-from fastapi import APIRouter
+from fastapi import Depends,  APIRouter
 from fastapi.responses import JSONResponse
 
 from ...schemas import LlmStatsResponse
+from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ async def get_llm_routing():
     )
 
 
-@router.post("/api/llm/routing")
+@router.post("/api/llm/routing", dependencies=[Depends(require_auth())])
 async def save_llm_routing(payload: dict):
     """Save LLM routing config."""
     try:
@@ -229,7 +230,7 @@ async def save_llm_routing(payload: dict):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/api/llm/routing/reset")
+@router.post("/api/llm/routing/reset", dependencies=[Depends(require_auth())])
 async def reset_llm_routing():
     """Reset routing to current auto-detected defaults (primary provider)."""
     try:
@@ -248,7 +249,7 @@ async def reset_llm_routing():
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/api/llm/providers/{provider_id}/toggle")
+@router.post("/api/llm/providers/{provider_id}/toggle", dependencies=[Depends(require_auth())])
 async def toggle_provider(provider_id: str):
     """Enable or disable a provider (independent of API key presence)."""
     try:
@@ -390,7 +391,7 @@ async def get_provider_models_live(provider_id: str):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/api/llm/local/ensure")
+@router.post("/api/llm/local/ensure", dependencies=[Depends(require_auth())])
 async def ensure_local_server():
     """Ensure the local LLM server (local-mlx) is running, starting it if needed.
 
@@ -463,3 +464,24 @@ async def ensure_local_server():
         },
         status_code=503,
     )
+
+
+@router.get("/api/tools/thompson")
+async def tool_thompson_stats_endpoint():
+    """Thompson Sampling stats for search tool selection (code_search vs mcp_cocoindex_search)."""
+    try:
+        from ....llm.tool_thompson import tool_thompson_stats
+        stats = tool_thompson_stats()
+        # Group by context_type
+        grouped: dict[str, list] = {}
+        for arm in stats:
+            ct = arm["context_type"]
+            grouped.setdefault(ct, []).append(arm)
+        return JSONResponse({
+            "ok": True,
+            "arms": stats,
+            "by_context": grouped,
+            "total_arms": len(stats),
+        })
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)

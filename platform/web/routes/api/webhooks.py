@@ -3,6 +3,7 @@
 Supported sources: github, jira, monitoring (Grafana/PagerDuty), generic.
 Each webhook config maps source+event to workflow_id + project_id.
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 import hashlib
@@ -10,7 +11,8 @@ import hmac
 import json
 import os
 import uuid
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -56,7 +58,7 @@ async def _launch_mission(
         return None
 
 
-@router.post("/github")
+@router.post("/github", dependencies=[Depends(require_auth())])
 async def github_webhook(request: Request):
     """GitHub webhook: push, pull_request, issues — launch configured workflow."""
     body = await request.body()
@@ -99,7 +101,7 @@ async def github_webhook(request: Request):
     return JSONResponse({"ok": True, "event": event, "launched": launched})
 
 
-@router.post("/jira")
+@router.post("/jira", dependencies=[Depends(require_auth())])
 async def jira_webhook(request: Request):
     """Jira webhook: issue_created, issue_updated — launch configured workflow."""
     body = await request.body()
@@ -141,7 +143,7 @@ async def jira_webhook(request: Request):
     )
 
 
-@router.post("/monitoring")
+@router.post("/monitoring", dependencies=[Depends(require_auth())])
 async def monitoring_webhook(request: Request):
     """Monitoring webhook: Grafana alerts, PagerDuty incidents — launch tma-autoheal."""
     body = await request.body()
@@ -171,7 +173,7 @@ async def monitoring_webhook(request: Request):
     return JSONResponse({"ok": True, "alert": alert_name, "launched": launched})
 
 
-@router.post("/generic")
+@router.post("/generic", dependencies=[Depends(require_auth())])
 async def generic_webhook(request: Request, workflow_id: str, project_id: str = ""):
     """Generic webhook: launch any workflow with payload as context.
     Usage: POST /api/webhooks/generic?workflow_id=tma-maintenance&project_id=my-project
@@ -205,7 +207,7 @@ async def list_webhook_configs():
     return {"configs": [dict(r) for r in rows]}
 
 
-@router.post("/configs")
+@router.post("/configs", dependencies=[Depends(require_auth())])
 async def create_webhook_config(
     source: str,
     event_filter: str = "*",
@@ -231,7 +233,7 @@ async def create_webhook_config(
     return {"id": cid, "ok": True}
 
 
-@router.delete("/configs/{config_id}")
+@router.delete("/configs/{config_id}", dependencies=[Depends(require_auth())])
 async def delete_webhook_config(config_id: str):
     from ...db.migrations import get_db
 

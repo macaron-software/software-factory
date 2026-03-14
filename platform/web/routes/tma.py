@@ -5,13 +5,15 @@ where code placeholders and inline annotations (TODO/FIXME/DEBT) are surfaced as
 actionable maintenance tickets (bug/debt/security/performance). Used with the
 tma-maintenance workflow for autonomous triage → root cause → TDD fix → deploy pipeline.
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from ...auth.middleware import require_auth
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -62,7 +64,7 @@ async def get_ticket(request: Request, ticket_id: str):
     }
 
 
-@router.put("/tickets/{ticket_id}")
+@router.put("/tickets/{ticket_id}", dependencies=[Depends(require_auth())])
 async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpdate):
     """Update TMA ticket."""
     from ...db.core import get_db
@@ -147,7 +149,7 @@ async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpda
         raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 
-@router.delete("/tickets/{ticket_id}")
+@router.delete("/tickets/{ticket_id}", dependencies=[Depends(require_auth())])
 async def delete_ticket(request: Request, ticket_id: str):
     """Delete TMA ticket (soft delete by setting status to archived)."""
     from ...db.core import get_db
@@ -267,7 +269,7 @@ class JSErrorReport(BaseModel):
     ua: str = ""
 
 
-@router.post("/js-error")
+@router.post("/js-error", dependencies=[Depends(require_auth())])
 async def report_js_error(request: Request, report: JSErrorReport):
     """Receive JS errors from browser and create TMA support tickets."""
     import uuid

@@ -1,4 +1,5 @@
 """API Keys management — generate, list, revoke platform API keys."""
+# Ref: feat-settings, feat-rbac
 
 from __future__ import annotations
 import hashlib

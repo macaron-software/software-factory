@@ -20,9 +20,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import AsyncIterator
 
-from fastapi import APIRouter
+from fastapi import Depends,  APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.requests import Request
+from ...auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ def _update_task(
 # ── Submit task ────────────────────────────────────────────────────────────────
 
 
-@router.post("/a2a/tasks")
+@router.post("/a2a/tasks", dependencies=[Depends(require_auth())])
 async def submit_task(request: Request):
     """Submit a task to Jarvis. Returns task object with id + submitted status."""
     try:
@@ -339,7 +340,7 @@ async def list_tasks():
 # ── Cancel task ────────────────────────────────────────────────────────────────
 
 
-@router.post("/a2a/tasks/{task_id}/cancel")
+@router.post("/a2a/tasks/{task_id}/cancel", dependencies=[Depends(require_auth())])
 async def cancel_task(task_id: str):
     """Cancel a submitted or working task."""
     task = _tasks.get(task_id)

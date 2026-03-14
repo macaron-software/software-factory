@@ -7,6 +7,7 @@ proper ID: pers-{uuid8}, feat-{uuid8}, us-{uuid8}, ac-{uuid8}, jour-{uuid8}.
 Tables created on first use (no manual migration needed).
 """
 from __future__ import annotations
+# Ref: feat-annotate, feat-quality
 
 import json
 import logging

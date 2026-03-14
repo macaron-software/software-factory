@@ -3,6 +3,7 @@
 Tests all 4 layers: pattern, project, global, and the compactor.
 Run: pytest tests/test_memory.py -v
 """
+# Ref: feat-memory
 
 import os
 import sys

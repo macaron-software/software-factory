@@ -9,6 +9,7 @@ WRITE-EXECUTE-OBSERVE-DECIDE cycle:
 3. OBSERVE: Results accumulated as findings
 4. DECIDE: Main LLM explores more or emits FINAL_ANSWER
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

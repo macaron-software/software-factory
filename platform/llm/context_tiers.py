@@ -16,6 +16,7 @@ we select a tier based on agent role, hierarchy, and token budget:
 Token savings: L0 = 90%, L1 = 60-70% vs L2 baseline.
 """
 from __future__ import annotations
+# Ref: feat-skills, feat-agents-list
 
 import enum
 import logging

@@ -1,4 +1,5 @@
 """Web routes — Session management and live views."""
+# Ref: feat-mission-replay
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -18,6 +19,7 @@ from fastapi.responses import (
 
 from .helpers import _templates, _agent_map_for_template
 from ...i18n import t, get_lang
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -850,7 +852,7 @@ async def session_page(request: Request, session_id: str):
     )
 
 
-@router.post("/api/sessions")
+@router.post("/api/sessions", dependencies=[Depends(require_auth())])
 async def create_session(request: Request):
     """Create a new session from form data."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -881,7 +883,7 @@ async def create_session(request: Request):
     return RedirectResponse(f"/sessions/{session.id}", status_code=303)
 
 
-@router.post("/api/sessions/{session_id}/messages", response_class=HTMLResponse)
+@router.post("/api/sessions/{session_id}/messages", response_class=HTMLResponse, dependencies=[Depends(require_auth())])
 async def send_message(request: Request, session_id: str):
     """User sends a message — agent responds via LLM."""
     from ...sessions.store import get_session_store, MessageDef
@@ -985,7 +987,7 @@ async def poll_messages(request: Request, session_id: str, after: str = ""):
     return HTMLResponse("".join(html_parts))
 
 
-@router.post("/api/sessions/{session_id}/stop")
+@router.post("/api/sessions/{session_id}/stop", dependencies=[Depends(require_auth())])
 async def stop_session(session_id: str):
     """Stop an active session."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1006,7 +1008,7 @@ async def stop_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/resume")
+@router.post("/api/sessions/{session_id}/resume", dependencies=[Depends(require_auth())])
 async def resume_session(session_id: str):
     """Resume a completed/stopped session back to active."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1024,7 +1026,7 @@ async def resume_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/run-pattern")
+@router.post("/api/sessions/{session_id}/run-pattern", dependencies=[Depends(require_auth())])
 async def run_session_pattern(request: Request, session_id: str):
     """Execute the pattern assigned to this session."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1090,7 +1092,7 @@ async def _run_pattern_background(pattern, session_id: str, task: str, project_i
         )
 
 
-@router.delete("/api/sessions/{session_id}")
+@router.delete("/api/sessions/{session_id}", dependencies=[Depends(require_auth())])
 async def delete_session(session_id: str):
     """Delete a session and all its messages."""
     from ...sessions.store import get_session_store
@@ -1099,7 +1101,7 @@ async def delete_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/agents/start")
+@router.post("/api/sessions/{session_id}/agents/start", dependencies=[Depends(require_auth())])
 async def start_session_agents(request: Request, session_id: str):
     """Start agent loops for a session — the agents begin thinking autonomously."""
     from ...sessions.store import get_session_store
@@ -1141,7 +1143,7 @@ async def start_session_agents(request: Request, session_id: str):
     return JSONResponse({"started": started, "count": len(started)})
 
 
-@router.post("/api/sessions/{session_id}/agents/stop")
+@router.post("/api/sessions/{session_id}/agents/stop", dependencies=[Depends(require_auth())])
 async def stop_session_agents(session_id: str):
     """Stop all agent loops for a session."""
     from ...agents.loop import get_loop_manager
@@ -1151,7 +1153,7 @@ async def stop_session_agents(session_id: str):
     return JSONResponse({"stopped": True})
 
 
-@router.post("/api/sessions/{session_id}/agents/{agent_id}/message")
+@router.post("/api/sessions/{session_id}/agents/{agent_id}/message", dependencies=[Depends(require_auth())])
 async def send_to_agent(request: Request, session_id: str, agent_id: str):
     """Send a message to a specific agent via the bus (user → agent)."""
     from ...a2a.bus import get_bus
@@ -1189,7 +1191,7 @@ async def send_to_agent(request: Request, session_id: str, agent_id: str):
     return JSONResponse({"sent": True, "to": agent_id})
 
 
-@router.post("/api/sessions/{session_id}/conversation")
+@router.post("/api/sessions/{session_id}/conversation", dependencies=[Depends(require_auth())])
 async def start_conversation(request: Request, session_id: str):
     """Start a real multi-agent conversation with streaming.
 

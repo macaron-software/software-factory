@@ -6,6 +6,7 @@ POST /api/modules/{id}/toggle → enable/disable a module
 POST /api/modules/{id}/install → run install command
 GET  /api/modules/categories → list categories
 """
+# Ref: feat-settings
 
 from __future__ import annotations
 
@@ -17,7 +18,8 @@ from pathlib import Path
 from typing import Any, Dict
 
 import yaml
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 
@@ -45,8 +47,6 @@ def _load_registry() -> list[Dict]:
 def _get_enabled_ids() -> set[str]:
     """Read enabled module IDs from DB settings table.
     Default: all builtin modules are enabled.
-    NOTE: toggling from UI persists preference in DB but does NOT yet enforce
-    at agent runtime — tool registration happens at startup unconditionally.
     """
     builtin_defaults = {m["id"] for m in _load_registry() if m.get("builtin")}
     if not _has_db:
@@ -54,7 +54,7 @@ def _get_enabled_ids() -> set[str]:
     try:
         db = get_db()
         rows = db.execute(
-            "SELECT value FROM settings WHERE key = 'enabled_modules'"
+            "SELECT value FROM platform_settings WHERE key = 'enabled_modules'"
         ).fetchone()
         if rows:
             import json
@@ -73,7 +73,8 @@ def _set_enabled_ids(ids: set[str]) -> None:
 
         db = get_db()
         db.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES('enabled_modules', ?)",
+            "INSERT INTO platform_settings(key, value) VALUES('enabled_modules', ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
             (json.dumps(sorted(ids)),),
         )
         db.commit()
@@ -146,7 +147,7 @@ async def list_categories():
     return JSONResponse(list(cats.values()))
 
 
-@router.post("/api/modules/{module_id}/toggle")
+@router.post("/api/modules/{module_id}/toggle", dependencies=[Depends(require_auth())])
 async def toggle_module(module_id: str):
     modules = _load_registry()
     ids = {m["id"] for m in modules}
@@ -181,7 +182,7 @@ async def toggle_module(module_id: str):
     return JSONResponse({"ok": True, "id": module_id, "enabled": now_enabled})
 
 
-@router.post("/api/modules/{module_id}/install")
+@router.post("/api/modules/{module_id}/install", dependencies=[Depends(require_auth())])
 async def install_module(module_id: str):
     modules = _load_registry()
     module = next((m for m in modules if m["id"] == module_id), None)

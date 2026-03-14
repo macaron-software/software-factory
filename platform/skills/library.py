@@ -1,5 +1,6 @@
 """Skills library — scans local SF skills (.md) + YAML role definitions + GitHub repos."""
 from __future__ import annotations
+# Ref: feat-skills
 
 import json
 import logging

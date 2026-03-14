@@ -1,4 +1,5 @@
 """Memory layer endpoints."""
+# Ref: feat-memory
 
 from __future__ import annotations
 
@@ -6,11 +7,12 @@ import html as html_mod
 import json
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
 from .input_models import GlobalMemoryCreate, ProjectMemoryCreate
+from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,7 +53,7 @@ async def project_memory(
     return JSONResponse(entries)
 
 
-@router.post("/api/memory/project/{project_id}")
+@router.post("/api/memory/project/{project_id}", dependencies=[Depends(require_auth())])
 async def project_memory_store(project_id: str, body: ProjectMemoryCreate):
     """Store a project memory entry (upsert by project_id + category + key)."""
     from ....memory.manager import get_memory_manager
@@ -95,7 +97,7 @@ async def global_memory(category: str = ""):
     return JSONResponse(entries)
 
 
-@router.post("/api/memory/global")
+@router.post("/api/memory/global", dependencies=[Depends(require_auth())])
 async def global_memory_store(body: GlobalMemoryCreate):
     """Store a global memory entry."""
     from ....memory.manager import get_memory_manager
@@ -149,7 +151,7 @@ async def memory_health():
     return JSONResponse(get_memory_health())
 
 
-@router.post("/api/memory/ingest")
+@router.post("/api/memory/ingest", dependencies=[Depends(require_auth())])
 async def memory_ingest(request: Request):
     """Ingest raw text into platform memory (memory_global, category='inbox').
 
@@ -360,7 +362,7 @@ Answer concisely with citations. If the context doesn't contain relevant info, s
     return JSONResponse({"answer": answer, "sources": sources})
 
 
-@router.post("/api/memory/compact")
+@router.post("/api/memory/compact", dependencies=[Depends(require_auth())])
 async def memory_compact():
     """Trigger on-demand memory compaction (dedup, prune, compress, re-score)."""
     import asyncio

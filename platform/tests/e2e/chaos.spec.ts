@@ -1,3 +1,4 @@
+// Ref: feat-ops
 /**
  * Chaos E2E — UI recovery and data integrity after chaos events.
  * Run: npx playwright test chaos.spec.ts --timeout 300000

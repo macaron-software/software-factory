@@ -4,20 +4,22 @@ WHY: phase_outcomes data now available; expose data-driven pattern selection
 so agents and UI can choose the best orchestration pattern for a given context.
 Ref: SF pattern observability, 2026-03.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/api/patterns/recommend")
+@router.post("/api/patterns/recommend", dependencies=[Depends(require_auth())])
 async def recommend_pattern(body: dict[str, Any]) -> JSONResponse:
     """Score and rank patterns for a given project context.
 

@@ -1,10 +1,12 @@
 """Incident management, auto-heal & chaos endurance endpoints."""
+# Ref: feat-ops, feat-monitoring
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import AutoHealStats, IncidentOut, IncidentStats, OkResponse
@@ -72,7 +74,7 @@ async def list_incidents(request: Request):
         db.close()
 
 
-@router.post("/api/incidents", responses={200: {"model": OkResponse}})
+@router.post("/api/incidents", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def create_incident(body: IncidentCreate):
     """Create a manual incident."""
     import uuid
@@ -101,7 +103,7 @@ async def create_incident(body: IncidentCreate):
         db.close()
 
 
-@router.patch("/api/incidents/{incident_id}", responses={200: {"model": OkResponse}})
+@router.patch("/api/incidents/{incident_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def update_incident(incident_id: str, body: IncidentUpdate):
     """Update incident status (resolve, close)."""
     from ....db.migrations import get_db
@@ -190,7 +192,7 @@ async def autoheal_heartbeat():
     return HTMLResponse(html)
 
 
-@router.post("/api/autoheal/trigger")
+@router.post("/api/autoheal/trigger", dependencies=[Depends(require_auth())])
 async def autoheal_trigger():
     """Manually trigger one auto-heal cycle."""
     from ....ops.auto_heal import heal_cycle
@@ -216,7 +218,7 @@ async def chaos_history():
     return JSONResponse(get_chaos_history())
 
 
-@router.post("/api/chaos/trigger")
+@router.post("/api/chaos/trigger", dependencies=[Depends(require_auth())])
 async def chaos_trigger(request: Request):
     """Manually trigger a chaos scenario."""
     from ....ops.chaos_endurance import trigger_chaos

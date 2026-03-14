@@ -1,3 +1,4 @@
+// Ref: feat-projects, feat-agent-chat
 import { test, expect } from "@playwright/test";
 import { collectErrors, assertNoErrors, safeGoto } from "./helpers";
 

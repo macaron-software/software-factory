@@ -1,10 +1,12 @@
 """Platform settings — configurable rate limits, budget caps, and AC quality thresholds."""
+# Ref: feat-settings
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +95,7 @@ async def get_rate_limits(request: Request):
         db.close()
 
 
-@router.put("/api/settings/rate-limits")
+@router.put("/api/settings/rate-limits", dependencies=[Depends(require_auth("admin"))])
 async def update_rate_limits(request: Request):
     from ....db.migrations import get_db
 
@@ -136,7 +138,7 @@ async def get_quality_settings(request: Request):
         db.close()
 
 
-@router.put("/api/settings/quality")
+@router.put("/api/settings/quality", dependencies=[Depends(require_auth("admin"))])
 async def update_quality_settings(request: Request):
     """Update AC quality thresholds live — no restart needed."""
     from ....db.migrations import get_db

@@ -1,5 +1,6 @@
 """Tests for tiered context loading (L0/L1/L2)."""
 from __future__ import annotations
+# Ref: feat-skills
 
 import pytest
 

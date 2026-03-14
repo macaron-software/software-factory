@@ -7,6 +7,7 @@ This is the runtime loop that makes agents actually work. It:
 4. When LLM returns text (no tool_calls) → done
 5. Sends response back via MessageBus or returns it
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

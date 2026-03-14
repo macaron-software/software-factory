@@ -5,6 +5,7 @@ Skills Injection Integration - Bridge between agent loop and skills injection sy
 Integrates automatic skills injection into the agent execution loop.
 Called from AgentLoop._build_execution_context() to enrich agent prompts.
 """
+# Ref: feat-skills
 
 import logging
 import re

@@ -1,4 +1,5 @@
 """Tool Builder — no-code custom tool creation (HTTP, SQL, shell)."""
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 
@@ -7,7 +8,8 @@ import subprocess
 import uuid
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ...auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...db.migrations import get_db
@@ -37,7 +39,7 @@ async def list_custom_tools():
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/tools/custom")
+@router.post("/api/tools/custom", dependencies=[Depends(require_auth())])
 async def create_custom_tool(request: Request):
     body = await request.json()
     tool_id = str(uuid.uuid4())
@@ -56,7 +58,7 @@ async def create_custom_tool(request: Request):
     return JSONResponse({"id": tool_id})
 
 
-@router.put("/api/tools/custom/{tool_id}")
+@router.put("/api/tools/custom/{tool_id}", dependencies=[Depends(require_auth())])
 async def update_custom_tool(tool_id: str, request: Request):
     body = await request.json()
     db = get_db()
@@ -76,7 +78,7 @@ async def update_custom_tool(tool_id: str, request: Request):
     return JSONResponse({"ok": True})
 
 
-@router.delete("/api/tools/custom/{tool_id}")
+@router.delete("/api/tools/custom/{tool_id}", dependencies=[Depends(require_auth())])
 async def delete_custom_tool(tool_id: str):
     db = get_db()
     db.execute("DELETE FROM custom_tools WHERE id=?", (tool_id,))
@@ -84,7 +86,7 @@ async def delete_custom_tool(tool_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/tools/custom/{tool_id}/toggle")
+@router.post("/api/tools/custom/{tool_id}/toggle", dependencies=[Depends(require_auth())])
 async def toggle_custom_tool(tool_id: str):
     db = get_db()
     db.execute("UPDATE custom_tools SET enabled = 1 - enabled WHERE id=?", (tool_id,))
@@ -98,7 +100,7 @@ async def toggle_custom_tool(tool_id: str):
 # ── Test execution ────────────────────────────────────────────────────────────
 
 
-@router.post("/api/tools/custom/{tool_id}/test")
+@router.post("/api/tools/custom/{tool_id}/test", dependencies=[Depends(require_auth())])
 async def test_custom_tool(tool_id: str, request: Request):
     db = get_db()
     row = db.execute("SELECT * FROM custom_tools WHERE id=?", (tool_id,)).fetchone()

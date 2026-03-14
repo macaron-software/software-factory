@@ -7,8 +7,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import JSONResponse, Response
+from ....auth.middleware import require_auth
 
 router = APIRouter()
 
@@ -151,7 +152,7 @@ def _empty_wireframe_svg(width: int = 1280, height: int = 800) -> str:
 # ── Wireframe endpoint ───────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/wireframe")
+@router.post("/api/projects/{project_id}/wireframe", dependencies=[Depends(require_auth())])
 async def generate_wireframe(project_id: str, request: Request):
     """Generate SVG wireframe from HTML (POST body: {html?: str, url?: str})."""
     body = {}
@@ -213,7 +214,7 @@ async def get_screen_svg(project_id: str, screen_id: str):
     return Response(p.read_text(), media_type="image/svg+xml")
 
 
-@router.delete("/api/projects/{project_id}/screens/{screen_id}")
+@router.delete("/api/projects/{project_id}/screens/{screen_id}", dependencies=[Depends(require_auth())])
 async def delete_screen(project_id: str, screen_id: str):
     db = _db()
     db.execute(
@@ -251,7 +252,7 @@ async def list_annotations(
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/projects/{project_id}/annotations")
+@router.post("/api/projects/{project_id}/annotations", dependencies=[Depends(require_auth())])
 async def create_annotation(project_id: str, request: Request):
     body = await request.json()
     db = _db()
@@ -301,7 +302,7 @@ async def create_annotation(project_id: str, request: Request):
     return JSONResponse({"id": ann_id, "seq_num": seq_num})
 
 
-@router.patch("/api/projects/{project_id}/annotations/{ann_id}")
+@router.patch("/api/projects/{project_id}/annotations/{ann_id}", dependencies=[Depends(require_auth())])
 async def update_annotation(project_id: str, ann_id: str, request: Request):
     body = await request.json()
     db = _db()
@@ -324,7 +325,7 @@ async def update_annotation(project_id: str, ann_id: str, request: Request):
     return JSONResponse({"ok": True})
 
 
-@router.delete("/api/projects/{project_id}/annotations/{ann_id}")
+@router.delete("/api/projects/{project_id}/annotations/{ann_id}", dependencies=[Depends(require_auth())])
 async def delete_annotation(project_id: str, ann_id: str):
     db = _db()
     db.execute(
@@ -395,7 +396,7 @@ async def export_annotations(project_id: str):
     return JSONResponse({"markdown": "\n".join(lines)})
 
 
-@router.post("/api/projects/{project_id}/annotations/fix-all")
+@router.post("/api/projects/{project_id}/annotations/fix-all", dependencies=[Depends(require_auth())])
 async def fix_all_annotations(project_id: str, request: Request):
     """Create a mission to fix all open annotations."""
     # Get export markdown
@@ -541,7 +542,7 @@ async def get_screen_traceability(project_id: str, screen_id: str):
     return JSONResponse(result)
 
 
-@router.patch("/api/projects/{project_id}/screens/{screen_id}")
+@router.patch("/api/projects/{project_id}/screens/{screen_id}", dependencies=[Depends(require_auth())])
 async def update_screen(project_id: str, screen_id: str, request: Request):
     """Update screen metadata (feature_id, mission_id, name)."""
     body = await request.json()
@@ -575,7 +576,7 @@ async def get_general_settings():
     return JSONResponse({r["key"]: r["value"] for r in rows})
 
 
-@router.post("/api/settings/general")
+@router.post("/api/settings/general", dependencies=[Depends(require_auth())])
 async def update_general_settings(request: Request):
     """Update one or more general platform settings."""
     body = await request.json()

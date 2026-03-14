@@ -7,6 +7,7 @@ attempts to escape the sandbox via other project paths, real system paths, etc.
 
 Run: pytest tests/test_workspace_path_alias.py -v
 """
+# Ref: feat-workspaces
 import os
 import sys
 

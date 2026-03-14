@@ -1,3 +1,4 @@
+// Ref: feat-ops, feat-monitoring
 /**
  * Endurance E2E — UI monitoring during long-running missions.
  * Run: npx playwright test endurance.spec.ts --timeout 300000

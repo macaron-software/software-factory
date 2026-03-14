@@ -1,10 +1,12 @@
 """Browser Web Push API — subscribe/unsubscribe and VAPID public key."""
+# Ref: feat-monitoring
 
 import json
 import logging
 import os
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 from ....services.notification_service import get_notification_service
@@ -90,7 +92,7 @@ async def get_vapid_public_key():
     return {"publicKey": key, "key": key, "enabled": bool(key)}
 
 
-@router.post("/api/push/subscribe")
+@router.post("/api/push/subscribe", dependencies=[Depends(require_auth())])
 async def subscribe_push(request: Request):
     """Register a browser push subscription.
 
@@ -113,7 +115,7 @@ async def subscribe_push(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.delete("/api/push/subscribe")
+@router.delete("/api/push/subscribe", dependencies=[Depends(require_auth())])
 async def unsubscribe_push(request: Request):
     """Unregister a browser push subscription."""
     try:

@@ -1,4 +1,5 @@
 """Web routes — Project management routes."""
+# Ref: feat-projects, feat-backlog
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import pty
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends,  APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -21,6 +22,7 @@ from fastapi.responses import (
 
 from .helpers import _templates, _parse_body, _is_json_request
 from ..schemas import ProjectOut, OkResponse
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -106,7 +108,7 @@ async def projects_page(request: Request):
     )
 
 
-@router.post("/api/projects/heal")
+@router.post("/api/projects/heal", dependencies=[Depends(require_auth())])
 async def projects_heal():
     """Scaffold all projects: ensure workspace + git + docker + docs + code exist."""
     import asyncio
@@ -117,7 +119,7 @@ async def projects_heal():
     return result
 
 
-@router.post("/api/projects/{project_id}/phase")
+@router.post("/api/projects/{project_id}/phase", dependencies=[Depends(require_auth())])
 async def project_set_phase(project_id: str, request: Request):
     """Set the current phase of a project (triggers mission status update).
     Accepts ?force=true to bypass gate check."""
@@ -293,7 +295,7 @@ async def project_missions_suggest(project_id: str):
     )
 
 
-@router.post("/api/projects/{project_id}/scaffold")
+@router.post("/api/projects/{project_id}/scaffold", dependencies=[Depends(require_auth())])
 async def project_scaffold(project_id: str):
     """Scaffold a single project (idempotent)."""
     import asyncio
@@ -1089,7 +1091,7 @@ async def api_projects():
     )
 
 
-@router.post("/api/projects", responses={200: {"model": OkResponse}})
+@router.post("/api/projects", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project
@@ -1157,7 +1159,7 @@ async def create_project(request: Request):
     return RedirectResponse(f"/projects/{p.id}", status_code=303)
 
 
-@router.post("/api/projects/{project_id}/vision")
+@router.post("/api/projects/{project_id}/vision", dependencies=[Depends(require_auth())])
 async def update_vision(request: Request, project_id: str):
     """Update project vision."""
     from ...projects.manager import get_project_store
@@ -1168,7 +1170,7 @@ async def update_vision(request: Request, project_id: str):
     return HTMLResponse('<span class="badge badge-green">Saved</span>')
 
 
-@router.post("/api/projects/{project_id}/chat")
+@router.post("/api/projects/{project_id}/chat", dependencies=[Depends(require_auth())])
 async def project_chat(request: Request, project_id: str):
     """Quick chat with a project's lead agent — creates or reuses session."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -1279,7 +1281,7 @@ async def project_chat(request: Request, project_id: str):
 # ── Conversation Management ──────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/conversations")
+@router.post("/api/projects/{project_id}/conversations", dependencies=[Depends(require_auth())])
 async def create_conversation(request: Request, project_id: str):
     """Create a new conversation session for a project."""
     from ...sessions.store import get_session_store, SessionDef
@@ -1316,7 +1318,7 @@ async def create_conversation(request: Request, project_id: str):
 # ── Streaming Chat (SSE) ────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/chat/stream")
+@router.post("/api/projects/{project_id}/chat/stream", dependencies=[Depends(require_auth())])
 async def project_chat_stream(request: Request, project_id: str):
     """Stream agent response via SSE — shows live progress to the user."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -2253,7 +2255,7 @@ async def ws_read_file(project_id: str, path: str):
     return JSONResponse({"content": content, "path": path})
 
 
-@router.post("/api/projects/{project_id}/workspace/file/save")
+@router.post("/api/projects/{project_id}/workspace/file/save", dependencies=[Depends(require_auth())])
 async def ws_save_file(project_id: str, request: Request):
     """Save file content (write to disk)."""
     from ...projects.manager import get_project_store
@@ -2424,7 +2426,7 @@ async def ws_docker_status(project_id: str):
     return JSONResponse({"containers": containers, "docker_files": docker_files})
 
 
-@router.post("/api/projects/{project_id}/workspace/docker/{action}")
+@router.post("/api/projects/{project_id}/workspace/docker/{action}", dependencies=[Depends(require_auth())])
 async def ws_docker_action(project_id: str, action: str, request: Request):
     """Perform docker action: start / stop / rebuild / compose_up."""
     import shutil
@@ -2546,7 +2548,7 @@ async def ws_git(project_id: str):
     return JSONResponse({"commits": commits, "changes": changes, "branch": branch})
 
 
-@router.post("/api/projects/{project_id}/workspace/git/commit")
+@router.post("/api/projects/{project_id}/workspace/git/commit", dependencies=[Depends(require_auth())])
 async def ws_git_commit(project_id: str, request: Request):
     """Run git commit (and optionally push) in project directory."""
     import subprocess
@@ -2671,7 +2673,7 @@ async def ws_db_list(project_id: str):
     return JSONResponse({"files": files})
 
 
-@router.post("/api/projects/{project_id}/workspace/db/query")
+@router.post("/api/projects/{project_id}/workspace/db/query", dependencies=[Depends(require_auth())])
 async def ws_db_query(project_id: str, request: Request):
     """Execute a SELECT query on a SQLite database file."""
     import sqlite3
@@ -2818,7 +2820,7 @@ async def ws_get_secrets(project_id: str):
     return JSONResponse({"files": files})
 
 
-@router.post("/api/projects/{project_id}/workspace/secrets/save")
+@router.post("/api/projects/{project_id}/workspace/secrets/save", dependencies=[Depends(require_auth())])
 async def ws_save_secrets(project_id: str, request: Request):
     """Save .env file with updated KEY=VALUE pairs."""
     from ...projects.manager import get_project_store
@@ -2860,7 +2862,7 @@ async def ws_save_secrets(project_id: str, request: Request):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/projects/{project_id}/workspace/dbgate/configure")
+@router.post("/api/projects/{project_id}/workspace/dbgate/configure", dependencies=[Depends(require_auth())])
 async def ws_dbgate_configure(project_id: str):
     """Auto-configure DbGate connections from project .env files."""
     import httpx
@@ -3262,7 +3264,7 @@ async def project_export(project_id: str):
     )
 
 
-@router.post("/api/projects/import")
+@router.post("/api/projects/import", dependencies=[Depends(require_auth())])
 async def project_import(request: Request):
     """Import a project from a ZIP archive (previously exported)."""
     import io
@@ -3513,7 +3515,7 @@ async def ws_packages(project_id: str, request: Request):
     )
 
 
-@router.post("/api/projects/{project_id}/workspace/packages/install")
+@router.post("/api/projects/{project_id}/workspace/packages/install", dependencies=[Depends(require_auth())])
 async def ws_packages_install(project_id: str, request: Request):
     """Install a package or run the full install command. Returns SSE stream."""
     from ...auth.middleware import get_current_user
@@ -3700,7 +3702,7 @@ async def ws_get_branches(project_id: str, request: Request):
         return JSONResponse({"branches": [], "current": "main", "error": str(exc)})
 
 
-@router.post("/api/projects/{project_id}/workspace/checkout")
+@router.post("/api/projects/{project_id}/workspace/checkout", dependencies=[Depends(require_auth())])
 async def ws_checkout_branch(project_id: str, request: Request):
     """Checkout a branch in the project."""
     import subprocess
@@ -3731,7 +3733,7 @@ async def ws_checkout_branch(project_id: str, request: Request):
 # ── Workspace: GitHub import ──────────────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/workspace/import-git")
+@router.post("/api/projects/{project_id}/workspace/import-git", dependencies=[Depends(require_auth())])
 async def ws_import_git(project_id: str, request: Request):
     """Clone a GitHub/GitLab repo into the project workspace (SSE stream)."""
     import subprocess
@@ -3784,7 +3786,7 @@ async def ws_import_git(project_id: str, request: Request):
 # ── Workspace: AI Chat ────────────────────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/workspace/chat")
+@router.post("/api/projects/{project_id}/workspace/chat", dependencies=[Depends(require_auth())])
 async def ws_workspace_chat(project_id: str, request: Request):
     """AI chat for the workspace — streaming SSE."""
     from ...projects.manager import get_project_store

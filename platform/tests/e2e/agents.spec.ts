@@ -1,3 +1,4 @@
+// Ref: feat-agents-list, feat-agents-create, feat-agent-chat
 import { test, expect } from "@playwright/test";
 
 test.describe("Agents page", () => {

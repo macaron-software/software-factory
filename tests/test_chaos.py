@@ -5,6 +5,7 @@ Run: pytest tests/test_chaos.py -v --live --timeout=600
 ⚠️ These tests modify system state (restart containers, stress CPU, etc).
 Only run against test/staging environments.
 """
+# Ref: feat-ops
 
 import os
 import time

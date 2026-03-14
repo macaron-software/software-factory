@@ -1,4 +1,5 @@
 """Search, export, i18n, perspective, notifications, reactions, SI blueprints, workspaces, webhooks & retrospectives."""
+# Ref: feat-cockpit
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -21,6 +22,7 @@ from fastapi.responses import (
 
 from ...schemas import FeatureOut
 from ..helpers import _templates
+from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -204,7 +206,7 @@ async def list_retrospectives(scope: str = "", limit: int = 20):
         db.close()
 
 
-@router.post("/api/retrospectives/generate")
+@router.post("/api/retrospectives/generate", dependencies=[Depends(require_auth())])
 async def generate_retrospective(request: Request):
     """Auto-generate a retrospective from session/ideation data using LLM."""
     import uuid
@@ -374,7 +376,7 @@ async def api_get_si_blueprint(project_id: str):
         return JSONResponse(yaml.safe_load(f))
 
 
-@router.put("/api/projects/{project_id}/si-blueprint")
+@router.put("/api/projects/{project_id}/si-blueprint", dependencies=[Depends(require_auth())])
 async def api_put_si_blueprint(request: Request, project_id: str):
     """Write SI blueprint for a project."""
     import yaml
@@ -474,7 +476,7 @@ async def i18n_catalog(lang: str):
     return JSONResponse(_catalog.get(lang, {}))
 
 
-@router.post("/api/perspective")
+@router.post("/api/perspective", dependencies=[Depends(require_auth())])
 async def set_perspective(request: Request):
     """Set SAFe perspective cookie."""
     body = await request.json()
@@ -772,7 +774,7 @@ async def export_features_csv(request: Request):
         db.close()
 
 
-@router.post("/api/webhooks/github")
+@router.post("/api/webhooks/github", dependencies=[Depends(require_auth())])
 async def github_webhook(request: Request):
     """Handle GitHub webhook events (push, pull_request, issues).
 

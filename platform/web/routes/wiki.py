@@ -1,4 +1,5 @@
 """Wiki — built-in documentation pages with markdown rendering + owner RBAC."""
+# Ref: feat-wiki
 
 from __future__ import annotations
 

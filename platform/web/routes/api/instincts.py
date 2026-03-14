@@ -12,6 +12,7 @@ Endpoints:
   GET  /api/instincts/stats      — confidence distribution, domain breakdown
   GET  /api/skills/stocktake     — audit all skill YAML definitions for quality
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 
@@ -20,7 +21,8 @@ import uuid
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -138,7 +140,7 @@ async def instinct_stats():
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.post("/api/instincts")
+@router.post("/api/instincts", dependencies=[Depends(require_auth())])
 async def create_instinct(request: Request):
     """Manually create an instinct.
 
@@ -185,7 +187,7 @@ async def create_instinct(request: Request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.delete("/api/instincts/{instinct_id}")
+@router.delete("/api/instincts/{instinct_id}", dependencies=[Depends(require_auth())])
 async def delete_instinct(instinct_id: str):
     """Delete an instinct by ID."""
     try:
@@ -202,7 +204,7 @@ async def delete_instinct(instinct_id: str):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.post("/api/instincts/evolve")
+@router.post("/api/instincts/evolve", dependencies=[Depends(require_auth())])
 async def evolve_instincts(request: Request):
     """Cluster high-confidence instincts → generate skill YAML + write to disk.
 
@@ -251,7 +253,7 @@ async def evolve_instincts(request: Request):
         return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
 
 
-@router.post("/api/instincts/promote")
+@router.post("/api/instincts/promote", dependencies=[Depends(require_auth())])
 async def promote_instincts(request: Request):
     """Promote project-scoped instincts to global when seen across 2+ projects.
 

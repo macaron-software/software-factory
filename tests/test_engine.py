@@ -4,6 +4,7 @@ Test Engine Module - Core testing functionality
 This module provides the core engine for running tests and validating
 software functionality.
 """
+# Ref: feat-patterns
 
 import unittest
 import sys

@@ -6,8 +6,9 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import Depends,  APIRouter
 from pydantic import BaseModel
+from ...auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -823,7 +824,7 @@ SF_COMMANDS = {
 }
 
 
-@router.post("/api/sf/execute")
+@router.post("/api/sf/execute", dependencies=[Depends(require_auth())])
 async def execute_sf_command(request: SFCommandRequest) -> SFCommandResponse:
     """Execute SF native command."""
     try:

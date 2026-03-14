@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .helpers import _templates
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ async def api_list_listings():
     return result
 
 
-@router.post("/api/mercato/listings")
+@router.post("/api/mercato/listings", dependencies=[Depends(require_auth())])
 async def api_create_listing(request: Request):
     from ...agents.store import get_agent_store
     from ...mercato.service import get_mercato_service
@@ -136,7 +137,7 @@ async def api_create_listing(request: Request):
         return JSONResponse({"error": str(e)}, 400)
 
 
-@router.delete("/api/mercato/listings/{listing_id}")
+@router.delete("/api/mercato/listings/{listing_id}", dependencies=[Depends(require_auth())])
 async def api_cancel_listing(listing_id: str, request: Request):
     from ...mercato.service import get_mercato_service
 
@@ -152,7 +153,7 @@ async def api_cancel_listing(listing_id: str, request: Request):
 # ── API: Transfers ───────────────────────────────────────────────
 
 
-@router.post("/api/mercato/transfers")
+@router.post("/api/mercato/transfers", dependencies=[Depends(require_auth())])
 async def api_execute_transfer(request: Request):
     from ...mercato.service import get_mercato_service
 
@@ -249,7 +250,7 @@ async def api_free_agents():
     ]
 
 
-@router.post("/api/mercato/draft/{agent_id}")
+@router.post("/api/mercato/draft/{agent_id}", dependencies=[Depends(require_auth())])
 async def api_draft(agent_id: str, request: Request):
     from ...mercato.service import get_mercato_service
 

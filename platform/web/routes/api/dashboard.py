@@ -1,4 +1,5 @@
 """Dashboard KPIs, quality, sprints, backlog & activity feed endpoints."""
+# Ref: feat-cockpit, feat-portfolio
 
 from __future__ import annotations
 

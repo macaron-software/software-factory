@@ -1,10 +1,12 @@
 """LLM Metrics + E2E Tests Metrics routes."""
+# Ref: feat-metrics
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ...auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -212,7 +214,7 @@ async def api_metrics_tests(run_id: str = ""):
     return JSONResponse({"run_id": run_id, "specs": [dict(r) for r in rows]})
 
 
-@router.post("/api/metrics/tests/record")
+@router.post("/api/metrics/tests/record", dependencies=[Depends(require_auth())])
 async def api_metrics_tests_record(body: TestRunRecord):
     """Record a single spec test result."""
     _ensure_tests_table()

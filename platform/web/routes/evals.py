@@ -7,11 +7,12 @@ import json
 import time
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import Depends,  APIRouter, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...db.migrations import get_db
 from .helpers import _templates
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 
@@ -36,7 +37,7 @@ async def list_datasets():
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/evals/datasets")
+@router.post("/api/evals/datasets", dependencies=[Depends(require_auth())])
 async def create_dataset(request: Request):
     body = await request.json()
     ds_id = str(uuid.uuid4())
@@ -67,7 +68,7 @@ async def list_cases(dataset_id: str):
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/evals/datasets/{dataset_id}/cases")
+@router.post("/api/evals/datasets/{dataset_id}/cases", dependencies=[Depends(require_auth())])
 async def add_case(dataset_id: str, request: Request):
     body = await request.json()
     case_id = str(uuid.uuid4())
@@ -86,7 +87,7 @@ async def add_case(dataset_id: str, request: Request):
     return JSONResponse({"id": case_id})
 
 
-@router.delete("/api/evals/cases/{case_id}")
+@router.delete("/api/evals/cases/{case_id}", dependencies=[Depends(require_auth())])
 async def delete_case(case_id: str):
     db = get_db()
     db.execute("DELETE FROM eval_cases WHERE id=?", (case_id,))
@@ -108,7 +109,7 @@ async def list_runs():
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/evals/runs")
+@router.post("/api/evals/runs", dependencies=[Depends(require_auth())])
 async def start_run(request: Request, background_tasks: BackgroundTasks):
     body = await request.json()
     dataset_id = body.get("dataset_id", "")

@@ -12,6 +12,7 @@ Usage:
     tracer.trace_call(provider="minimax", model="MiniMax-M2.5", ...)
     stats = tracer.stats()
 """
+# Ref: feat-metrics
 
 from __future__ import annotations
 

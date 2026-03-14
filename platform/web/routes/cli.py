@@ -1,12 +1,14 @@
 """
 CLI API — Execute predefined CLI commands (not full shell)
 """
+# Ref: feat-toolbox
 
 import logging
 import subprocess
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ...auth.middleware import require_auth
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -150,7 +152,7 @@ def execute_help() -> str:
     return help_text
 
 
-@router.post("/api/cli/execute", response_model=CLIResponse)
+@router.post("/api/cli/execute", response_model=CLIResponse, dependencies=[Depends(require_auth())])
 async def execute_cli_command(cmd: CLICommand) -> CLIResponse:
     """
     Execute a whitelisted CLI command.

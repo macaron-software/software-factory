@@ -1,4 +1,5 @@
 """Shared helpers for all route modules."""
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

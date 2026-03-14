@@ -88,6 +88,14 @@ async def mkt_ideation_page(request: Request):
                 "avatar_url": avatar_url,
                 "description": (a.description or "") if a else "",
                 "tagline": (a.tagline or "") if a else "",
+                "persona": (a.persona or "") if a else "",
+                "motivation": (a.motivation or "") if a else "",
+                "skills": (a.skills or []) if a else [],
+                "tools": (a.tools or []) if a else [],
+                "model": (a.model or "") if a else "",
+                "provider": (getattr(a, "provider", "") or "") if a else "",
+                "can_veto": (a.permissions or {}).get("can_veto", False) if a else False,
+                "veto_level": (a.permissions or {}).get("veto_level", "") if a else "",
             }
         )
 

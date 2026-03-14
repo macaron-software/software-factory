@@ -1,4 +1,5 @@
 """Health, sandbox, watchdog & live monitoring endpoints."""
+# Ref: feat-ops, feat-monitoring
 
 from __future__ import annotations
 
@@ -6,10 +7,11 @@ import json
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ...schemas import HealthResponse
+from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -199,7 +201,7 @@ async def cluster_nodes():
     return JSONResponse({"nodes": nodes, "count": len(nodes)})
 
 
-@router.post("/api/cluster/heartbeat")
+@router.post("/api/cluster/heartbeat", dependencies=[Depends(require_auth())])
 async def cluster_heartbeat(request: Request):
     """Node self-registration and heartbeat update."""
 
@@ -1202,7 +1204,7 @@ async def monitoring_live(request: Request, hours: int = 24):
     return JSONResponse(result)
 
 
-@router.post("/api/ops/cleanup-phantom-runs")
+@router.post("/api/ops/cleanup-phantom-runs", dependencies=[Depends(require_auth())])
 async def cleanup_phantom_runs():
     """Manually trigger phantom run cleanup (stale runs > 48h → abandoned)."""
     try:
@@ -1214,7 +1216,7 @@ async def cleanup_phantom_runs():
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
 
 
-@router.post("/api/admin/reload-agents")
+@router.post("/api/admin/reload-agents", dependencies=[Depends(require_auth())])
 async def reload_agents():
     """Hot-reload YAML agent definitions without server restart."""
     try:

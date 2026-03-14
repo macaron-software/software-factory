@@ -3,6 +3,7 @@
 Unit tests: pure functions (_build_dynamic_phase, _build_evidence)
 Integration tests: mock LLM → _pm_checkpoint → verify phase decisions
 """
+# Ref: feat-backlog
 import json
 import os
 import sys

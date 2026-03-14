@@ -3,6 +3,7 @@ A2A Negotiation - Multi-agent consensus and compromise protocol.
 =================================================================
 Supports proposal → counter-proposal → vote → accept/reject cycle.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

@@ -1,5 +1,6 @@
 """Product Backlog — Epic → Feature → User Story hierarchy."""
 from __future__ import annotations
+# Ref: feat-backlog, feat-portfolio
 
 import json
 import logging

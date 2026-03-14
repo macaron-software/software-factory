@@ -1,10 +1,12 @@
 """Mission CRUD routes."""
+# Ref: feat-backlog, feat-portfolio
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ....i18n import t
@@ -144,7 +146,7 @@ async def mission_detail_page(request: Request, epic_id: str):
     )
 
 
-@router.post("/api/missions", responses={200: {"model": OkResponse}})
+@router.post("/api/missions", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def create_mission(request: Request):
     """Create a new mission."""
     from fastapi import HTTPException
@@ -234,8 +236,8 @@ async def list_missions_api(request: Request):
     return JSONResponse({"epics": result, "total": len(result)})
 
 
-@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}})
-@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}})
+@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
+@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def delete_mission(epic_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ....db.migrations import get_db

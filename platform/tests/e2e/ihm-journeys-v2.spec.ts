@@ -1,3 +1,4 @@
+// Ref: feat-cockpit, feat-mission-control
 /**
  * IHM Journeys V2 — 25 complete end-to-end user flows.
  *

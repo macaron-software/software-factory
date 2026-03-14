@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-from fastapi import APIRouter
+from fastapi import Depends,  APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from ...auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -813,7 +814,7 @@ async def get_failure_analysis() -> dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@router.post("/api/analytics/failures/resume-all")
+@router.post("/api/analytics/failures/resume-all", dependencies=[Depends(require_auth())])
 async def resume_all_paused() -> dict[str, Any]:
     """Mass-resume all paused runs that can be continued."""
     try:

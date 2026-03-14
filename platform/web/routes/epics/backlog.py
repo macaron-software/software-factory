@@ -1,8 +1,10 @@
 """Features, stories, and backlog management routes."""
+# Ref: feat-backlog
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import OkResponse, StoryOut
@@ -10,7 +12,7 @@ from ...schemas import OkResponse, StoryOut
 router = APIRouter()
 
 
-@router.post("/api/epics/{epic_id}/features", responses={200: {"model": OkResponse}})
+@router.post("/api/epics/{epic_id}/features", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def create_feature_api(request: Request, epic_id: str):
     """Create a new feature under an epic."""
     from ....missions.product import FeatureDef, get_product_backlog
@@ -33,7 +35,7 @@ async def create_feature_api(request: Request, epic_id: str):
     return JSONResponse({"ok": True, "feature": {"id": feat.id, "name": feat.name}})
 
 
-@router.patch("/api/features/{feature_id}", responses={200: {"model": OkResponse}})
+@router.patch("/api/features/{feature_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def update_feature(request: Request, feature_id: str):
     """Update feature fields (story points, acceptance criteria, priority, status)."""
     from ....missions.product import get_product_backlog
@@ -101,7 +103,8 @@ async def list_feature_stories_api(feature_id: str):
 
 
 @router.post(
-    "/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}}
+    "/api/features/{feature_id}/stories", responses={200: {"model": OkResponse}},
+    dependencies=[Depends(require_auth())],
 )
 async def create_story_api(request: Request, feature_id: str):
     """Create a new user story under a feature."""
@@ -128,7 +131,7 @@ async def create_story_api(request: Request, feature_id: str):
 # ── Backlog priority reorder ─────────────────────────────────────
 
 
-@router.patch("/api/stories/{story_id}", responses={200: {"model": OkResponse}})
+@router.patch("/api/stories/{story_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def update_story(request: Request, story_id: str):
     """Update user story fields (story points, acceptance criteria, status, sprint)."""
     from ....missions.product import get_product_backlog
@@ -162,7 +165,7 @@ async def update_story(request: Request, story_id: str):
 # ── Feature / Story creation ─────────────────────────────────────
 
 
-@router.patch("/api/backlog/reorder", responses={200: {"model": OkResponse}})
+@router.patch("/api/backlog/reorder", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def reorder_backlog(request: Request):
     """Reorder features or stories by priority. Body: {type:'feature'|'story', ids:[ordered list]}"""
     from ....db.migrations import get_db
@@ -188,7 +191,7 @@ async def reorder_backlog(request: Request):
 # ── Feature dependencies ─────────────────────────────────────────
 
 
-@router.post("/api/features/{feature_id}/deps", responses={200: {"model": OkResponse}})
+@router.post("/api/features/{feature_id}/deps", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def add_feature_dep(request: Request, feature_id: str):
     """Add a dependency: feature_id depends on depends_on_id."""
     from ....db.migrations import get_db
@@ -212,6 +215,7 @@ async def add_feature_dep(request: Request, feature_id: str):
 @router.delete(
     "/api/features/{feature_id}/deps/{depends_on}",
     responses={200: {"model": OkResponse}},
+    dependencies=[Depends(require_auth())],
 )
 async def remove_feature_dep(feature_id: str, depends_on: str):
     """Remove a feature dependency."""
@@ -262,7 +266,7 @@ async def list_feature_deps(feature_id: str):
 # ── Sprint planning: assign stories to sprint ────────────────────
 
 
-@router.post("/api/missions/{epic_id}/wsjf", responses={200: {"model": OkResponse}})
+@router.post("/api/missions/{epic_id}/wsjf", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def compute_wsjf(epic_id: str, request: Request):
     """Compute and store WSJF score from components."""
     from ....db.migrations import get_db as _gdb

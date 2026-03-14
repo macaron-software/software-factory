@@ -10,6 +10,7 @@ Reads SAFE_MAP from retro_sf_safe.py and creates:
 
 Run:  python3 platform/scripts/sync_sf_traceability.py
 """
+# Ref: feat-annotate, feat-quality
 import sys
 from pathlib import Path
 

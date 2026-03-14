@@ -1,9 +1,13 @@
+<!-- Ref: feat-toolbox, feat-skills, feat-memory, feat-wiki -->
 {% extends "base.html" %}
 {% block content %}
 <div class="tabs">
     <button class="tab active" hx-get="/skills" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("skills") }}</button>
     <button class="tab" hx-get="/memory" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("memory") }}</button>
     <button class="tab" hx-get="/mcps" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("mcps") }}</button>
+    <button class="tab" hx-get="/bricks" hx-select="body > *" hx-target="body" hx-swap="outerHTML" onclick="window.location='/bricks'">
+        <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-layers"/></svg> Bricks
+    </button>
     <button class="tab" onclick="switchTab(this); showAPITab()">API</button>
     <button class="tab" onclick="switchTab(this); showCLITab()">CLI</button>
     <button class="tab" onclick="switchTab(this); showA2ATab()">A2A</button>

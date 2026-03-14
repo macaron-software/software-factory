@@ -1,3 +1,4 @@
+// Ref: feat-settings
 import { test, expect } from "@playwright/test";
 
 const LANGUAGES = ["en", "fr", "zh", "es", "ja", "pt", "de", "ko"];

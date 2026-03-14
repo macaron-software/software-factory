@@ -1,4 +1,5 @@
 """Web routes — Workflow CRUD and DSI workflows."""
+# Ref: feat-workflows
 
 from __future__ import annotations
 
@@ -8,10 +9,11 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .helpers import _templates, _avatar_url
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -127,7 +129,7 @@ async def workflow_edit(request: Request, wf_id: str):
     )
 
 
-@router.post("/api/workflows")
+@router.post("/api/workflows", dependencies=[Depends(require_auth())])
 async def create_workflow(request: Request):
     """Create or update a workflow."""
     from ...workflows.store import get_workflow_store, WorkflowDef, WorkflowPhase
@@ -172,7 +174,7 @@ async def create_workflow(request: Request):
     return RedirectResponse(url="/workflows", status_code=303)
 
 
-@router.post("/api/workflows/resume-all")
+@router.post("/api/workflows/resume-all", dependencies=[Depends(require_auth())])
 async def workflow_resume_all():
     """Mass-resume all interrupted/paused workflows from their last checkpoint."""
     from ...sessions.store import get_session_store
@@ -221,7 +223,7 @@ async def workflow_resume_all():
     return {"resumed": resumed, "total_candidates": len(rows), "errors": errors[:10]}
 
 
-@router.post("/api/workflows/{wf_id}")
+@router.post("/api/workflows/{wf_id}", dependencies=[Depends(require_auth())])
 async def update_workflow(request: Request, wf_id: str):
     """Update an existing workflow."""
     from ...workflows.store import get_workflow_store, WorkflowDef, WorkflowPhase
@@ -265,7 +267,7 @@ async def update_workflow(request: Request, wf_id: str):
     return RedirectResponse(url="/workflows", status_code=303)
 
 
-@router.post("/api/workflows/{wf_id}/delete")
+@router.post("/api/workflows/{wf_id}/delete", dependencies=[Depends(require_auth())])
 async def delete_workflow(request: Request, wf_id: str):
     """Delete a workflow."""
     from ...workflows.store import get_workflow_store
@@ -274,7 +276,7 @@ async def delete_workflow(request: Request, wf_id: str):
     return RedirectResponse(url="/workflows", status_code=303)
 
 
-@router.post("/api/sessions/{session_id}/run-workflow")
+@router.post("/api/sessions/{session_id}/run-workflow", dependencies=[Depends(require_auth())])
 async def run_session_workflow(request: Request, session_id: str):
     """Execute a workflow in a session."""
     from ...sessions.store import get_session_store, MessageDef
@@ -798,7 +800,7 @@ async def _run_workflow_background(
 # ── Workflow Resume ───────────────────────────────────────────────
 
 
-@router.post("/api/workflow/{session_id}/resume")
+@router.post("/api/workflow/{session_id}/resume", dependencies=[Depends(require_auth())])
 async def workflow_resume(session_id: str):
     """Resume a workflow from its last checkpoint (skips completed phases)."""
     from ...sessions.store import get_session_store
@@ -831,7 +833,7 @@ async def workflow_resume(session_id: str):
     }
 
 
-@router.post("/api/workflow/{session_id}/nogo")
+@router.post("/api/workflow/{session_id}/nogo", dependencies=[Depends(require_auth())])
 async def workflow_nogo(session_id: str):
     """Reject a paused workflow checkpoint — stops the workflow as failed."""
     from ...sessions.store import get_session_store

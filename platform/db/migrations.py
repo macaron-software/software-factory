@@ -3,6 +3,7 @@ Database migrations and initialization for the platform.
 Supports dual backend: SQLite (local) / PostgreSQL (production).
 Backend selected via DATABASE_URL env var.
 """
+# Ref: feat-settings
 
 from pathlib import Path
 

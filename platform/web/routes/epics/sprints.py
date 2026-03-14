@@ -1,8 +1,10 @@
 """Sprint and task management routes."""
+# Ref: feat-backlog, feat-pi-board
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from ....auth.middleware import require_auth
 from fastapi.responses import JSONResponse
 
 from ...schemas import OkResponse, StoryOut
@@ -10,7 +12,7 @@ from ...schemas import OkResponse, StoryOut
 router = APIRouter()
 
 
-@router.post("/api/missions/{epic_id}/sprints", responses={200: {"model": OkResponse}})
+@router.post("/api/missions/{epic_id}/sprints", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
 async def create_sprint(epic_id: str):
     """Add a sprint to a mission."""
     from ....epics.store import SprintDef, get_epic_store
@@ -23,7 +25,7 @@ async def create_sprint(epic_id: str):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/missions/{epic_id}/tasks")
+@router.post("/api/missions/{epic_id}/tasks", dependencies=[Depends(require_auth())])
 async def create_task(request: Request, epic_id: str):
     """Create a task in a mission sprint (inline kanban creation)."""
     from ....epics.store import TaskDef, get_epic_store
@@ -52,7 +54,7 @@ async def create_task(request: Request, epic_id: str):
     return JSONResponse({"ok": True, "task_id": task.id})
 
 
-@router.patch("/api/tasks/{task_id}/status")
+@router.patch("/api/tasks/{task_id}/status", dependencies=[Depends(require_auth())])
 async def update_task_status(request: Request, task_id: str):
     """Update task status (drag-drop kanban)."""
     from ....epics.store import get_epic_store
@@ -72,7 +74,8 @@ async def update_task_status(request: Request, task_id: str):
 
 
 @router.post(
-    "/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}}
+    "/api/sprints/{sprint_id}/assign-stories", responses={200: {"model": OkResponse}},
+    dependencies=[Depends(require_auth())],
 )
 async def assign_stories_to_sprint(request: Request, sprint_id: str):
     """Assign multiple stories to a sprint. Body: {story_ids: [...]}"""
@@ -97,6 +100,7 @@ async def assign_stories_to_sprint(request: Request, sprint_id: str):
 @router.delete(
     "/api/sprints/{sprint_id}/stories/{story_id}",
     responses={200: {"model": OkResponse}},
+    dependencies=[Depends(require_auth())],
 )
 async def unassign_story_from_sprint(sprint_id: str, story_id: str):
     """Remove a story from a sprint."""
