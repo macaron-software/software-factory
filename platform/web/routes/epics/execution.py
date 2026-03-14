@@ -1112,6 +1112,118 @@ async def api_epic_run(request: Request, epic_id: str):
     )
 
 
+@router.post("/api/epics/{epic_id}/resume")
+@router.post("/api/missions/{epic_id}/resume")
+async def api_mission_resume(request: Request, epic_id: str):
+    """Resume a mission from a specific phase. Reuses existing workspace and session.
+
+    Body params:
+        phase: str | int — phase_id (e.g. "dev-sprint") or phase index (0-based)
+        reset_only: bool — if true, only reset the phase without launching (default: false)
+
+    Behavior:
+        - Finds the latest epic_run for this mission
+        - Resets the target phase + all subsequent phases to PENDING
+        - Marks completed phases before the target as DONE
+        - Resumes orchestration from the target phase
+    """
+    from ....epics.store import get_epic_run_store, get_epic_store
+    from ....models import PhaseStatus
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    phase_target = body.get("phase", body.get("from_phase"))
+    reset_only = body.get("reset_only", False)
+
+    # Find the latest epic_run for this mission (by parent_epic_id)
+    run_store = get_epic_run_store()
+
+    # Try direct lookup first (epic_id might be the run_id)
+    run = run_store.get(epic_id)
+    if not run:
+        # Search by parent_epic_id (mission_id → run)
+        try:
+            from ....db.migrations import get_db
+            db = get_db()
+            rows = db.execute(
+                "SELECT id FROM epic_runs WHERE parent_epic_id = ? ORDER BY created_at DESC LIMIT 1",
+                (epic_id,),
+            ).fetchall()
+            if rows:
+                run = run_store.get(rows[0][0] if isinstance(rows[0], (tuple, list)) else rows[0]["id"])
+            db.close()
+        except Exception:
+            pass
+
+    if not run:
+        return JSONResponse({"error": "No run found for this mission"}, status_code=404)
+
+    # Resolve phase target to index
+    target_idx = -1
+    if phase_target is not None:
+        if isinstance(phase_target, int) or (isinstance(phase_target, str) and phase_target.isdigit()):
+            target_idx = int(phase_target)
+        else:
+            # Match by phase_id
+            for idx, p in enumerate(run.phases):
+                if p.phase_id == phase_target:
+                    target_idx = idx
+                    break
+
+    if target_idx < 0 or target_idx >= len(run.phases):
+        phase_list = [f"  {i}: {p.phase_id} ({p.status})" for i, p in enumerate(run.phases)]
+        return JSONResponse({
+            "error": f"Phase '{phase_target}' not found",
+            "available_phases": phase_list,
+        }, status_code=400)
+
+    # Reset target + subsequent phases → PENDING, mark prior as done
+    reset_count = 0
+    for idx, p in enumerate(run.phases):
+        if idx < target_idx:
+            if p.status in ("pending", "running"):
+                p.status = PhaseStatus.DONE
+        elif idx >= target_idx:
+            p.status = PhaseStatus.PENDING
+            reset_count += 1
+
+    # Update run status
+    if run.status in ("completed", "failed", "paused", "gated", "escalated"):
+        run.status = "running"
+    run_store.update(run)
+
+    # Update session checkpoint
+    try:
+        from ....sessions.store import get_session_store
+        sess_store = get_session_store()
+        sess = sess_store.get(run.session_id)
+        if sess:
+            config = sess.config or {}
+            config["workflow_checkpoint"] = target_idx
+            sess_store.update_config(run.session_id, config)
+    except Exception:
+        pass
+
+    result = {
+        "status": "reset" if reset_only else "running",
+        "run_id": run.id,
+        "session_id": run.session_id,
+        "from_phase": target_idx,
+        "phase_id": run.phases[target_idx].phase_id,
+        "phase_name": run.phases[target_idx].phase_name,
+        "phases_reset": reset_count,
+    }
+
+    if not reset_only:
+        await _launch_orchestrator(run.id)
+
+    return JSONResponse(result)
+
+
 async def _run_milestone_pipeline_background(
     *,
     milestones: list[dict],
@@ -1410,6 +1522,98 @@ async def worker_resume_run(run_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
     return JSONResponse({"status": "launched", "run_id": run_id}, status_code=202)
+
+
+# ── Resume at specific phase ──────────────────────────────────────────
+
+
+@router.post("/api/missions/runs/{run_id}/resume-at-phase")
+async def resume_run_at_phase(run_id: str, request: Request):
+    """Reset a phase (or all phases from it) and resume from there.
+
+    Body JSON:
+      phase_id   (str)  – target phase to reset and resume from
+      reset_from (bool) – if true, also reset all phases AFTER phase_id (default: false)
+
+    Behaviour:
+      - target phase → status=pending, cleared timestamps/summary/error
+      - if reset_from=true: same for every phase after the target
+      - run.current_phase = phase_id
+      - run.status = paused  (auto_resume picks it up next cycle)
+    """
+    from ....epics.store import get_epic_run_store
+    from ....models import EpicStatus, PhaseStatus
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    phase_id: str = body.get("phase_id", "")
+    reset_from: bool = bool(body.get("reset_from", False))
+
+    if not phase_id:
+        return JSONResponse({"error": "phase_id required"}, status_code=400)
+
+    store = get_epic_run_store()
+    run = store.get(run_id)
+    if not run:
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+
+    # Safety: refuse to mutate an actively running run
+    if run.status == EpicStatus.RUNNING:
+        # Check if it's actually in-flight (task exists and is alive)
+        existing = _active_mission_tasks.get(run_id)
+        if existing and not existing.done():
+            return JSONResponse(
+                {"error": "Run is currently executing — cancel it first"},
+                status_code=409,
+            )
+
+    # Find target phase index
+    target_idx = next(
+        (i for i, p in enumerate(run.phases) if p.phase_id == phase_id), None
+    )
+    if target_idx is None:
+        available = [p.phase_id for p in run.phases]
+        return JSONResponse(
+            {"error": f"Phase '{phase_id}' not found. Available: {available}"},
+            status_code=404,
+        )
+
+    # Reset phases
+    phases_to_reset = (
+        run.phases[target_idx:]          # target + everything after
+        if reset_from
+        else [run.phases[target_idx]]    # target only
+    )
+    for p in phases_to_reset:
+        p.status = PhaseStatus.PENDING
+        p.started_at = None
+        p.completed_at = None
+        p.summary = ""
+        p.error = ""
+        p.iteration = 0
+        p.sprint_count = 0
+
+    run.current_phase = phase_id
+    run.status = EpicStatus.PAUSED
+    run.completed_at = None
+
+    store.update(run)
+
+    reset_ids = [p.phase_id for p in phases_to_reset]
+    return JSONResponse(
+        {
+            "status": "ok",
+            "run_id": run_id,
+            "resume_from": phase_id,
+            "reset_phases": reset_ids,
+            "reset_from": reset_from,
+            "message": f"Run paused at phase '{phase_id}' — will resume on next auto_resume cycle",
+        }
+    )
 
 
 # ── Compliance Reports ────────────────────────────────────────────────

@@ -347,6 +347,25 @@ def _save_checkpoint(store, session_id: str, completed_phase: int):
         logger.debug("Checkpoint save failed for %s: %s", session_id, e)
 
 
+def _persist_phase_status(session_id: str, phase_id: str, status: str, phase_index: int):
+    """Persist phase status + current_phase to epic_run in DB for resume support."""
+    try:
+        from ..epics.store import get_epic_run_store
+        run_store = get_epic_run_store()
+        run = run_store.get(session_id)
+        if not run:
+            # session_id may differ from run_id; search by session
+            return
+        run.current_phase = phase_id
+        for p in run.phases:
+            if p.phase_id == phase_id:
+                p.status = status
+                break
+        run_store.update(run)
+    except Exception as e:
+        logger.debug("Phase status persist failed for %s/%s: %s", session_id, phase_id, e)
+
+
 def _is_transient_error(error_str: str) -> bool:
     """Check if an error is transient (rate limit, timeout, connection)."""
     return any(
@@ -1396,6 +1415,9 @@ async def run_workflow(
             phase_timeout,
         )
 
+        # Persist phase status → RUNNING in epic_run DB
+        _persist_phase_status(session_id, phase.id, "running", i)
+
         # Collect tool_calls from phase for PM evidence
         _phase_tool_calls: list[dict] = []
 
@@ -1734,6 +1756,19 @@ async def run_workflow(
             continue
 
         finally:
+            # Determine phase outcome from phase_results
+            _phase_outcome = "done"
+            if run.phase_results:
+                _last = run.phase_results[-1]
+                if not _last.get("success", True):
+                    if _last.get("paused"):
+                        _phase_outcome = "pending"
+                    elif _last.get("escalated"):
+                        _phase_outcome = "failed"
+                    else:
+                        _phase_outcome = "failed"
+            _persist_phase_status(session_id, phase.id, _phase_outcome, i)
+
             logger.warning(
                 "WORKFLOW phase_end wf=%s phase=%s (%d/%d) results=%d",
                 workflow.id,
