@@ -38,6 +38,40 @@ phases:
     - lead_frontend
     - lead_backend
     dynamic_lead: true
+- id: ux-design-review
+  pattern_id: sequential
+  name: UX Design Review
+  description: >
+    UX designer reviews the feature design brief and enriches acceptance criteria with
+    cognitive science constraints (Laws of UX). This phase DOES NOT redesign the feature —
+    it ADDS measurable UX acceptance criteria to each user story produced in feature-design.
+
+    MANDATORY outputs for each user story:
+    1. RESPONSE TIME: "[AC-yyyyyy] GIVEN <action> THEN visual feedback within Xms"
+       - Instant (<100ms): no indicator; Fast (100–400ms): subtle spinner; Slow (>400ms): skeleton/progress
+    2. COGNITIVE LOAD: "[AC-yyyyyy] GIVEN the screen THEN only one primary action is available"
+    3. DECISION COMPLEXITY: "[AC-yyyyyy] GIVEN N choices THEN primary options ≤7; recommended option highlighted"
+    4. MEMORY DEMAND: "[AC-yyyyyy] GIVEN multi-step flow THEN user never needs to memorize info between steps"
+    5. OFFLINE/NETWORK: "[AC-yyyyyy] GIVEN offline state THEN empathic message shown (not technical error)"
+       Required only for features with network calls.
+
+    ALSO CHECK AND FLAG (must fix before tdd-sprint):
+    - Touch targets: minimum 44×44px (flag if smaller)
+    - Fitts's Law: primary CTA near natural cursor/thumb path
+    - Peak-End Rule: confirm the happy-path ending is designed (not just "Request submitted")
+    - Jakob's Law: verify design follows established conventions for this feature type
+    - Von Restorff: exactly ONE visually distinct CTA per screen (no competing highlights)
+
+    OUTPUT FORMAT:
+    For each US from feature-design: add [AC-UX-yyyyyy] lines.
+    Close with: "UX Gate: PASS" or "UX Gate: FAIL — [list issues]"
+    If FAIL, the story-decomposition phase must not start until issues are resolved.
+
+    USE SKILL: ux-laws (all 30 laws, CONTEXT A AC patterns, CONTEXT D mobile/network patterns)
+  gate: always
+  config:
+    agents:
+    - ux_designer
 - id: story-decomposition
   pattern_id: fractal-stories
   name: Fractal Story Decomposition
