@@ -1182,3 +1182,42 @@
 /* Fade in when real data arrives */
 .sk-loaded { animation: sk-fadein 0.3s ease-out; }
 @keyframes sk-fadein { from { opacity: 0.6; } to { opacity: 1; } }
+
+/* ── New skeleton variants ─────────────────────────────────── */
+.sk-pill  { height: 1.4rem; border-radius: 999px; }
+.sk-pill-sm { height: 1.1rem; border-radius: 999px; width: 72px; }
+.sk-phase-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 0.5rem;
+}
+.sk-phase-row .sk-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+.sk-phase-row .sk-info { flex: 1; }
+.sk-phase-row .sk-chips { display: flex; gap: 0.4rem; }
+
+/* ── Placeholder dash ──────────────────────────────────────── */
+/* Usage: <span class="ph-dash" aria-label="No value"></span>  */
+/* Usage: <span class="ph-dash ph-dash--sm"></span>             */
+.ph-dash {
+  display: inline-block;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  letter-spacing: 0;
+}
+.ph-dash::before { content: "—"; }  /* em dash — clearly "no value" */
+.ph-dash--sm::before { content: "–"; } /* en dash for compact contexts */
+.ph-dash--dot::before { content: "·"; } /* mid dot for very dense tables */
+
+/* In a table cell */
+td .ph-dash, th .ph-dash { display: block; text-align: center; }
+
+/* Inline metric — when no number is available yet */
+.ph-metric {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2ch;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+.ph-metric::before { content: "—"; }

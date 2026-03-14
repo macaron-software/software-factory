@@ -1,0 +1,69 @@
+// SF ToolService — binary gRPC interface for agent tool execution
+// Binary framing: protobuf over HTTP/2. Args/results encoded as JSON bytes.
+// Generated stubs: python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. tool_service.proto
+//
+// Ref: feat-grpc-tools
+
+syntax = "proto3";
+
+package sf.tools.v1;
+
+// ────────────────────────────────────────────────────────────────
+// Service
+// ────────────────────────────────────────────────────────────────
+
+service ToolService {
+  // Execute a single tool call; returns when complete.
+  rpc Execute (ToolRequest) returns (ToolResponse);
+
+  // Execute and stream output chunks (for long-running tools: build, test, deploy).
+  rpc ExecuteStream (ToolRequest) returns (stream ToolChunk);
+
+  // Return OpenAI-compatible schemas for available tools.
+  rpc GetSchemas (GetSchemasRequest) returns (GetSchemasResponse);
+}
+
+// ────────────────────────────────────────────────────────────────
+// Messages
+// ────────────────────────────────────────────────────────────────
+
+message ToolContext {
+  string session_id    = 1;  // agent session
+  string agent_id      = 2;  // agent executing the call
+  string project_id    = 3;  // current project
+  string project_path  = 4;  // workspace filesystem path
+  string epic_run_id   = 5;  // mission run ID (for phase tools)
+}
+
+message ToolRequest {
+  string      call_id = 1;  // uuid per call (for tracing + idempotency)
+  string      name    = 2;  // tool function name (e.g. "code_read", "git_commit")
+  bytes       args    = 3;  // JSON-encoded dict of arguments
+  ToolContext ctx     = 4;  // execution context
+}
+
+message ToolResponse {
+  string call_id      = 1;
+  bool   success      = 2;
+  bytes  result       = 3;  // JSON-encoded result string
+  string error        = 4;  // empty if success
+  uint32 duration_ms  = 5;
+}
+
+// Streaming chunk for ExecuteStream
+message ToolChunk {
+  string call_id = 1;
+  bytes  data    = 2;  // incremental output bytes
+  bool   done    = 3;  // true on final chunk
+  bool   success = 4;  // set on final chunk
+  string error   = 5;  // set on final chunk if not success
+}
+
+message GetSchemasRequest {
+  string           agent_id      = 1;
+  repeated string  allowed_tools = 2;  // empty = all tools
+}
+
+message GetSchemasResponse {
+  bytes schemas = 1;  // JSON array of OpenAI-compatible function schemas
+}

@@ -350,3 +350,41 @@
   {{ skeleton_html }}
 </div>
 {% endmacro %}
+
+{# ── Skills audit — phase rows with skill pill chips ── #}
+{% macro skeleton_skills_audit(phases=9) %}
+<div class="sk-list" aria-busy="true" aria-label="Loading skills audit…">
+  {% for i in range(phases) %}
+  <div class="sk-phase-row">
+    <div class="sk sk-icon sk-circle"></div>
+    <div class="sk-info">
+      <div class="sk sk-line" style="width:{{ [35,55,45,60,40,50,35,65,42][i % 9] }}%"></div>
+      <div class="sk sk-line-sm" style="width:{{ [20,30,25,35,22,28,20,38,24][i % 9] }}%"></div>
+    </div>
+    <div class="sk-chips">
+      {% for _ in range([3,2,4,1,3,2,3,2,1][i % 9]) %}
+      <div class="sk sk-pill-sm"></div>
+      {% endfor %}
+    </div>
+    <div class="sk sk-badge" style="width:52px"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── Skill pill chips (inline) ── #}
+{% macro skeleton_skill_chips(count=5) %}
+<span class="d-flex gap-1 flex-wrap" aria-busy="true">
+  {% for _ in range(count) %}
+  <span class="sk sk-pill-sm"></span>
+  {% endfor %}
+</span>
+{% endmacro %}
+
+{# ── Placeholder dash macro (empty/N.A. value) ── #}
+{# Usage: {{ ph() }}  or  {{ ph("No data", "sm") }} #}
+{% macro ph(label="No value", size="") %}
+<span class="ph-dash{% if size %} ph-dash--{{ size }}{% endif %}"
+      aria-label="{{ label }}" title="{{ label }}"></span>
+{% endmacro %}
+
