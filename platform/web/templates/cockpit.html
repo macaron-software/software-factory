@@ -41,6 +41,18 @@
 .badge-err{background:rgba(239,68,68,.15);color:#ef4444}
 .badge-off{background:rgba(107,114,128,.15);color:#6b7280}
 .badge-disabled{background:rgba(107,114,128,.1);color:#9ca3af}
+.concept-badge{display:inline-flex;align-items:center;padding:0.2rem 0.55rem;border-radius:999px;font-size:0.62rem;font-weight:600;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent}
+.cb-method{background:rgba(139,92,246,.12);color:#a78bfa;border-color:rgba(139,92,246,.2)}
+.cb-arch{background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.2)}
+.cb-ai{background:rgba(236,72,153,.12);color:#f472b6;border-color:rgba(236,72,153,.2)}
+.cb-pattern{background:rgba(34,197,94,.1);color:#4ade80;border-color:rgba(34,197,94,.18)}
+.cb-dp{background:rgba(251,191,36,.1);color:#fbbf24;border-color:rgba(251,191,36,.18)}
+.cb-sec{background:rgba(239,68,68,.1);color:#f87171;border-color:rgba(239,68,68,.18)}
+.cb-ops{background:rgba(6,182,212,.1);color:#22d3ee;border-color:rgba(6,182,212,.18)}
+.cb-data{background:rgba(168,85,247,.1);color:#c084fc;border-color:rgba(168,85,247,.18)}
+.cb-ux{background:rgba(244,114,182,.1);color:#f9a8d4;border-color:rgba(244,114,182,.18)}
+.cb-gov{background:rgba(251,146,60,.1);color:#fb923c;border-color:rgba(251,146,60,.18)}
+.cb-formal{background:rgba(52,211,153,.12);color:#34d399;border-color:rgba(52,211,153,.2)}
 
 /* Projects */
 .proj-list{display:flex;flex-direction:column;gap:0.5rem}
@@ -2295,7 +2307,211 @@
     </div><!-- /overflow-x:auto -->
   </div>
 
-  <!-- 12. Footer KPIs -->
+  <!-- 12. Engineering Concepts — Badge Cloud -->
+  <div class="ck-card" style="padding:1rem 1.25rem">
+    <div class="ck-card-title" style="margin-bottom:0.75rem">
+      <svg class="icon icon-xs"><use href="#icon-award"/></svg>
+      ENGINEERING CONCEPTS — Technology &amp; Methodology Stack
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.65rem">
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Methodologies</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-method">SAFe</span>
+          <span class="concept-badge cb-method">TDD</span>
+          <span class="concept-badge cb-method">BDD</span>
+          <span class="concept-badge cb-method">Lean</span>
+          <span class="concept-badge cb-method">Agile</span>
+          <span class="concept-badge cb-method">Scrum</span>
+          <span class="concept-badge cb-method">Kanban</span>
+          <span class="concept-badge cb-method">XP</span>
+          <span class="concept-badge cb-method">KISS</span>
+          <span class="concept-badge cb-method">YAGNI</span>
+          <span class="concept-badge cb-method">DRY</span>
+          <span class="concept-badge cb-method">WSJF</span>
+          <span class="concept-badge cb-method">INVEST</span>
+          <span class="concept-badge cb-method">Gherkin</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Architecture</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-arch">CQRS</span>
+          <span class="concept-badge cb-arch">Event Sourcing</span>
+          <span class="concept-badge cb-arch">Hexagonal</span>
+          <span class="concept-badge cb-arch">Clean Architecture</span>
+          <span class="concept-badge cb-arch">DDD</span>
+          <span class="concept-badge cb-arch">Microservices</span>
+          <span class="concept-badge cb-arch">Ports &amp; Adapters</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">AI &amp; ML</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-ai">Thompson Sampling</span>
+          <span class="concept-badge cb-ai">Genetic Algorithm</span>
+          <span class="concept-badge cb-ai">Q-Learning (RL)</span>
+          <span class="concept-badge cb-ai">Chain of Thought</span>
+          <span class="concept-badge cb-ai">ReAct</span>
+          <span class="concept-badge cb-ai">Few-shot</span>
+          <span class="concept-badge cb-ai">Adversarial L0+L1</span>
+          <span class="concept-badge cb-ai">PUA (L1→L4)</span>
+          <span class="concept-badge cb-ai">RAG</span>
+          <span class="concept-badge cb-ai">Embeddings</span>
+          <span class="concept-badge cb-ai">Darwin Selection</span>
+          <span class="concept-badge cb-ai">Skill Broker</span>
+          <span class="concept-badge cb-ai">Deep Bench</span>
+          <span class="concept-badge cb-ai">CoVe</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Orchestration Patterns (26)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-pattern">Solo</span>
+          <span class="concept-badge cb-pattern">Sequential</span>
+          <span class="concept-badge cb-pattern">Parallel</span>
+          <span class="concept-badge cb-pattern">Hierarchical</span>
+          <span class="concept-badge cb-pattern">Loop</span>
+          <span class="concept-badge cb-pattern">Network</span>
+          <span class="concept-badge cb-pattern">Router</span>
+          <span class="concept-badge cb-pattern">Aggregator</span>
+          <span class="concept-badge cb-pattern">Wave</span>
+          <span class="concept-badge cb-pattern">Tournament</span>
+          <span class="concept-badge cb-pattern">Voting</span>
+          <span class="concept-badge cb-pattern">Escalation</span>
+          <span class="concept-badge cb-pattern">Speculative</span>
+          <span class="concept-badge cb-pattern">Red-Blue</span>
+          <span class="concept-badge cb-pattern">Relay</span>
+          <span class="concept-badge cb-pattern">Mob</span>
+          <span class="concept-badge cb-pattern">HITL</span>
+          <span class="concept-badge cb-pattern">Blackboard</span>
+          <span class="concept-badge cb-pattern">Map-Reduce</span>
+          <span class="concept-badge cb-pattern">Composite</span>
+          <span class="concept-badge cb-pattern">Fractal QA</span>
+          <span class="concept-badge cb-pattern">Fractal Stories</span>
+          <span class="concept-badge cb-pattern">Fractal Tests</span>
+          <span class="concept-badge cb-pattern">Fractal Worktree</span>
+          <span class="concept-badge cb-pattern">Backprop Merge</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Design Patterns</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-dp">Singleton</span>
+          <span class="concept-badge cb-dp">Factory</span>
+          <span class="concept-badge cb-dp">Builder</span>
+          <span class="concept-badge cb-dp">Adapter</span>
+          <span class="concept-badge cb-dp">Decorator</span>
+          <span class="concept-badge cb-dp">Facade</span>
+          <span class="concept-badge cb-dp">Proxy</span>
+          <span class="concept-badge cb-dp">Strategy</span>
+          <span class="concept-badge cb-dp">Observer</span>
+          <span class="concept-badge cb-dp">Chain of Resp.</span>
+          <span class="concept-badge cb-dp">State Machine</span>
+          <span class="concept-badge cb-dp">Command</span>
+          <span class="concept-badge cb-dp">Template Method</span>
+          <span class="concept-badge cb-dp">Iterator</span>
+          <span class="concept-badge cb-dp">Mediator</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Security &amp; Quality</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-sec">OWASP Top 10</span>
+          <span class="concept-badge cb-sec">SAST</span>
+          <span class="concept-badge cb-sec">DAST</span>
+          <span class="concept-badge cb-sec">Chaos Engineering</span>
+          <span class="concept-badge cb-sec">Mutation Testing</span>
+          <span class="concept-badge cb-sec">17 Quality Gates</span>
+          <span class="concept-badge cb-sec">Prompt Injection Guard</span>
+          <span class="concept-badge cb-sec">Veto System</span>
+          <span class="concept-badge cb-sec">RBAC (12 roles)</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">DevOps &amp; Infra</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-ops">CI/CD</span>
+          <span class="concept-badge cb-ops">GitOps</span>
+          <span class="concept-badge cb-ops">Docker</span>
+          <span class="concept-badge cb-ops">Blue-Green Deploy</span>
+          <span class="concept-badge cb-ops">Canary Deploy</span>
+          <span class="concept-badge cb-ops">IaC</span>
+          <span class="concept-badge cb-ops">OTEL Traces</span>
+          <span class="concept-badge cb-ops">Prometheus</span>
+          <span class="concept-badge cb-ops">SRE Auto-Heal</span>
+          <span class="concept-badge cb-ops">SSE</span>
+          <span class="concept-badge cb-ops">A2A Bus</span>
+          <span class="concept-badge cb-ops">MCP</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Data &amp; Storage</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-data">PG 16 (62 tables)</span>
+          <span class="concept-badge cb-data">FTS5</span>
+          <span class="concept-badge cb-data">WAL</span>
+          <span class="concept-badge cb-data">Advisory Locks</span>
+          <span class="concept-badge cb-data">Redis 7</span>
+          <span class="concept-badge cb-data">TTL Cache</span>
+          <span class="concept-badge cb-data">Multi-Tenant</span>
+          <span class="concept-badge cb-data">Migrations</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">UX &amp; Accessibility</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-ux">Atomic Design</span>
+          <span class="concept-badge cb-ux">Design Tokens (59)</span>
+          <span class="concept-badge cb-ux">WCAG AA</span>
+          <span class="concept-badge cb-ux">Dark Mode</span>
+          <span class="concept-badge cb-ux">Skeleton Loading</span>
+          <span class="concept-badge cb-ux">30 UX Laws</span>
+          <span class="concept-badge cb-ux">30 ARIA Patterns</span>
+          <span class="concept-badge cb-ux">Responsive</span>
+          <span class="concept-badge cb-ux">i18n (40 langs)</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Compliance &amp; Governance</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-gov">SOC2 Type II (92%)</span>
+          <span class="concept-badge cb-gov">ISO 27001 (88%)</span>
+          <span class="concept-badge cb-gov">GDPR</span>
+          <span class="concept-badge cb-gov">SecureByDesign (96%)</span>
+          <span class="concept-badge cb-gov">AGPL-3.0</span>
+          <span class="concept-badge cb-gov">OpenAPI 3.1</span>
+          <span class="concept-badge cb-gov">Traceability</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.3rem">Formal Methods</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+          <span class="concept-badge cb-formal">TLA+</span>
+          <span class="concept-badge cb-formal">State Invariants</span>
+          <span class="concept-badge cb-formal">Model Checking</span>
+          <span class="concept-badge cb-formal">Temporal Logic</span>
+        </div>
+      </div>
+
+    </div>
+    <div style="margin-top:0.75rem;text-align:right;font-size:0.6rem;color:var(--text-secondary)">
+      <span id="concept-count">110+</span> concepts · 1091 skills · 26 patterns · 218 agents · 375 files · 148K LOC
+    </div>
+  </div>
+
+  <!-- 13. Footer KPIs -->
   <div class="kpi-bar" id="kpiBar">
     <div class="kpi-item">
       <span class="kpi-label">TMA Tickets</span>
