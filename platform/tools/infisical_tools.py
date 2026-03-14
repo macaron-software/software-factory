@@ -10,6 +10,7 @@ All tools are read-mostly and safe by default:
 - set_secret: create/update a secret (requires elevated role)
 - rotate_secret: re-generate a secret (requires elevated role)
 """
+# Ref: feat-settings
 
 from __future__ import annotations
 

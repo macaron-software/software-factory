@@ -13,6 +13,7 @@ TOOLS:
   rtk_run   — pipe any shell command through rtk (compressed stdout)
   rtk_wrap  — compress an arbitrary text blob via rtk read -l {mode}
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

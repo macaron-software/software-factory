@@ -8,6 +8,7 @@ When a user sends a message in a session:
 5. Handle delegations / multi-agent conversation rounds
 6. Push SSE events for live UI
 """
+# Ref: feat-mission-replay
 
 from __future__ import annotations
 

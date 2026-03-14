@@ -14,6 +14,7 @@ Metrics:
 - Patterns: good practices
 - Anti-patterns: code smells
 """
+# Ref: feat-patterns
 
 import asyncio
 import json

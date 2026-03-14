@@ -6,6 +6,7 @@ Validation utilities for phase inputs in the project-setup pattern.
 
 Target Error: TOO_SHORT (35 chars vs min 200 for dev)
 """
+# Ref: feat-quality
 
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass

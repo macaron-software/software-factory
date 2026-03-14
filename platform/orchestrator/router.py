@@ -3,6 +3,7 @@ Intent Router - Classifies user input and selects the right orchestration patter
 ====================================================================================
 Uses a fast LLM (GPT-4o) to classify intent, then maps to pattern + agent roles.
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

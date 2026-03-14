@@ -8,6 +8,7 @@ Each brick is a self-contained module that provides:
 
 Bricks auto-register via the BrickRegistry on platform startup.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

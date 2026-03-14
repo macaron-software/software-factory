@@ -1,6 +1,7 @@
 """
 Dead Code Tools — Find potentially unused Python symbols via AST analysis.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

@@ -20,6 +20,7 @@ Tools:
 Usage:
     python -m platform.mcp_platform.server
 """
+# Ref: feat-mcps
 
 import asyncio
 import json

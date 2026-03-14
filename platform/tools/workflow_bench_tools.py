@@ -26,6 +26,7 @@ Usage:
     result = run_workflow_bench()           # structural only (6 cases)
     result = run_workflow_bench(full=True)  # all layers (6 + 50 + 27 cases)
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

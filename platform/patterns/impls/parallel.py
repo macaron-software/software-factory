@@ -1,4 +1,5 @@
 """Parallel pattern: dispatcher fans out to workers with role-specific subtasks."""
+# Ref: feat-patterns
 
 from __future__ import annotations
 

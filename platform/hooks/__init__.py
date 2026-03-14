@@ -34,6 +34,7 @@ Usage (built-in registration happens automatically at module import):
     # Executor fires POST_TOOL (no block):
     await registry.fire(HookType.POST_TOOL, ctx)
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

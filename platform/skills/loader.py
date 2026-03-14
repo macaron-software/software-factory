@@ -4,6 +4,7 @@ Extends the existing core/skills.py pattern with full Pydantic validation
 and hot-reload capability for the platform's richer YAML format.
 """
 from __future__ import annotations
+# Ref: feat-skills
 
 import logging
 from pathlib import Path

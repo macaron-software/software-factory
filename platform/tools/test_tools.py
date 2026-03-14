@@ -2,6 +2,7 @@
 Test Tools - Playwright screenshots, simulator captures, and test execution.
 =============================================================================
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

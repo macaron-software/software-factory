@@ -8,6 +8,7 @@ Analyzes score trends across N cycles and triggers:
   - "spike_failure"→ sudden VETO after good scores → trigger skill eval
   - "cold_start"   → < 3 cycles → wait
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

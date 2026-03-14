@@ -4,6 +4,7 @@ One 'driver' agent writes code while others 'navigate' (review/suggest).
 After each round, driver role rotates. All agents see evolving code.
 Builds shared understanding and catches issues early.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

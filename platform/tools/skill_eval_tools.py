@@ -42,6 +42,7 @@ Eval case format (YAML frontmatter in skills/*.md):
     has_section:TITLE  — markdown heading present
     no_placeholder     — no TODO/FIXME/placeholder/... patterns
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

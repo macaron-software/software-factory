@@ -13,6 +13,7 @@ Usage:
 Table: llm_provider_scores (provider, accepted, rejected, total_calls, avg_quality, last_used)
 """
 from __future__ import annotations
+# Ref: feat-patterns
 
 import logging
 import math

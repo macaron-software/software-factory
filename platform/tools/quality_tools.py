@@ -3,6 +3,7 @@
 Exposes QualityScanner capabilities as tools that agents can call during
 missions/sessions. Integrated into the tool registry.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

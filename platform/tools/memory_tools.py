@@ -4,6 +4,7 @@ WHY: memory_retrieve and memory_prune expose explicit LTM/STM control to agents,
 inspired by AgeMem (arXiv:2601.01885) — unified tool-based memory management.
 """
 from __future__ import annotations
+# Ref: feat-tool-builder
 
 from ..models import AgentInstance
 from .registry import BaseTool

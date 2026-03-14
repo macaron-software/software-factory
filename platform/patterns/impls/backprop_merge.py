@@ -10,6 +10,7 @@ Decision: implement the merge-agent concept as a standalone SF pattern.
 Use case in SF: coding missions where N agents each produce a module/file,
   and a senior agent must integrate them into a coherent codebase.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

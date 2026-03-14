@@ -10,6 +10,7 @@ Optional env vars (see conftest.py for defaults):
 
 Tests are tagged @pytest.mark.stability and skipped by default.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

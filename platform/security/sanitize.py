@@ -6,6 +6,7 @@ Three layers:
   3. sanitize_command() — whitelist-based command validation for subprocess execution
 """
 from __future__ import annotations
+# Ref: feat-quality
 
 import logging
 import os

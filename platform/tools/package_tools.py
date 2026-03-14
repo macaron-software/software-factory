@@ -9,6 +9,7 @@ Covered registries:
   - npm  : search, package info, weekly download stats
   - PyPI : package info (exact name lookup via JSON API)
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

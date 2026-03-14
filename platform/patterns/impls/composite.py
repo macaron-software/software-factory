@@ -12,6 +12,7 @@ the context for step N+1 (compressed if > 2 steps).
 
 Ref: SF pattern observability, composite patterns, 2026-03.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

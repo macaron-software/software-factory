@@ -11,6 +11,7 @@ Can run as:
   - In-process asyncio task (server lifespan)
   - Standalone: python3 -m platform.ops.endurance_watchdog
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

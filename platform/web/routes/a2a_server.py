@@ -9,6 +9,7 @@ Exposes Jarvis (strat-cto) as a standard A2A-compliant agent:
 
 A2A spec: https://a2a-protocol.org/latest/specification/
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

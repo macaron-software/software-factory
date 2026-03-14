@@ -10,6 +10,7 @@ Redis pub/sub (optional):
   - Call ``start_redis_listener(redis_url)`` in the UI process to receive
     factory events and forward them to local SSE listeners.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

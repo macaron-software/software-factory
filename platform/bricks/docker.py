@@ -1,4 +1,5 @@
 """Docker brick — container management via docker CLI."""
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """Tests for the plugin SDK."""
+# Ref: feat-settings
 import pytest
 from pathlib import Path
 

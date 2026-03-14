@@ -13,6 +13,7 @@ Can run as:
   - In-process asyncio task (server lifespan)
   - Standalone cron: python3 -m platform.ops.auto_heal --once
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

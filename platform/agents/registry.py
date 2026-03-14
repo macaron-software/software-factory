@@ -4,6 +4,7 @@ Agent Registry - Load and manage agent roles from YAML definitions.
 Scans platform/skills/definitions/*.yaml and legacy skills/*.md.
 Provides hot-reload capability.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

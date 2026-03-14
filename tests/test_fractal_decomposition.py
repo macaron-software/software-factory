@@ -5,6 +5,7 @@ Test FRACTAL Decomposition: Standard vs 3-Concerns
 Tests the decomposition logic WITHOUT running LLM calls.
 This proves the FRACTAL approach generates more complete prompts.
 """
+# Ref: feat-patterns
 
 import sys
 from pathlib import Path

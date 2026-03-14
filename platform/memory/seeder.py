@@ -3,6 +3,7 @@
 Called at startup to ensure the memory wiki is never empty.
 Seeds both project-level and global-level memories.
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

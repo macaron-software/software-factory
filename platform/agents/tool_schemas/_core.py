@@ -5,6 +5,7 @@ Split into sub-modules by category for readability without breaking any callers
 (package __init__.py re-exports all public symbols).
 """
 from __future__ import annotations
+# Ref: feat-agents-list
 def _core_schemas() -> list[dict]:
     """Core file/code/git/shell/communication tool schemas."""
     return [

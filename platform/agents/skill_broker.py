@@ -7,6 +7,7 @@ Option C: generate_dynamic_context() — inline ephemeral block, no files needed
 
 Called from patterns/engine.py _build_node_context() for dev/qa/lead roles.
 """
+# Ref: feat-skills
 
 from __future__ import annotations
 

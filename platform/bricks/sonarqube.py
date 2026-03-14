@@ -1,4 +1,5 @@
 """SonarQube brick — code quality analysis via REST API."""
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

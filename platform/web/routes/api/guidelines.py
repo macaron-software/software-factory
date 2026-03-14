@@ -1,4 +1,5 @@
 """Guidelines API — manage domain architecture guidelines."""
+# Ref: feat-quality
 
 from __future__ import annotations
 

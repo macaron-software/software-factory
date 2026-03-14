@@ -1,4 +1,5 @@
 """Backward-compat shim — use platform.epics.feedback instead."""
+# Ref: feat-mission-control
 
 # ruff: noqa: F401, F403
 from platform.epics.feedback import *  # noqa

@@ -1,4 +1,5 @@
 """Structured JSON logging with trace_id and secret redaction."""
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

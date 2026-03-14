@@ -3,6 +3,7 @@
 These tools let the Comité Stratégique and ART agents dynamically compose
 workflows, create feature teams, and spawn sub-missions at runtime.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

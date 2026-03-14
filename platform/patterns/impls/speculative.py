@@ -4,6 +4,7 @@ Multiple agents attempt the task in parallel with different approaches.
 The first agent producing valid output (non-empty, with tool calls,
 not vetoed) is the winner. Like speculative execution in CPUs.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

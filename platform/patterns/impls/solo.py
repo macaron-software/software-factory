@@ -1,5 +1,6 @@
 """Solo pattern: single agent execution."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 
 async def run_solo(engine, run, task: str):

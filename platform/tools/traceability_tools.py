@@ -6,6 +6,7 @@ Tools:
 - traceability_coverage: coverage analysis (% covered, orphans)
 - traceability_validate: judge tool — pass/fail + gap list
 """
+# Ref: feat-annotate
 
 from __future__ import annotations
 

@@ -3,6 +3,7 @@
 Serves the HTMX-based UI with SSE real-time updates.
 Runs on port 8090 (separate from Factory dashboard on 8080).
 """
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

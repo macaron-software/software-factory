@@ -1,4 +1,5 @@
 """Git Service — read-only git operations for local repositories."""
+# Ref: feat-projects
 
 from __future__ import annotations
 

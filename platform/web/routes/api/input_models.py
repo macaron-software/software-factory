@@ -3,6 +3,7 @@
 All POST/PATCH JSON endpoints should use these models as Body parameters
 to get automatic type checking, length limits, and 422 error responses.
 """
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

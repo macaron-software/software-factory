@@ -12,6 +12,7 @@ Live tests (require --live + running server):
 Stress / load tests (run last, take longer):
   pytest tests/test_chaos_module.py -v --live -m "stress"
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

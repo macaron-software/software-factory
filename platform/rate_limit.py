@@ -3,6 +3,7 @@
 Multi-node deployments share rate-limit state via Redis so that the effective
 limit is per-IP across all nodes, not per-process.
 """
+# Ref: feat-settings
 
 from __future__ import annotations
 

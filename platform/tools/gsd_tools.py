@@ -15,6 +15,7 @@ PATTERNS APPLIED:
   - progressive context compression: extract signal, discard noise
   - spec-driven development: spec before code, tests before implementation
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

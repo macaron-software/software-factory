@@ -7,6 +7,7 @@ Persists in `mcps` table. Each MCP has:
 - tools list (discovered at runtime)
 - status: stopped | running | error
 """
+# Ref: feat-mcps
 
 from __future__ import annotations
 

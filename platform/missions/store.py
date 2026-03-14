@@ -1,4 +1,5 @@
 """Backward compat shim — use platform.epics.store instead."""
+# Ref: feat-mission-control
 
 from platform.epics.store import *  # noqa: F401, F403
 from platform.epics.store import (  # noqa: F401

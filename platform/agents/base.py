@@ -4,6 +4,7 @@ BaseAgent - Abstract base class for all platform agents.
 Provides the common interface: think, act, respond, delegate, veto, approve.
 Each agent has a role, memory, tools, and an LLM connection.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

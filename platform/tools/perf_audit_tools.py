@@ -25,6 +25,7 @@ Tool naming: mcp_cdp_<tool_name> — routed by _tool_mcp_dynamic in tool_runner.
 
 Source: https://github.com/ChromeDevTools/chrome-devtools-mcp (Apache-2.0)
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

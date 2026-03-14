@@ -35,6 +35,7 @@ ADAPTATIONS
 - Pas de ClusterSummary Pydantic : JSON brut parsé avec fallback
 - generate_signature() en méthode séparée (appelée après cluster() si besoin)
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

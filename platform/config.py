@@ -4,6 +4,7 @@ Software Factory - Configuration
 100% local platform. LLM providers: Anthropic, MiniMax, GLM, Azure Foundry.
 Loads from ~/.config/factory/platform.yaml with env var overrides.
 """
+# Ref: feat-settings
 
 import os
 from dataclasses import dataclass, field

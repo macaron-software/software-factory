@@ -4,6 +4,7 @@ Multi-model routing with fallback chain:
   Azure (GPT-4o / Claude Sonnet 4 / GPT-4.1) → local fallback
 """
 from __future__ import annotations
+# Ref: feat-workflows
 
 import logging
 import os

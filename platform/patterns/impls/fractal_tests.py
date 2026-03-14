@@ -7,6 +7,7 @@ Each leaf test includes its lineage as a docstring — answers "why does this te
 This is the "test fractal" layer in the fractal vertical stack:
   Story (fractal-stories) → Acceptance Criteria → Test Suite → Test Case → Assertion
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 import asyncio

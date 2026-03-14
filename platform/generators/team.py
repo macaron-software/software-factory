@@ -1,5 +1,6 @@
 """Team & Workflow Generator — LLM-driven team composition from natural language."""
 from __future__ import annotations
+# Ref: feat-art
 
 import json
 import logging

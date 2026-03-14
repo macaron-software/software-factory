@@ -1,5 +1,6 @@
 """Unit tests for circuit breaker and memory compression."""
 from __future__ import annotations
+# Ref: feat-quality
 
 import sqlite3
 from datetime import datetime, timedelta

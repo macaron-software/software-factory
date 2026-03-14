@@ -1,4 +1,5 @@
 """Structured output validation for agent phases."""
+# Ref: feat-quality
 
 from __future__ import annotations
 

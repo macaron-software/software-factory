@@ -7,6 +7,7 @@ Every significant action in the platform emits an event:
 Events are immutable (INSERT only, never UPDATE/DELETE).
 Query by aggregate_id (mission/project) for full audit trail.
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

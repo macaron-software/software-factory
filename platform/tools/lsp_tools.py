@@ -17,6 +17,7 @@ When to use LSP over code_search:
   - Post-edit type checking   → lsp_diagnostics (catch errors before commit)
   - File structure overview   → lsp_symbols     (semantic, not line-scan)
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

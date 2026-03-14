@@ -11,6 +11,7 @@ Sub-modules:
   _platform.py — platform-introspection + org + project tool schemas
   _mapping.py  — ROLE_TOOL_MAP, _classify_agent_role, _filter_schemas
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

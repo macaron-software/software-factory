@@ -1,4 +1,5 @@
 """Hierarchical pattern: manager decomposes, devs execute, QA validates."""
+# Ref: feat-patterns
 
 from __future__ import annotations
 

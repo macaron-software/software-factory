@@ -6,6 +6,7 @@ a smooth fade-in transition.
 
 Cache headers: short Cache-Control for browser + ETag for conditional requests.
 """
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

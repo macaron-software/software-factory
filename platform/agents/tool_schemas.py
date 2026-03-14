@@ -3,6 +3,7 @@
 Contains OpenAI-compatible function-calling tool definitions and
 role-based access control mappings. Extracted from executor.py.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

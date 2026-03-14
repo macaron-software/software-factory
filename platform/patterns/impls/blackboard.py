@@ -4,6 +4,7 @@ Agents take turns reading the blackboard state and contributing their expertise.
 Each iteration, every agent reads the current state and adds/refines content.
 Converges when max_iterations is reached or no agent modifies the blackboard.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

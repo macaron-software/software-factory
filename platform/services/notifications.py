@@ -1,4 +1,5 @@
 """In-app notification store — persistent notifications with bell icon support."""
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

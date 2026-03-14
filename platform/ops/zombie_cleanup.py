@@ -5,6 +5,7 @@ Rules:
 - paused > 24h without updated_at change → status = 'abandoned'
 - running > 48h → always failed (no matter updated_at)
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

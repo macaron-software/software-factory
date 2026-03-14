@@ -25,6 +25,7 @@ YAML (platform/agents/benchmarks/teams/{team_id}.yaml):
     - "Brain produces a clear plan/steps"
     - "Dev implements following the plan with TDD"
 """
+# Ref: feat-art
 
 from __future__ import annotations
 

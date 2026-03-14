@@ -7,6 +7,7 @@ Usage:
 Reads wiki_pages from local SQLite, upserts to GitLab via REST API.
 Creates a home page (README) with table of contents + individual pages.
 """
+# Ref: feat-wiki
 
 from __future__ import annotations
 

@@ -3,6 +3,7 @@
 Maps events (ci_failed, deploy_success, agent_stuck) to actions
 (retry, notify, escalate, create_task). Inspired by agent-orchestrator.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

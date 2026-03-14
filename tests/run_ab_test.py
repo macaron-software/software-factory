@@ -8,6 +8,7 @@ Runs Wiggum on two identical tasks:
 
 Captures generated code and compares.
 """
+# Ref: feat-patterns
 
 import asyncio
 import sys

@@ -23,6 +23,7 @@ ADAPTATION vs always-on-memory-agent:
 SUPPORTED FILE TYPES (text tier — same as original's text category):
   .txt .md .log .csv .xml .yaml .yml .json
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

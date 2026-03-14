@@ -1,4 +1,5 @@
 """Shared low-level helpers for tool modules."""
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

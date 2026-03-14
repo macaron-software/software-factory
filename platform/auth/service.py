@@ -4,6 +4,7 @@ Auth service — user registration, login, JWT token management.
 Uses bcrypt for password hashing and PyJWT for token generation.
 Tokens are stored as httponly cookies (access 15min, refresh 7 days).
 """
+# Ref: feat-rbac
 
 import hashlib
 import os

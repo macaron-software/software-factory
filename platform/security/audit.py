@@ -1,4 +1,5 @@
 """Append-only audit log for admin/system actions."""
+# Ref: feat-quality
 
 from __future__ import annotations
 import logging

@@ -48,6 +48,7 @@ SECURITY — SBD-09 vs SBD-10 conflict resolution (SecureByDesign v1.1):
   PII in logs: pseudonymize user_id → hash after 30 days.
   Source: https://github.com/Yems221/securebydesign-llmskill SBD-09/SBD-10
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

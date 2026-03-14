@@ -14,6 +14,7 @@ Configuration (platform_settings table):
   - guardrails_block_destructive: "1" — block destructive git ops
   - guardrails_block_sensitive: "0" — warn only for sensitive reads
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

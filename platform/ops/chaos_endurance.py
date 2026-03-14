@@ -7,6 +7,7 @@ Can run as:
   - In-process asyncio task (server lifespan)
   - Standalone: python3 -m platform.ops.chaos_endurance --once
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

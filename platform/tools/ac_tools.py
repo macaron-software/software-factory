@@ -4,6 +4,7 @@ AC Tools — Amélioration Continue tool implementations.
 Tools for AC cycle recording, project state, and experiment tracking.
 These replace the http_post calls described in AC skill files.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

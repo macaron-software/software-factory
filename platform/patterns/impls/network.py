@@ -1,5 +1,6 @@
 """Network/debate pattern: agents discuss in rounds, judge decides."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 import asyncio
 import logging

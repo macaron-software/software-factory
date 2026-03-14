@@ -1,4 +1,5 @@
 """MercatoService — wallet, listing, transfer, draft operations."""
+# Ref: feat-mercato
 
 from __future__ import annotations
 

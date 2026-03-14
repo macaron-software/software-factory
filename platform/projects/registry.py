@@ -1,4 +1,5 @@
 """Project Registry — discovers projects from SF/MF YAMLs + manual config."""
+# Ref: feat-projects
 
 from __future__ import annotations
 

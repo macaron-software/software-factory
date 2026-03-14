@@ -16,6 +16,7 @@ Install once (downloads Chromium):
 For Docker/server:
     RUN npm install -g agent-browser && agent-browser install --with-deps
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

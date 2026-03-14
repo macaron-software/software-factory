@@ -7,6 +7,7 @@ Provides:
 
 Used by: llm-judge-ux, ux-adversarial (verification step).
 """
+# Ref: feat-design-system
 
 from __future__ import annotations
 

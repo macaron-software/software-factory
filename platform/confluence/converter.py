@@ -3,6 +3,7 @@ Convert platform content to Confluence storage format (XHTML).
 Handles: markdown, tables, agent messages, features kanban, SVG graphs, mermaid.
 """
 from __future__ import annotations
+# Ref: feat-wiki
 
 import html
 import re

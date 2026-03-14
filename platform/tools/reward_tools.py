@@ -30,6 +30,7 @@ SOURCE: Reward function design from ART (OpenPipe, Apache-2.0) — we port the
   *concept* (explicit per-run reward signal + trajectory storage) without the
   GPU training loop. The data format is ART-compatible for future migration.
 """
+# Ref: feat-mercato
 
 from __future__ import annotations
 

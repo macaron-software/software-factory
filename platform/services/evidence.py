@@ -4,6 +4,7 @@ After each dev sprint, verifies that real artifacts were produced.
 Loop until criteria met or max sprints exhausted.
 No LLM — pure subprocess/filesystem checks.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

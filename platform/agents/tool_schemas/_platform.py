@@ -5,6 +5,7 @@ Split into sub-modules by category for readability without breaking any callers
 (package __init__.py re-exports all public symbols).
 """
 from __future__ import annotations
+# Ref: feat-agents-list
 def _platform_schemas() -> list[dict]:
     """Platform introspection and lifecycle tool schemas."""
     return [

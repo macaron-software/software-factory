@@ -9,6 +9,7 @@ Checks beyond basic lint:
 - Unbounded collections growing in loops
 - Semgrep rules (if installed)
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

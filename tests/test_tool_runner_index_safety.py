@@ -3,6 +3,7 @@ Test suite for tool_runner index safety (TMA Auto-Heal)
 
 Validates fix for: "list index out of range" error in executor.py:508
 """
+# Ref: feat-tool-builder
 
 import pytest
 from unittest.mock import MagicMock, patch

@@ -20,6 +20,7 @@ Configuration (env vars):
   RTK_ENABLED=true           — enable RTK token compression proxy (default: auto-detect)
   RTK_PATH=/path/to/rtk      — override RTK binary path
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

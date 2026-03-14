@@ -1,4 +1,5 @@
 """Web routes — Agent, pattern, skill, MCP CRUD."""
+# Ref: feat-agents-list
 
 from __future__ import annotations
 
@@ -6,11 +7,12 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .helpers import _templates
 from ..schemas import AgentOut, AgentDetail, LlmProvider
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -171,7 +173,7 @@ async def agent_save(request: Request, agent_id: str = ""):
     return RedirectResponse("/agents", status_code=303)
 
 
-@router.delete("/api/agents/{agent_id}")
+@router.delete("/api/agents/{agent_id}", dependencies=[Depends(require_auth())])
 async def agent_delete(agent_id: str):
     """Delete an agent."""
     from ...agents.store import get_agent_store
@@ -346,7 +348,7 @@ async def pattern_save(request: Request, pattern_id: str = ""):
     return RedirectResponse("/patterns", status_code=303)
 
 
-@router.delete("/api/patterns/{pattern_id}")
+@router.delete("/api/patterns/{pattern_id}", dependencies=[Depends(require_auth())])
 async def pattern_delete(pattern_id: str):
     """Delete a pattern."""
     from ...patterns.store import get_pattern_store
@@ -487,7 +489,7 @@ async def mcps_page(request: Request):
     )
 
 
-@router.post("/api/mcps/{mcp_id}/start")
+@router.post("/api/mcps/{mcp_id}/start", dependencies=[Depends(require_auth())])
 async def api_mcp_start(mcp_id: str):
     """Start an MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -497,7 +499,7 @@ async def api_mcp_start(mcp_id: str):
     return {"ok": ok, "message": msg}
 
 
-@router.post("/api/mcps/{mcp_id}/stop")
+@router.post("/api/mcps/{mcp_id}/stop", dependencies=[Depends(require_auth())])
 async def api_mcp_stop(mcp_id: str):
     """Stop an MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -507,7 +509,7 @@ async def api_mcp_stop(mcp_id: str):
     return {"ok": ok, "message": msg}
 
 
-@router.post("/api/mcps/{mcp_id}/test")
+@router.post("/api/mcps/{mcp_id}/test", dependencies=[Depends(require_auth())])
 async def api_mcp_test(mcp_id: str):
     """Test an MCP server — start, discover tools, test call."""
     from ...mcps.manager import get_mcp_manager
@@ -517,7 +519,7 @@ async def api_mcp_test(mcp_id: str):
     return result
 
 
-@router.post("/api/mcps/{mcp_id}/call")
+@router.post("/api/mcps/{mcp_id}/call", dependencies=[Depends(require_auth())])
 async def api_mcp_call(mcp_id: str, request: Request):
     """Call a tool on a running MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -616,7 +618,7 @@ async def api_providers():
     return JSONResponse(providers)
 
 
-@router.post("/api/skills/reload")
+@router.post("/api/skills/reload", dependencies=[Depends(require_auth())])
 async def reload_skills():
     """Hot-reload skill definitions."""
     from ...skills.loader import get_skill_loader
@@ -625,7 +627,7 @@ async def reload_skills():
     return {"reloaded": count}
 
 
-@router.post("/api/admin/skills/update")
+@router.post("/api/admin/skills/update", dependencies=[Depends(require_auth())])
 async def update_skill_file(request: Request):
     """Overwrite a skill markdown file and invalidate the library cache.
     Body: {"name": "devops-pipeline", "content": "...markdown..."}
@@ -655,7 +657,7 @@ async def update_skill_file(request: Request):
     return {"status": "ok", "skill": name, "bytes": len(content)}
 
 
-@router.post("/api/skills/github/add")
+@router.post("/api/skills/github/add", dependencies=[Depends(require_auth())])
 async def add_github_skill_source(request: Request):
     """Add a GitHub repo as skill source."""
     from ...skills.library import get_skill_library
@@ -681,7 +683,7 @@ async def add_github_skill_source(request: Request):
     )
 
 
-@router.post("/api/skills/github/sync")
+@router.post("/api/skills/github/sync", dependencies=[Depends(require_auth())])
 async def sync_github_skills():
     """Sync all GitHub skill sources via git clone (runs in thread)."""
     import asyncio
@@ -702,7 +704,7 @@ async def sync_github_skills():
     )
 
 
-@router.post("/api/skills/github/remove")
+@router.post("/api/skills/github/remove", dependencies=[Depends(require_auth())])
 async def remove_github_skill_source(request: Request):
     """Remove a GitHub skill source."""
     from ...skills.library import get_skill_library
@@ -729,7 +731,7 @@ async def generate_page(request: Request):
     )
 
 
-@router.post("/api/generate-team")
+@router.post("/api/generate-team", dependencies=[Depends(require_auth())])
 async def generate_team(request: Request):
     """Generate team + workflow from natural language prompt, launch it."""
     from ...generators.team import TeamGenerator
@@ -1016,7 +1018,7 @@ async def agent_chat_page(request: Request, agent_id: str, project_id: str = "")
     )
 
 
-@router.post("/api/agents/{agent_id}/chat")
+@router.post("/api/agents/{agent_id}/chat", dependencies=[Depends(require_auth())])
 async def agent_chat(request: Request, agent_id: str):
     """Direct chat with an agent — SSE stream of tokens."""
     import json

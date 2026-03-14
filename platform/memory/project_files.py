@@ -9,6 +9,7 @@ Files scanned (in order):
 6. .cursorrules — Cursor rules
 """
 from __future__ import annotations
+# Ref: feat-memory
 
 import logging
 import os

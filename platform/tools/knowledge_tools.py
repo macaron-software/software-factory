@@ -10,6 +10,7 @@ need structured access to external knowledge sources. This module provides:
 All HTTP calls use stdlib urllib.request. Subprocess calls use
 asyncio.create_subprocess_shell for non-blocking execution.
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

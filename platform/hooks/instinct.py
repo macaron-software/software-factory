@@ -21,6 +21,7 @@ PATTERN TYPES DETECTED:
     2. Error corrections — tool call followed by a retry with different args
     3. Workflow clusters — same 3+ tools appearing together in same session
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

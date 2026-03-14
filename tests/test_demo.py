@@ -1,4 +1,5 @@
 """Tests for demo mode — mock LLM responses and data seeding."""
+# Ref: feat-cockpit
 import os
 import pytest
 from unittest.mock import patch

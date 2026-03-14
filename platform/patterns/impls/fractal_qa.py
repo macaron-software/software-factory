@@ -10,6 +10,7 @@ Fractal vertical position (deepest layer):
                → Test Suite → Test Case (fractal-tests)
                → QA Scenario (fractal-qa)  ← this pattern
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 import asyncio

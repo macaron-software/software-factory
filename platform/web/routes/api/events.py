@@ -1,4 +1,5 @@
 """Event store API endpoints."""
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

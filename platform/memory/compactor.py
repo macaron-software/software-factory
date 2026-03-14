@@ -10,6 +10,7 @@ Compaction rules:
   4. Re-score global entries: boost confidence when key appears in 2+ projects
   5. Deduplicate global entries with same key (merge, keep highest-confidence value)
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

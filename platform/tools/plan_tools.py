@@ -3,6 +3,7 @@
 Allows agents to externalize their execution plan before tackling complex tasks.
 Plans are stored in DB, visible in dashboard, and updated in real-time.
 """
+# Ref: feat-backlog
 
 from __future__ import annotations
 

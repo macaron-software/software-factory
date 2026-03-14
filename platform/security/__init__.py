@@ -1,4 +1,5 @@
 """Security package — prompt injection, command validation, path hardening, auth."""
+# Ref: feat-quality
 
 from __future__ import annotations
 

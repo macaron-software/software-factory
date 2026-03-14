@@ -3,6 +3,7 @@ Security Tools - SAST scanning, dependency audit, secrets detection.
 ====================================================================
 Real security tools (subprocess-based), not LLM guessing.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

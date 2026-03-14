@@ -1,6 +1,7 @@
 """
 Dependency Tools — Manifest parsing and security auditing.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

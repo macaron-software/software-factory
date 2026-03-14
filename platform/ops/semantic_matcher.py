@@ -31,6 +31,7 @@ ADAPTATIONS
 - find_matching_ticket() supprimé (dépendait d'Airweave + Linear)
 - check_mute_match() est maintenant synchrone (pas de LLM)
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

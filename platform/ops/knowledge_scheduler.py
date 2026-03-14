@@ -3,6 +3,7 @@
 Triggers the 'knowledge-maintenance' workflow automatically on all active projects.
 Runs after memory compactor (03:00) and before business hours.
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

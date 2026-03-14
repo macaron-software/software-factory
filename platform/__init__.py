@@ -1,3 +1,4 @@
+# Ref: feat-cockpit
 # Workaround: this package shadows stdlib 'platform'. Re-export critical attrs
 # so that libraries like httpx/zstandard that call platform.python_implementation() work.
 import importlib.util as _ilu

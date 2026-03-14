@@ -1,6 +1,7 @@
 """
 Tool utilities — shared helpers for all platform tools.
 """
+# Ref: feat-tool-builder
 
 import shutil
 import subprocess

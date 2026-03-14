@@ -10,6 +10,7 @@ Flow:
   → fits in context, conversation feels continuous
 """
 from __future__ import annotations
+# Ref: feat-mission-replay
 
 import hashlib
 import json

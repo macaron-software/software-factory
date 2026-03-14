@@ -3,6 +3,7 @@ Build Tools - Build, test, lint operations (bridges to Factory core).
 ======================================================================
 Uses Docker sandbox for isolation when SANDBOX_ENABLED=true.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

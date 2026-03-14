@@ -2,6 +2,7 @@
 Tool Registry - Discovery, registration, and permission management.
 =====================================================================
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

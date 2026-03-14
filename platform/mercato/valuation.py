@@ -1,4 +1,5 @@
 """Agent market valuation — compute market_value from agent stats."""
+# Ref: feat-mercato
 
 from __future__ import annotations
 

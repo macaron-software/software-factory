@@ -4,6 +4,7 @@ MCP Manager — Launch, stop, and proxy to stdio-based MCP servers.
 Each MCP server runs as a subprocess with JSON-RPC over stdin/stdout.
 The manager maintains a process pool and routes tool calls to the right server.
 """
+# Ref: feat-mcps
 
 from __future__ import annotations
 

@@ -4,6 +4,7 @@ Provides CRUD for legacy_items (UUID inventory of every legacy element)
 and traceability_links (bidirectional linking: legacy↔story↔code↔test).
 Also provides coverage analysis and orphan detection.
 """
+# Ref: feat-annotate
 
 from __future__ import annotations
 

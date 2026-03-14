@@ -7,6 +7,7 @@ Extends the ProjectRegistry (read-only discovery) with write operations:
 - Assign Agent Lead
 - Track project-level memory
 """
+# Ref: feat-projects
 
 from __future__ import annotations
 

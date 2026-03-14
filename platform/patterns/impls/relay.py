@@ -4,6 +4,7 @@ Each agent receives the accumulated work product and adds their contribution.
 Unlike sequential (independent tasks), relay explicitly builds on previous
 output. Like a relay race — each runner carries the baton further.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

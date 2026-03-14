@@ -8,6 +8,7 @@ Usage:
     scorecard = await scanner.full_scan("/workspace/myproject", project_id="abc")
     print(scorecard.global_score)  # 72.5
 """
+# Ref: feat-metrics
 
 from __future__ import annotations
 

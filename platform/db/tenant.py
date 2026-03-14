@@ -1,4 +1,5 @@
 """Multi-tenant project isolation — all projects use shared PostgreSQL database."""
+# Ref: feat-workspaces
 
 from __future__ import annotations
 

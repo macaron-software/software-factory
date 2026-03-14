@@ -1,4 +1,5 @@
 """Agent Evaluation Framework — datasets, cases, runs, LLM-as-judge scoring."""
+# Ref: feat-evals
 
 from __future__ import annotations
 

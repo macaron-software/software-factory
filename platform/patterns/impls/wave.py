@@ -1,5 +1,6 @@
 """Wave pattern: parallel within waves, sequential across waves."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 import asyncio
 import logging

@@ -19,6 +19,7 @@ Six hooks registered automatically:
 7. instinct_observer— SESSION_END : runs instinct pattern analysis (ECC CL-v2 core)
                       SOURCE: ECC continuous-learning-v2/SKILL.md + observe.sh
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

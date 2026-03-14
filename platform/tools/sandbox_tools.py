@@ -5,6 +5,7 @@ WHY: Agents need a safe way to execute shell commands without importing
 sandbox internals directly. These tools wrap platform/tools/sandbox.py
 and surface the result as JSON, including sandbox mode and Landlock status.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

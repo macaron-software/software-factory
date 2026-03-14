@@ -16,6 +16,7 @@ Configure via environment variables:
   NOTIFY_VAPID_PRIVATE_KEY=... (base64url PEM)
   NOTIFY_VAPID_EMAIL=admin@example.com
 """
+# Ref: feat-monitoring
 import asyncio
 import json
 import logging

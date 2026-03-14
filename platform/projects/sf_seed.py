@@ -4,6 +4,7 @@ Populated at every startup (idempotent — ON CONFLICT DO NOTHING).
 Covers the SF web platform + macOS native app + agents/patterns ecosystem.
 PostgreSQL only — uses TEXT PRIMARY KEY, TIMESTAMP DEFAULT CURRENT_TIMESTAMP.
 """
+# Ref: feat-projects
 
 from __future__ import annotations
 

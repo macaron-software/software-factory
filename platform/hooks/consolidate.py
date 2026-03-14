@@ -23,6 +23,7 @@ INSIGHT TYPES:
   insight     — meta observation from clustering (e.g., "3 agents avoid X")
   convergence — same trigger/action in 2+ agents → global candidate
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

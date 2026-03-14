@@ -4,6 +4,7 @@ Deploy Target Registry.
 Loads named deploy targets from the DB (deploy_targets table).
 Always provides a built-in "docker-local" fallback.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

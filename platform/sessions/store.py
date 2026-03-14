@@ -1,4 +1,5 @@
 """Session & message store — manages conversations between agents and users."""
+# Ref: feat-mission-replay
 
 from __future__ import annotations
 

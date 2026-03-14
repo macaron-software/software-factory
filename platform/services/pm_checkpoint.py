@@ -7,6 +7,7 @@ After each phase, the PM checkpoint:
 
 This replaces blind phase transitions with evidence-driven decisions.
 """
+# Ref: feat-mission-control
 
 from __future__ import annotations
 

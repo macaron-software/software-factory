@@ -22,6 +22,7 @@ Add to mission config::
 Then launch via ``MilestoneRunner.run()`` — called automatically from
 ``platform/web/routes/epics/execution.py`` when milestones are present.
 """
+# Ref: feat-mission-control
 
 from __future__ import annotations
 

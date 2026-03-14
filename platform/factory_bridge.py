@@ -4,6 +4,7 @@ Allows platform agents to use Factory tools: brain, cycle, adversarial,
 task_store, fractal, build_queue, etc.
 """
 from __future__ import annotations
+# Ref: feat-workflows
 
 import logging
 import sys

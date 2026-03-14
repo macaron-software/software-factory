@@ -1,4 +1,5 @@
 """Demo mode: seed sample data for exploring the platform without LLM keys."""
+# Ref: feat-cockpit
 
 import os
 import logging

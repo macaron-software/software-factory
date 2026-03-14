@@ -7,6 +7,7 @@ Leader election: only one node runs the nightly cycle.  The first node to set
 the Redis key ``leader:evolution`` (NX EX 3600) becomes the leader for that
 night.  If Redis is unavailable, every node runs (safe — idempotent GA writes).
 """
+# Ref: feat-agents-create
 
 from __future__ import annotations
 

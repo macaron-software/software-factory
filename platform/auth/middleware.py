@@ -16,6 +16,7 @@ Usage in routes:
     async def update_project(user: User = Depends(require_project_role("project_id", "project_manager"))):
         ...
 """
+# Ref: feat-rbac
 
 import hashlib
 import os

@@ -7,6 +7,7 @@ Layer 4: Global (cross-project learnings)
 
 Uses existing DB tables: memory_pattern, memory_project, memory_global.
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

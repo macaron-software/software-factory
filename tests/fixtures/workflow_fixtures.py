@@ -2,6 +2,7 @@
 Test fixtures for project-setup phase validation
 Simulates the ideation-to-prod workflow configuration
 """
+# Ref: feat-workflows
 
 PROJECT_SETUP_FIXTURE = {
     "id": "project-setup",

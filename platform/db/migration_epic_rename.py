@@ -2,6 +2,7 @@
 DB migration: rename missions/mission_runs tables to epics/epic_runs.
 Run once. Idempotent (checks if already done).
 """
+# Ref: feat-settings
 
 import logging
 from .migrations import get_db

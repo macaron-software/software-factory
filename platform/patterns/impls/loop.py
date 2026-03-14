@@ -1,5 +1,6 @@
 """Loop pattern: writer/reviewer iterate until approval."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 import uuid
 from datetime import datetime

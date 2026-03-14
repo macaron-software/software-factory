@@ -4,6 +4,7 @@ Azure A2A Bridge - Connect local agents to Azure AI Foundry Agent Service.
 Maps internal A2AMessage format to Azure's Agent-to-Agent protocol.
 Falls back to local-only mode if Azure is unavailable.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

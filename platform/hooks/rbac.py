@@ -7,6 +7,7 @@ Rules:
 - SESSION_START / SESSION_END → scope=platform agents or whitelist
 - PRE_COMPACT                 → any active agent
 """
+# Ref: feat-rbac
 
 from __future__ import annotations
 

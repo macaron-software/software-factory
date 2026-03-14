@@ -2,6 +2,7 @@
 
 Extracted from executor.py to keep the main file focused on the agent loop.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

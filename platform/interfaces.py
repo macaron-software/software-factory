@@ -3,6 +3,7 @@
 Inspired by agent-orchestrator's 8-slot plugin system.
 All core abstractions are defined as Python Protocols for duck-typing extensibility.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

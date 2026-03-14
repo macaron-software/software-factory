@@ -1,4 +1,5 @@
 """Tests for deterministic analysis tools (AST, lint, type-check, deps, dead code)."""
+# Ref: feat-tool-builder
 import asyncio
 import os
 import tempfile

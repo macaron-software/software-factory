@@ -23,6 +23,7 @@ manifest.yaml format:
       - id: my-mcp
         command: python3 -m my_mcp_server
 """
+# Ref: feat-settings
 
 from __future__ import annotations
 

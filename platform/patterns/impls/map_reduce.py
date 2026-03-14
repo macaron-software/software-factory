@@ -3,6 +3,7 @@
 Phase 1 (Map): Each worker processes the task independently in parallel.
 Phase 2 (Reduce): A designated reducer agent synthesizes all worker outputs.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

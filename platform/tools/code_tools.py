@@ -2,6 +2,7 @@
 Code Tools - File read/write/search operations for agents.
 ============================================================
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

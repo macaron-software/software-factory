@@ -1,4 +1,5 @@
 """Tests for the sf CLI — DB mode (offline, no server needed)."""
+# Ref: feat-toolbox
 import json
 import os
 import subprocess

@@ -3,6 +3,7 @@ Software Factory - Data Models
 =====================================
 Pydantic models for agents, messages, sessions, artifacts.
 """
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

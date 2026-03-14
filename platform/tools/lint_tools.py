@@ -1,6 +1,7 @@
 """
 Lint Tools — Bridge to ruff, eslint, golint with auto-detection.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

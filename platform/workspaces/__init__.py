@@ -3,6 +3,7 @@
 Each agent session gets its own git worktree — isolated branch, no file conflicts.
 Inspired by agent-orchestrator's workspace plugin.
 """
+# Ref: feat-workspaces
 
 from __future__ import annotations
 

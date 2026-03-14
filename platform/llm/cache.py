@@ -8,6 +8,7 @@ Env vars:
   LLM_CACHE_TTL=86400      (default: 24h, 0 = infinite)
   LLM_CACHE_MAX_SIZE=10000  (max cached entries)
 """
+# Ref: feat-metrics
 
 from __future__ import annotations
 

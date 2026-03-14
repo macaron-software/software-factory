@@ -7,6 +7,7 @@ Config via env vars:
     AWS_ACCESS_KEY_ID     — AWS credentials (or use IAM role)
     AWS_SECRET_ACCESS_KEY — AWS credentials (or use IAM role)
 """
+# Ref: feat-rbac
 
 import logging
 import os

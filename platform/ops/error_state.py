@@ -36,6 +36,7 @@ ADAPTATIONS
 - Matching sémantique des mutes délégué à monitoring-ops agent (tool loop)
 - Typage Python natif, pas de Pydantic PreviousErrorState
 """
+# Ref: feat-ops
 
 from __future__ import annotations
 

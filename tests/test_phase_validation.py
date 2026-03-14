@@ -2,6 +2,7 @@
 Test implementation for project-setup phase validation
 Validates the TOO_SHORT error fix and SLOP detection
 """
+# Ref: feat-workflows
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import sys

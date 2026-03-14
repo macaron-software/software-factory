@@ -1,5 +1,6 @@
 """Sequential pattern: nodes executed in order with context rot mitigation."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 
 async def run_sequential(engine, run, task: str):

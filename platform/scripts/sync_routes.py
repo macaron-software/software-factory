@@ -7,6 +7,7 @@ For each HTML route (non-API, non-static) not yet in project_screens:
 - Creates a screen row with auto-matched feature_id (longest prefix match)
 - Leaves rbac_roles empty (to be filled by retro_sf_safe.py)
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

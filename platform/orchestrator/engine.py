@@ -3,6 +3,7 @@ Orchestration Engine - Coordinates agents using patterns.
 ===========================================================
 Central coordinator that selects patterns, assigns agents, and manages workflows.
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

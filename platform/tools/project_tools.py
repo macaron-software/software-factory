@@ -7,6 +7,7 @@ Architecture First workflow:
   4. PM calls set_project_phase("mvp") → gate checks Architecture + Audit missions done
   5. Dev agents get docs/ injected into context via read_project_doc
 """
+# Ref: feat-projects
 
 from __future__ import annotations
 

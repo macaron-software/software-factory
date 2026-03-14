@@ -2,6 +2,7 @@
 Platform Tools — Expose platform internals (agents, missions, memory, metrics)
 as native executor tools. Same handlers as mcp_platform/server.py but in-process.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

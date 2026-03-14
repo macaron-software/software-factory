@@ -4,6 +4,7 @@ Red team finds bugs, security holes, edge cases. Blue team fixes.
 Iterates until red team finds no more issues or max_rounds reached.
 More structured than network debate — explicit attack/defend roles.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

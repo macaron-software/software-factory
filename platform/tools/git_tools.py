@@ -3,6 +3,7 @@ Git Tools - Version control operations for agents.
 ====================================================
 Git branch isolation: agents commit to agent/{agent_id}/ branches, never main/master.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

@@ -11,6 +11,7 @@ Data locations (resolved at startup):
   SOLARIS_REPORTS_DIR — validation reports (optional)
 """
 from __future__ import annotations
+# Ref: feat-design-system
 
 import asyncio
 import json

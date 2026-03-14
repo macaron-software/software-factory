@@ -18,6 +18,7 @@ Destinations:
 
 Lifecycle: daily=90d, weekly=365d, monthly=forever
 """
+# Ref: feat-ops
 
 import argparse
 import datetime

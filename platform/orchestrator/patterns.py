@@ -3,6 +3,7 @@ Orchestration Patterns - All 8 agentic architecture patterns.
 ===============================================================
 Parallel, Sequential, Loop, Router, Aggregator, Hierarchical, Network, Human-in-Loop.
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

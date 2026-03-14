@@ -4,6 +4,7 @@ Each agent evaluates the task independently and produces a vote.
 Results aggregated by majority. Unlike network (debate), agents don't
 see each other's positions — pure independent judgment.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

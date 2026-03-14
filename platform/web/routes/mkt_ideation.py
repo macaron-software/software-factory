@@ -1,4 +1,5 @@
 """Web routes — Marketing Ideation workspace."""
+# Ref: feat-mkt-ideation
 
 from __future__ import annotations
 
@@ -7,10 +8,11 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .helpers import _templates
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -137,7 +139,7 @@ async def mkt_ideation_page(request: Request):
 # ── Launch multi-agent marketing analysis ────────────────────────
 
 
-@router.post("/api/mkt-ideation")
+@router.post("/api/mkt-ideation", dependencies=[Depends(require_auth())])
 async def mkt_ideation_submit(request: Request):
     """Launch marketing ideation via multi-agent network pattern."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -383,7 +385,7 @@ Sois précis, concret et actionnable. Adapte toutes les valeurs au contexte spé
 Réponds UNIQUEMENT avec le JSON, sans markdown wrapper."""
 
 
-@router.post("/api/mkt-ideation/generate-plan")
+@router.post("/api/mkt-ideation/generate-plan", dependencies=[Depends(require_auth())])
 async def mkt_generate_plan(request: Request):
     """CMO generates a full structured marketing plan from the ideation session."""
     from ...llm.client import get_llm_client, LLMMessage
@@ -432,7 +434,7 @@ async def mkt_generate_plan(request: Request):
     return JSONResponse({"plan": plan, "session_id": session_id})
 
 
-@router.post("/api/mkt-ideation/create-mission")
+@router.post("/api/mkt-ideation/create-mission", dependencies=[Depends(require_auth())])
 async def mkt_create_mission(request: Request):
     """Create a Go-to-Market mission from a completed marketing plan."""
     from ...epics.store import get_epic_store, MissionDef

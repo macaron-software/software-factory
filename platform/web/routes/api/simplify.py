@@ -1,4 +1,5 @@
 """Code simplification endpoint — parallel 3-agent analysis of a git diff."""
+# Ref: feat-settings
 
 from __future__ import annotations
 

@@ -31,6 +31,7 @@ Benchmark YAML (platform/agents/benchmarks/{agent_id}.yaml):
 
 Darwin feedback weight: 0.3 (bench is cheaper signal than real mission = 1.0)
 """
+# Ref: feat-evals
 
 from __future__ import annotations
 

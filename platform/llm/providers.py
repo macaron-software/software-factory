@@ -1,5 +1,6 @@
 """LLM Provider registry — unified interface for Anthropic, MiniMax, GLM, Azure."""
 from __future__ import annotations
+# Ref: feat-settings
 
 import json
 import os

@@ -1,5 +1,6 @@
 """Router pattern: first agent routes to best specialist."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 
 async def run_router(engine, run, task: str):

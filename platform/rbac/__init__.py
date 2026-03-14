@@ -9,6 +9,7 @@ Hierarchy of product artifacts:
 
 Permission matrix: role_category × artifact_type × action
 """
+# Ref: feat-rbac
 
 from __future__ import annotations
 

@@ -4,6 +4,7 @@ The android-builder container has JDK 17, Android SDK 35, and a headless emulato
 Platform invokes builds via `docker exec android-builder ...` on the shared workspace volume.
 """
 from __future__ import annotations
+# Ref: feat-tool-builder
 
 import asyncio
 import logging

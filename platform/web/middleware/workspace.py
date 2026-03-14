@@ -1,4 +1,5 @@
 """Workspace middleware — injects workspace context into request.state."""
+# Ref: feat-rbac
 
 from __future__ import annotations
 

@@ -10,6 +10,7 @@ PostgreSQL prod) as all other platform tables, instead of a hard-coded SQLite pa
 The why_log schema is created by _ensure_table() on first use so no migration needed.
 Source: TinyAGI/fractals traceability concept + ADR-0015.
 """
+# Ref: feat-annotate
 
 from __future__ import annotations
 

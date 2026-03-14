@@ -18,6 +18,7 @@ Table: ac_skill_scores
   updated_at TEXT
   PRIMARY KEY (skill_id, variant, project_id)
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

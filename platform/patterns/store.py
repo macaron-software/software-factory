@@ -1,5 +1,6 @@
 """Pattern store — CRUD + pre-built workflow templates."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 import json
 import uuid

@@ -27,6 +27,7 @@ Table: ac_experiments
   created_at      TEXT
   closed_at       TEXT
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

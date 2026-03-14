@@ -1,5 +1,6 @@
 """Human-in-the-loop pattern: agents work with human validation checkpoints."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 
 async def run_human_in_the_loop(engine, run, task: str):

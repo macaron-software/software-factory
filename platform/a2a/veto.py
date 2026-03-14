@@ -3,6 +3,7 @@ A2A Veto System - Hierarchical veto with escalation.
 ======================================================
 Extends the Team of Rivals pattern from core/adversarial.py.
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

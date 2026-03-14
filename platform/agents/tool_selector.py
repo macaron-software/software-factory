@@ -15,6 +15,7 @@ no external API dependency. See: packages/vector-selector/src/select.ts
 
 Ref: Robertson & Zaragoza, "The Probabilistic Relevance Framework: BM25 and Beyond"
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

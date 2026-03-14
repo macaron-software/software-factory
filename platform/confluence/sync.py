@@ -3,6 +3,7 @@ Confluence sync engine — syncs mission control tabs to Confluence pages.
 Idempotent: creates or updates pages by title match.
 Tracks page IDs in `confluence_pages` DB table.
 """
+# Ref: feat-wiki
 
 from __future__ import annotations
 

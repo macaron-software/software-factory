@@ -24,6 +24,7 @@ Environment:
   SF_PASSWORD  — Login password
   SF_TOKEN     — Pre-existing JWT token (skips login)
 """
+# Ref: feat-agents-list
 
 from __future__ import annotations
 

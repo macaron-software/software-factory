@@ -4,6 +4,7 @@ Agents are ordered by expertise level. The first agent attempts the task;
 if the result is insufficient (no tools used, empty output, or vetoed),
 escalate to the next tier. Stops at first successful tier.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

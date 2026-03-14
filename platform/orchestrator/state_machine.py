@@ -3,6 +3,7 @@ State Machine - FSM for workflow state management.
 ====================================================
 Persisted states with validated transitions.
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

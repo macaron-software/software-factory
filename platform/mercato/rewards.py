@@ -1,4 +1,5 @@
 """Token rewards — hooks for mission/task success."""
+# Ref: feat-mercato
 
 from __future__ import annotations
 

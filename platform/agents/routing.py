@@ -15,6 +15,7 @@ OVH: minimax MiniMax-M2.5
 Local: local-mlx Qwen3.5-35B-A3B-4bit
 All: RTK prompt compression enabled by default
 """
+# Ref: feat-agent-chat
 
 from __future__ import annotations
 

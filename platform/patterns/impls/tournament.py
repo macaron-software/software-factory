@@ -4,6 +4,7 @@ Unlike network (debate format), agents work independently without seeing
 each other's outputs. A judge agent evaluates all submissions and
 selects the winner. Useful for creative tasks where approach diversity matters.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

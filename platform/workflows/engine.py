@@ -6,6 +6,7 @@ Executes multi-phase workflows with proper error handling.
 
 Target Error: TOO_SHORT (35 chars vs min 200 for dev)
 """
+# Ref: feat-workflows
 
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass

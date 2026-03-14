@@ -4,6 +4,7 @@ Provides real-time scoring of inputs for prompt injection risk.
 Integrated at the executor level before any LLM call.
 """
 from __future__ import annotations
+# Ref: feat-quality
 
 import logging
 import re

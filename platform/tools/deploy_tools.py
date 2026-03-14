@@ -5,6 +5,7 @@ Provides real deployment: Dockerfile auto-generation → npm install →
 docker build → docker run → health check → screenshot.
 Each mission workspace gets its own container with a unique port.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

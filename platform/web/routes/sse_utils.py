@@ -4,6 +4,7 @@ Rationale: the `sse()` formatter was duplicated in cto.py, projects.py, and
 epics/execution.py with identical bodies. Centralised here to avoid drift.
 Pattern: SSE frame = "event: <name>\ndata: <json>\n\n"
 """
+# Ref: feat-live
 
 from __future__ import annotations
 

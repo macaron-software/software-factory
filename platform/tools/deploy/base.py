@@ -8,6 +8,7 @@ Every driver must implement:
   - logs(mission_id, lines) → str
   - test_connection() → (ok: bool, message: str)
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

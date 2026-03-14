@@ -20,6 +20,7 @@ Why this pattern instead of docker run --rm:
 
 Source: inspired by GitHub Actions runner, Dagger.io socket pattern.
 """
+# Ref: feat-projects
 
 from __future__ import annotations
 

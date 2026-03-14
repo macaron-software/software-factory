@@ -13,6 +13,7 @@ to keep the context window fresh for each agent (inspired by GSD).
 Wave Dependencies: nodes are grouped into waves based on dependency edges.
 Agents within a wave run in parallel, waves run sequentially.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

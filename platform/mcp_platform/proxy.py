@@ -6,6 +6,7 @@ Translates stdio JSON-RPC to HTTP calls to the platform server.
 Usage in opencode config:
     "mcp": {"platform": {"type": "local", "command": ["python3", ".../proxy.py"]}}
 """
+# Ref: feat-mcps
 
 import json
 import sys

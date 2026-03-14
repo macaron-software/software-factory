@@ -21,6 +21,7 @@ Usage in tool_runner._run_tool():
     if denied:
         return denied  # "Permission denied: ..."
 """
+# Ref: feat-rbac
 
 from __future__ import annotations
 

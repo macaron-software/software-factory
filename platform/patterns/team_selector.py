@@ -8,6 +8,7 @@ Thompson Sampling over Beta(wins+1, losses+1) distributions. Supports:
   - Soft retirement: fitness < RETIRE_THRESHOLD after RETIRE_MIN_RUNS → weight × 0.1
   - A/B shadow test detection (callers can query should_ab_test())
 """
+# Ref: feat-art
 
 from __future__ import annotations
 

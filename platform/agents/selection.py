@@ -3,6 +3,7 @@
 Selects the best agent for a role+domain using Beta(accepted+1, rejected+1) sampling.
 Agents with high rejection rates are deprioritised but not excluded (exploration).
 """
+# Ref: feat-art
 
 from __future__ import annotations
 

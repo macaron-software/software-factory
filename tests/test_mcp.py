@@ -1,4 +1,5 @@
 """Tests for MCP platform tools — direct handler calls (no server needed)."""
+# Ref: feat-mcps
 import json
 import os
 import sys

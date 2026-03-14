@@ -1,4 +1,5 @@
 """Security middleware — authentication, RBAC, rate limiting."""
+# Ref: feat-quality
 
 from __future__ import annotations
 

@@ -11,6 +11,7 @@ Decisions:
                Only checks runs completed in last 2h to avoid re-scanning old runs.
                One quality-improvement run at a time (dedup by source_run_id in brief).
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

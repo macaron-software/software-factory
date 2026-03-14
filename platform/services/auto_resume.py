@@ -6,6 +6,7 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 - Launches unstarted continuous missions (first run ever)
 - Hourly: cleans up orphaned workspaces + old llm_traces + cancelled run records
 """
+# Ref: feat-mission-control
 
 from __future__ import annotations
 

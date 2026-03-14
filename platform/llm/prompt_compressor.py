@@ -18,6 +18,7 @@ Dual inspiration:
 - Ralph (https://github.com/frankbria/ralph-claude-code) — context rot prevention in agent loops
   The _summarize_context() function in agents/executor.py is the Ralph-inspired counterpart.
 """
+# Ref: feat-skills
 
 from __future__ import annotations
 

@@ -1,4 +1,5 @@
 """GitHub brick — issue, PR, and Actions integration via gh CLI."""
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

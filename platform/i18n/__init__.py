@@ -3,6 +3,7 @@
 Usage in Jinja2 templates:  {{ _('key') }}  or  {{ _('key', name='World') }}
 Usage in Python:            from platform.i18n import t; t('key', lang='en')
 """
+# Ref: feat-settings
 
 from __future__ import annotations
 

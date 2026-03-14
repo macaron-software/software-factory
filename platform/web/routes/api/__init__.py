@@ -1,4 +1,5 @@
 """API routes package — assembles all sub-routers."""
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

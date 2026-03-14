@@ -6,6 +6,7 @@ Usage:
     store.emit("mission.started", {"mission_id": "abc", "workflow": "tdd"})
     events = store.query(entity_id="abc", limit=50)
 """
+# Ref: feat-monitoring
 
 from __future__ import annotations
 

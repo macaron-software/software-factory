@@ -6,6 +6,7 @@ E2E Test Scheduler — nightly Playwright run at 05:00 UTC.
 - Creates platform_incidents for any failing spec
 - Gracefully skips if Playwright is not available (Docker prod without Chromium)
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

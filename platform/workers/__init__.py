@@ -8,6 +8,7 @@ Usage:
     job = queue.claim(worker_id="worker-1")  # atomic claim
     queue.complete(job.id, result={"output": "..."})
 """
+# Ref: feat-workflows
 
 from __future__ import annotations
 

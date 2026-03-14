@@ -81,6 +81,7 @@ PRINCIPES D'ORCHESTRATION (décisions structurelles)
 
 ═══════════════════════════════════════════════════════════════════════════════
 """
+# Ref: feat-mission-control
 
 from __future__ import annotations
 

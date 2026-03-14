@@ -1,5 +1,6 @@
 """Aggregator pattern: workers in parallel, one aggregator consolidates."""
 from __future__ import annotations
+# Ref: feat-patterns
 
 import asyncio
 

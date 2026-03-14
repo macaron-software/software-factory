@@ -8,10 +8,11 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .helpers import _templates
+from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ async def ideation_page(request: Request):
     )
 
 
-@router.post("/api/ideation")
+@router.post("/api/ideation", dependencies=[Depends(require_auth())])
 async def ideation_submit(request: Request):
     """Launch a REAL multi-agent ideation via the pattern engine (network pattern).
 
@@ -373,7 +374,7 @@ Réponds UNIQUEMENT avec ce JSON (sans commentaires, JSON valide strict):
 Sois pragmatique et concret. Réponds UNIQUEMENT avec le JSON valide, rien d'autre."""
 
 
-@router.post("/api/ideation/create-epic")
+@router.post("/api/ideation/create-epic", dependencies=[Depends(require_auth())])
 async def ideation_create_epic(request: Request):
     """PO agent structures project + epic + features + stories from ideation."""
     import subprocess as _sp

@@ -3,6 +3,7 @@
 Covers: classify prompt, decompose parsing, worktree helpers, backprop merge logic.
 All tests are offline (no LLM calls, no git repo required).
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 

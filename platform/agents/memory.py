@@ -3,6 +3,7 @@ Agent Memory - Short-term, long-term, and shared memory management.
 ====================================================================
 Uses SQLite FTS5 for semantic search over memory entries.
 """
+# Ref: feat-memory
 
 from __future__ import annotations
 

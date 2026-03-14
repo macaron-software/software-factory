@@ -8,6 +8,7 @@ Stability tests require STABILITY_TESTS=1 env var + optional host/SSH vars:
   STABILITY_SSH_AZ_KEY   — path to SSH private key for Azure nodes
   STABILITY_SSH_OVH_KEY  — path to SSH private key for OVH
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

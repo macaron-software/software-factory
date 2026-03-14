@@ -12,6 +12,7 @@ Three capabilities:
 Original PUA concept: corporate rhetoric forcing AI to exhaust all solutions.
 SF adaptation: integrated with adversarial guard, PM checkpoint, and A2A bus.
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 

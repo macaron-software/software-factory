@@ -1,6 +1,7 @@
 """
 Type Check Tools — Bridge to mypy, tsc, go vet with auto-detection.
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

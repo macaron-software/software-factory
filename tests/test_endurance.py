@@ -2,6 +2,7 @@
 Endurance tests — project lifecycle, phase progression, auto-resume, LLM tracking.
 Run: pytest tests/test_endurance.py -v --live --timeout=600
 """
+# Ref: feat-ops
 import os
 import time
 

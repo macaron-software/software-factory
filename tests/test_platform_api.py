@@ -2,6 +2,7 @@
 Platform API unit tests — real endpoints, real data, real assertions.
 Run: pytest tests/test_platform_api.py -v
 """
+# Ref: feat-cockpit
 
 import os
 import sys

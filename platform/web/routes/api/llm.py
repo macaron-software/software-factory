@@ -1,4 +1,5 @@
 """LLM observability endpoints."""
+# Ref: feat-metrics
 
 from __future__ import annotations
 

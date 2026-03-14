@@ -14,6 +14,7 @@ Auth: service principal (client_id + client_secret + tenant_id)
 
 VM defaults: Standard_B2s, francecentral, Ubuntu 22.04 LTS
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

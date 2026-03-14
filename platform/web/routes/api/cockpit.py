@@ -4,6 +4,7 @@ Aggregates all SF state into a single JSON payload for the /cockpit dashboard:
 pipeline stats, environments, daemons, LLM providers, projects, activity feed,
 TMA, incidents, DORA metrics.
 """
+# Ref: feat-cockpit
 
 from __future__ import annotations
 

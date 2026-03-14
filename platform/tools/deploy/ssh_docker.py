@@ -12,6 +12,7 @@ Config keys:
   remote_dir   Remote working directory (default: /opt/macaron-apps)
   container_port  Internal container port to expose (default: 3000)
 """
+# Ref: feat-tool-builder
 
 from __future__ import annotations
 

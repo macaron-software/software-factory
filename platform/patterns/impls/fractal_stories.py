@@ -8,6 +8,7 @@ This produces more accurate, context-aware story breakdowns than fixed templates
 Lineage propagated at each level: Vision → Epic → Feature → Story → Task
 Each leaf = a story/task atomic enough for 1 agent in 1 session.
 """
+# Ref: feat-patterns
 
 from __future__ import annotations
 import asyncio

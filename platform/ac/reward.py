@@ -16,6 +16,7 @@ Adversarial dimensions (14 total):
   Warning (weight=1.0): architecture, fallback, over_engineering,
     observability, resilience, refactoring
 """
+# Ref: feat-quality
 
 from __future__ import annotations
 
