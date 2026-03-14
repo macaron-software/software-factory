@@ -160,6 +160,8 @@ _FALLBACK_CHAIN = [_primary] + [
 _disable_thinking = bool(os.environ.get("LLM_DISABLE_THINKING", ""))
 _THINKING_PROVIDERS = frozenset({"ollama", "minimax"})  # providers that respect /no_think
 
+_rtk_cache: dict = {}  # RTK prompt compression state cache
+
 
 class _RateLimiter:
     """Sliding window rate limiter with async queuing.
