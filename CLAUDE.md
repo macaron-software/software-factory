@@ -67,7 +67,7 @@ psql: PGPASSWORD=macaron /opt/homebrew/bin/psql -h localhost -U macaron -d macar
 | proj | repo | path | stack |
 |------|------|------|-------|
 | Sienna | macaron-software/sienna (priv) | _BABY | Rust/WASM+SvelteKit+iOS/Android |
-| ADA-NDIS | macaron-software/ada-ndis | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC |
+| CareOps | macaron-software/careops | MVP_ADA | FastAPI+Next.js+Supabase+Rust/gRPC |
 | SF | macaron-software/software-factory | _SOFTWARE_FACTORY | Python/FastAPI+HTMX |
 | FLO | macaron-software/luna | _FLO | TBD |
 | PSY | macaron-software/psy-platform | _PSY | Rust/Axum+React |
