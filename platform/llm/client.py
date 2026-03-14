@@ -155,7 +155,10 @@ _FALLBACK_CHAIN = [_primary] + [
     if p != _primary
 ]
 
-_rtk_cache: dict = {}
+# LLM_DISABLE_THINKING=1: prepend /no_think to all providers that support it (saves ~30-80%
+# of tokens for routine tasks — see arXiv:2603.05488 "performative CoT" / reasoning theater).
+_disable_thinking = bool(os.environ.get("LLM_DISABLE_THINKING", ""))
+_THINKING_PROVIDERS = frozenset({"ollama", "minimax"})  # providers that respect /no_think
 
 
 class _RateLimiter:
@@ -366,6 +369,7 @@ class LLMClient:
         max_tokens: int = 4096,
         system_prompt: str = "",
         tools: list[dict] | None = None,
+        disable_thinking: bool | None = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
         # ── Cache lookup (deterministic dedup) ──
@@ -516,6 +520,7 @@ class LLMClient:
                         max_tokens,
                         _send_system,
                         tools,
+                        disable_thinking=disable_thinking,
                     )
                     # Auto-retry on empty response (MiniMax M2.5 quirk):
                     # - tokens_out==0: classic empty response
@@ -659,19 +664,22 @@ class LLMClient:
         max_tokens: int,
         system_prompt: str,
         tools: list[dict] | None = None,
+        disable_thinking: bool | None = None,
     ) -> LLMResponse:
         http = await self._get_http()
         url = self._build_url(pcfg, model)
         headers = self._build_headers(pcfg)
 
         msgs = []
+        # Disable thinking when LLM_DISABLE_THINKING=1 or per-project override
+        # (arXiv:2603.05488 — saves tokens on routine tasks where extended CoT is
+        # "performative" / reasoning theater).
+        _should_disable = disable_thinking if disable_thinking is not None else _disable_thinking
+        _no_think = _should_disable and provider in _THINKING_PROVIDERS
         if system_prompt:
-            # For Ollama/Qwen3: prepend /no_think to disable thinking mode (saves tokens)
-            sp = (
-                f"/no_think\n{system_prompt}" if provider == "ollama" else system_prompt
-            )
+            sp = f"/no_think\n{system_prompt}" if _no_think else system_prompt
             msgs.append({"role": "system", "content": sp})
-        elif provider == "ollama":
+        elif _no_think:
             msgs.append({"role": "system", "content": "/no_think"})
         for m in messages:
             # Accept both LLMMessage objects and plain dicts
@@ -837,6 +845,7 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         system_prompt: str = "",
+        disable_thinking: bool | None = None,
     ) -> AsyncIterator[LLMStreamChunk]:
         """Stream chat completion response with provider fallback."""
         if _is_azure:
@@ -928,6 +937,7 @@ class LLMClient:
                         temperature,
                         max_tokens,
                         _stream_system,
+                        disable_thinking=disable_thinking,
                     ):
                         if chunk.delta:
                             _stream_accumulated += chunk.delta
@@ -1009,6 +1019,7 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
         system_prompt: str,
+        disable_thinking: bool | None = None,
     ) -> AsyncIterator[LLMStreamChunk]:
         """Single-provider streaming attempt."""
         url = self._build_url(pcfg, model)
@@ -1016,7 +1027,11 @@ class LLMClient:
         logger.warning("LLM stream trying %s/%s ...", provider, model)
 
         msgs = []
-        sys_content = system_prompt or ""
+        _should_disable = disable_thinking if disable_thinking is not None else _disable_thinking
+        _no_think = _should_disable and provider in _THINKING_PROVIDERS
+        sys_content = ("/no_think\n" + system_prompt if _no_think and system_prompt
+                       else "/no_think" if _no_think and not system_prompt
+                       else system_prompt or "")
         for m in messages:
             d = {"role": m.role, "content": m.content or ""}
             if m.name:

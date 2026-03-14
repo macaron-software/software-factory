@@ -766,6 +766,17 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode
             )
 
+            # Per-project LLM overrides (e.g. disable_thinking for token savings)
+            _project_disable_thinking = None
+            if ctx.project_id:
+                try:
+                    from ..projects.manager import get_project_store
+                    _proj = get_project_store().get_by_id(ctx.project_id)
+                    if _proj and _proj.llm_config.get("disable_thinking"):
+                        _project_disable_thinking = True
+                except Exception:
+                    pass
+
             # Tool-calling loop
             deep_search_used = False
             for round_num in range(MAX_TOOL_ROUNDS):
@@ -780,6 +791,7 @@ class AgentExecutor:
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
                     tools=tools,
+                    disable_thinking=_project_disable_thinking,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
@@ -1348,6 +1360,17 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
+            # Per-project LLM overrides (e.g. disable_thinking for token savings)
+            _project_disable_thinking = None
+            if ctx.project_id:
+                try:
+                    from ..projects.manager import get_project_store
+                    _proj = get_project_store().get_by_id(ctx.project_id)
+                    if _proj and _proj.llm_config.get("disable_thinking"):
+                        _project_disable_thinking = True
+                except Exception:
+                    pass
+
             _max_rounds = ctx.max_rounds if ctx.max_rounds > 0 else MAX_TOOL_ROUNDS
             for round_num in range(_max_rounds):
                 is_last_possible = (round_num >= _max_rounds - 1) or tools is None
@@ -1363,6 +1386,7 @@ class AgentExecutor:
                         temperature=agent.temperature,
                         max_tokens=agent.max_tokens,
                         system_prompt=system if round_num == 0 else "",
+                        disable_thinking=_project_disable_thinking,
                     ):
                         if chunk.delta:
                             accumulated += chunk.delta
@@ -1398,6 +1422,7 @@ class AgentExecutor:
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
                     tools=tools,
+                    disable_thinking=_project_disable_thinking,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
