@@ -3938,3 +3938,50 @@ async def ws_deploy_logs(project_id: str, request: Request):
         yield f"data: {json.dumps({'line': '[FIN DU STREAM]', 'src': 'system'})}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── Compliance Audit ─────────────────────────────────────────────
+
+
+@router.post("/api/projects/{project_id}/audit")
+async def api_start_audit(project_id: str, request: Request):
+    """Start a compliance audit on a project. Returns report immediately."""
+    from ...ops.project_audit import run_audit
+
+    # Determine workspace
+    from ...projects.manager import get_project_store
+    store = get_project_store()
+    proj = store.get(project_id)
+    workspace = ""
+    if proj:
+        workspace = getattr(proj, "workspace", "") or getattr(proj, "path", "")
+    if not workspace:
+        workspace = os.getcwd()
+
+    user = "system"
+    u = getattr(request.state, "user", None)
+    if u:
+        user = getattr(u, "email", "system")
+
+    report = await run_audit(project_id, workspace, user)
+    return JSONResponse(report.to_dict())
+
+
+@router.get("/api/projects/{project_id}/audit/report")
+async def api_audit_report(project_id: str):
+    """Get latest audit report for a project."""
+    from ...ops.project_audit import get_latest_report
+
+    report = await get_latest_report(project_id)
+    if not report:
+        return JSONResponse({"error": "No audit report found"}, status_code=404)
+    return JSONResponse(report)
+
+
+@router.get("/api/projects/{project_id}/audit/history")
+async def api_audit_history(project_id: str, limit: int = 10):
+    """Get audit history for a project."""
+    from ...ops.project_audit import get_audit_history
+
+    history = await get_audit_history(project_id, limit)
+    return JSONResponse({"history": history})

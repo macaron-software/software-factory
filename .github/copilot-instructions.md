@@ -277,6 +277,15 @@ Backup: pg_dump 02:00 daily(30d) . Redis RDB 15min . Git=continuous . Infisical=
 Agentation-inspired. Types: comment/bug/move/area/text. Click element→annotate→export markdown.
 Drag-drop markers. Pause animations. CSS selector + component path capture.
 
+## Project Compliance Audit (`sf audit`)
+19-dimension check per project: SAFe traceability, Quality(10 dims), Security(4), A11Y(3),
+  i18n(2), GDPR(4), Observability(3), API(3), DR(1), LEAN(1), Tests(2), RBAC(2)
+CLI: `sf audit run <project>` . `sf audit report <project>` . `sf audit history <project>`
+API: POST /api/projects/{id}/audit . GET /api/projects/{id}/audit/report . /audit/history
+Engine: platform/ops/project_audit.py — deterministic (no LLM), grep-based, scores 0-100
+DB: audit_reports + audit_checks tables (project-scoped, time-series)
+Integrates: QualityScanner(10 dims) + traceability_scheduler + security grep checks
+
 ## Gotchas
 - `platform/` shadows stdlib — NEVER `import platform`
 - NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE

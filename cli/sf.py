@@ -2013,6 +2013,110 @@ def cmd_simplify(args):
         )
 
 
+# ── Audit Commands ───────────────────────────────────────────────
+
+
+def cmd_audit_run(args):
+    """Run compliance audit on a project."""
+    b = get_backend(args)
+    project_id = args.project_id
+    workspace = getattr(args, "workspace", "") or ""
+
+    if hasattr(b, "audit_start"):
+        data = b.audit_start(project_id, workspace)
+    else:
+        # API backend
+        data = b._post(f"/api/projects/{project_id}/audit")
+
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+
+    score = data.get("global_score", 0)
+    pc = data.get("pass_count", 0)
+    tc = data.get("total_count", 0)
+
+    color = out.green if score >= 80 else (out.yellow if score >= 60 else out.red)
+    print(f"\n  {'='*50}")
+    print(f"  COMPLIANCE AUDIT: {project_id}")
+    print(f"  Score: {color(f'{score:.0f}/100')} ({pc}/{tc} pass)")
+    print(f"  {'='*50}")
+
+    dims = data.get("dimensions", {})
+    for cat, d in dims.items():
+        p, w, f = d.get("pass", 0), d.get("warn", 0), d.get("fail", 0)
+        icon = out.green("✓") if w == 0 and f == 0 else (out.red("✗") if f > 0 else out.yellow("△"))
+        print(f"  {icon} {cat:<20} {p} pass / {w} warn / {f} fail")
+
+    recs = data.get("recommendations", [])
+    if recs:
+        print(f"\n  Recommendations:")
+        for r in recs[:10]:
+            print(f"    • {r}")
+
+
+def cmd_audit_report(args):
+    """Show latest audit report."""
+    b = get_backend(args)
+    project_id = args.project_id
+
+    try:
+        data = b._get(f"/api/projects/{project_id}/audit/report")
+    except Exception:
+        out.error(f"No audit report found for {project_id}")
+        return
+
+    if "error" in data:
+        out.error(data["error"])
+        return
+
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+
+    score = data.get("global_score", 0)
+    checks = data.get("checks", [])
+    print(f"\n  Latest audit: {project_id} — Score: {score:.0f}/100")
+    print(f"  Created: {data.get('created_at', '?')}")
+    print(f"  {'─'*50}")
+    for c in checks:
+        s = c.get("status", "?")
+        icon = "✓" if s == "pass" else ("✗" if s == "fail" else ("△" if s == "warn" else "○"))
+        cat = c.get("category", "?")
+        name = c.get("name", "?")
+        print(f"  {icon} [{cat}] {name}: {s.upper()}")
+
+
+def cmd_audit_history(args):
+    """Show audit score history."""
+    b = get_backend(args)
+    project_id = args.project_id
+    limit = getattr(args, "limit", 10)
+
+    try:
+        data = b._get(f"/api/projects/{project_id}/audit/history", {"limit": limit})
+    except Exception:
+        out.error(f"No audit history for {project_id}")
+        return
+
+    history = data.get("history", [])
+    if not history:
+        out.info("No audit history found.")
+        return
+
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+
+    print(f"\n  Audit History: {project_id}")
+    print(f"  {'─'*40}")
+    for h in history:
+        s = h.get("score", 0)
+        d = h.get("created_at", "?")
+        bar = "█" * int(s / 5) + "░" * (20 - int(s / 5))
+        print(f"  {d[:16]}  [{bar}] {s:.0f}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="sf",
@@ -2682,6 +2786,26 @@ def build_parser() -> argparse.ArgumentParser:
     sksh = skl_sub.add_parser("show", help="Show last skill eval result")
     sksh.add_argument("skill")
     sksh.set_defaults(func=cmd_skill_show)
+
+    # ── audit ──────────────────────────────────────────────────────
+    aud = sub.add_parser(
+        "audit", help="Project compliance audit (19-dim: SAFe/Security/GDPR/A11Y/...)"
+    )
+    aud_sub = aud.add_subparsers(dest="subcmd")
+
+    aud_run = aud_sub.add_parser("run", help="Run compliance audit on project")
+    aud_run.add_argument("project_id", help="Project ID")
+    aud_run.add_argument("--workspace", "-w", help="Workspace path (default: cwd)")
+    aud_run.set_defaults(func=cmd_audit_run)
+
+    aud_rpt = aud_sub.add_parser("report", help="Show latest audit report")
+    aud_rpt.add_argument("project_id", help="Project ID")
+    aud_rpt.set_defaults(func=cmd_audit_report)
+
+    aud_hist = aud_sub.add_parser("history", help="Audit score history")
+    aud_hist.add_argument("project_id", help="Project ID")
+    aud_hist.add_argument("--limit", type=int, default=10)
+    aud_hist.set_defaults(func=cmd_audit_history)
 
     return p
 

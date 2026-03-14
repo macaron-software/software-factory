@@ -528,3 +528,31 @@ CREATE TABLE IF NOT EXISTS deploy_targets (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver);
+
+-- ── Compliance Audit Reports ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS audit_reports (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    global_score REAL DEFAULT 0,
+    dimensions_json TEXT DEFAULT '{}',
+    checks_json TEXT DEFAULT '[]',
+    recommendations_json TEXT DEFAULT '[]',
+    report_html TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT DEFAULT 'system'
+);
+CREATE INDEX IF NOT EXISTS idx_audit_reports_project ON audit_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_audit_reports_created ON audit_reports(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS audit_checks (
+    id SERIAL,
+    report_id TEXT NOT NULL REFERENCES audit_reports(id),
+    category TEXT NOT NULL,
+    check_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'warn',
+    score REAL DEFAULT 0,
+    evidence TEXT DEFAULT '',
+    remediation TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_checks_report ON audit_checks(report_id);
