@@ -12,6 +12,7 @@ from fastapi import Depends,  APIRouter, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
+    PlainTextResponse,
 )
 
 from .helpers import (
@@ -37,6 +38,19 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # ── Auth pages ───────────────────────────────────────────────────
+
+
+@router.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt(request: Request):
+    """SEO: robots.txt — allow all crawlers."""
+    base = str(request.base_url).rstrip("/")
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        "Disallow: /admin/\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
 
 
 @router.get("/login", response_class=HTMLResponse)

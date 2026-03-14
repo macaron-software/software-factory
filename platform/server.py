@@ -970,6 +970,11 @@ def create_app() -> FastAPI:
 
     app.add_middleware(AuthMiddleware)
 
+    # ── Performance: Gzip compression ─────────────────────────────────────
+    from starlette.middleware.gzip import GZipMiddleware
+
+    app.add_middleware(GZipMiddleware, minimum_size=500)
+
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
 
@@ -1259,6 +1264,8 @@ def create_app() -> FastAPI:
                 "/openapi.json",
                 "/docs",
                 "/redoc",
+                "/robots.txt",
+                "/privacy",
             )
         )
         # HTMX partial requests should never be redirected to onboarding

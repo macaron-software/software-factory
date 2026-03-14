@@ -249,6 +249,8 @@ PUBLIC_PATHS = {
     "/auth/github",
     "/auth/azure",
     "/.well-known",
+    "/robots.txt",
+    "/privacy",
 }
 
 # Internal-only paths matched by suffix (watchdog, health probes)

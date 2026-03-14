@@ -12,6 +12,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SF Platform">
+    <meta name="description" content="{% block meta_description %}Software Factory — AI-powered multi-agent platform for software engineering, quality gates, and compliance.{% endblock %}">
     <link rel="stylesheet" href="/static/css/main.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
@@ -590,7 +591,7 @@
         <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
       </div>
       <div>
-        <h3 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h3>
+        <h2 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h2>
         <p id="dcm-subtitle" style="margin:0;font-size:0.78rem;color:var(--text-secondary)">Cette action est irréversible</p>
       </div>
     </div>
@@ -941,10 +942,10 @@ body.sf-wireframe #sfWireframeBtn {
 <!-- Annotation Help Panel -->
 <div id="sfAnnHelp">
   <button class="ann-close" onclick="document.getElementById('sfAnnHelp').style.display='none'">×</button>
-  <h4>
+  <h2 style="font-size:.9rem;margin:0 0 .5rem">
     <svg style="width:14px;height:14px;stroke:#58a6ff;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
     Annotations SF
-  </h4>
+  </h2>
   <div class="ann-step">
     <span class="ann-step-num">1</span>
     <span class="ann-step-text">Activez <strong>Self-Annotation Mode</strong> dans Settings → General</span>
