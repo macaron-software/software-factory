@@ -7,7 +7,7 @@ is_builtin: true
 pm_driven: true
 phases:
 - id: feature-design
-  pattern_id: aggregator
+  pattern_id: sequential
   name: Feature Design
   description: >
     Lead + Archi analysent le brief et DÉCIDENT du workflow adapté.
@@ -30,6 +30,8 @@ phases:
   config:
     agents:
     - system-architect-art
+    - lead_frontend
+    - lead_backend
     dynamic_lead: true
 - id: story-decomposition
   pattern_id: fractal-stories
