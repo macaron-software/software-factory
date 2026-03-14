@@ -293,6 +293,27 @@ Engine: platform/ops/project_audit.py — deterministic (no LLM), grep-based, sc
 DB: audit_reports + audit_checks tables (project-scoped, time-series)
 Integrates: QualityScanner(10 dims) + traceability_scheduler + security grep checks
 
+## Engineering Concepts (139 concepts · 13 categories · UDID CO-{CAT}-NNN)
+Methodologies(14): SAFe TDD BDD Lean Agile Scrum Kanban XP KISS YAGNI DRY WSJF INVEST Gherkin
+Architecture(7): CQRS EventSourcing Hexagonal CleanArch DDD Microservices Ports&Adapters
+AI/ML(20): ThompsonSampling GA(pop=40) Q-Learning CoT ReAct Few-shot Adversarial(L0+L1)
+  PUA(L1→L4) RAG Embeddings Darwin SkillBroker DeepBench CoVe ContextTiers(L0/L1/L2)
+  PromptCompression BM25ToolSelection InstinctLearning ConvergenceDetection RLM(arXiv:2512.24601)
+Patterns(25): Solo Seq Par Hier Loop Net Router Aggr Wave Tournament Voting Escalation
+  Speculative Red-Blue Relay Mob HITL Blackboard MapReduce Composite Fractal{QA,Stories,Tests,Worktree} BackpropMerge
+GoF(15): Singleton Factory Builder Adapter Decorator Facade Proxy Strategy Observer
+  ChainOfResp StateMachine Command TemplateMethod Iterator Mediator
+Security(9): OWASP SAST DAST Chaos MutationTest 17Gates PromptGuard RBAC(12) Veto
+DevOps(13): CI/CD GitOps Docker Blue-Green Canary IaC OTEL Prometheus SRE-AutoHeal SSE A2A MCP ProviderFallback
+Data(9): PG16(62tbl) FTS5 WAL AdvisoryLocks Redis7 TTLCache MultiTenant Migrations AsyncJobQueue
+UX(9): AtomicDesign Tokens(59) WCAG-AA DarkMode Skeleton 30UXLaws 30ARIA Responsive i18n(40)
+Governance(7): SOC2(92%) ISO27001(88%) GDPR SecureByDesign(96%) AGPL-3.0 OpenAPI3.1 Traceability
+Formal(4): TLA+ StateInvariants ModelChecking TemporalLogic
+AgentProtocol(4): A2ANegotiation HierarchicalVeto PMCheckpoint PhaseQueue
+Observability(3): SemanticErrorClustering LLMCostTracing EnduranceWatchdog
+Cockpit: section 12 badge cloud card — 13 color-coded categories
+DB: concepts table UDID CO-{CAT}-NNN with source_file+description
+
 ## Gotchas
 - `platform/` shadows stdlib — NEVER `import platform`
 - NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE
