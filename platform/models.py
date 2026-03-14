@@ -343,6 +343,7 @@ class PhaseRun(BaseModel):
     output_schema: Optional[dict] = None  # expected JSON schema
     output_validated: bool = False  # whether output matched schema
     output_parse_errors: int = 0  # retry count
+    injected_skills: list[str] = []  # skill IDs injected during this phase (traceability)
 
 
 class EpicStatus(str, Enum):

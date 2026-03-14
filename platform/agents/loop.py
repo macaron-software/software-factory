@@ -553,6 +553,7 @@ class AgentLoop:
                 project_id=self.project_id,
                 fallback_skills=self.agent.skills,  # Fallback to manual skills
                 context_tier=tier.value,
+                session_id=self.session_id,
             )
         except Exception as exc:
             logger.debug(f"Auto skills injection failed: {exc}, using manual skills")

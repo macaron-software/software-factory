@@ -360,6 +360,12 @@ def _persist_phase_status(session_id: str, phase_id: str, status: str, phase_ind
         for p in run.phases:
             if p.phase_id == phase_id:
                 p.status = status
+                # At phase end, persist which skills were injected (traceability)
+                if status != "running":
+                    from ..agents.skills_integration import consume_injected_skills
+                    skills = consume_injected_skills(session_id)
+                    if skills:
+                        p.injected_skills = skills
                 break
         run_store.update(run)
     except Exception as e:

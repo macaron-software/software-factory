@@ -1396,9 +1396,68 @@ async def _run_quality_scan_background(
 # ── Mission Debug & Replay ────────────────────────────────────────
 
 
-@router.get("/api/epics/{run_id}/debug")
-@router.get("/api/missions/{run_id}/debug")
-async def mission_debug(run_id: str):
+@router.get("/api/missions/{run_id}/skills-audit")
+@router.get("/api/epics/{run_id}/skills-audit")
+async def mission_skills_audit(run_id: str):
+    """Return per-phase skill injection audit for a mission run.
+
+    Shows which skills were injected at each phase, useful for verifying
+    that design-system-components, ux-laws, etc. are active during UX phases.
+
+    Returns:
+        {
+          "run_id": "...",
+          "phases": [
+            {
+              "phase_id": "ux-design-review",
+              "phase_name": "UX Design Review",
+              "status": "done",
+              "injected_skills": ["ux-laws", "design-system-components", "ux-best-practices"]
+            }, ...
+          ],
+          "skill_coverage": {           # which skills appeared at least once
+            "ux-laws": ["ux-design-review"],
+            "design-system-components": ["ux-design-review", "tdd-sprint"]
+          },
+          "phases_without_skills": ["env-setup"]   # phases where nothing was injected
+        }
+    """
+    from ....epics.store import get_epic_run_store
+
+    run = get_epic_run_store().get(run_id)
+    if not run:
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+
+    phases_out = []
+    skill_coverage: dict[str, list[str]] = {}
+    phases_without_skills: list[str] = []
+
+    for p in run.phases:
+        entry = {
+            "phase_id": p.phase_id,
+            "phase_name": p.phase_name or p.phase_id,
+            "status": p.status.value if hasattr(p.status, "value") else str(p.status),
+            "injected_skills": p.injected_skills or [],
+        }
+        phases_out.append(entry)
+
+        if p.injected_skills:
+            for sk in p.injected_skills:
+                skill_coverage.setdefault(sk, []).append(p.phase_id)
+        else:
+            phases_without_skills.append(p.phase_id)
+
+    return JSONResponse({
+        "run_id": run_id,
+        "phases": phases_out,
+        "skill_coverage": skill_coverage,
+        "phases_without_skills": phases_without_skills,
+        "total_phases": len(run.phases),
+        "phases_with_skills": len(run.phases) - len(phases_without_skills),
+    })
+
+
+
     """Return debug info for a mission run: phases, llm_traces, cost breakdown."""
     from ....db.migrations import get_db
 

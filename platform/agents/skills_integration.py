@@ -12,6 +12,27 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Session-scoped skills cache — tracks injected skills per session for traceability
+# Key: session_id → list[skill_id]. Accumulated during phase; consumed at phase end.
+# ---------------------------------------------------------------------------
+_session_skills_cache: dict[str, list[str]] = {}
+
+
+def _cache_skills(session_id: str, skill_ids: list[str]) -> None:
+    """Accumulate injected skill IDs for a session (thread-safe enough for asyncio)."""
+    if not session_id or not skill_ids:
+        return
+    cache = _session_skills_cache.setdefault(session_id, [])
+    for sid in skill_ids:
+        if sid not in cache:
+            cache.append(sid)
+
+
+def consume_injected_skills(session_id: str) -> list[str]:
+    """Read and clear cached skill IDs for a session. Called at phase end to persist."""
+    return list(_session_skills_cache.pop(session_id, []))
+
 
 def enrich_agent_with_skills(
     agent_id: str,
@@ -20,6 +41,7 @@ def enrich_agent_with_skills(
     project_id: str | None = None,
     fallback_skills: list[str] | None = None,
     context_tier: str = "L1",
+    session_id: str = "",
 ) -> str:
     """
     Automatically inject relevant external skills into agent's prompt.
@@ -51,7 +73,7 @@ def enrich_agent_with_skills(
 
         if not azure_endpoint or not azure_key:
             logger.debug("Azure credentials not configured, using trigger-based injection")
-            return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier)
+            return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier, session_id)
 
         enhancer = AgentEnhancer(
             db_path=db_path,
@@ -70,29 +92,32 @@ def enrich_agent_with_skills(
         )
 
         if result["injected_skills"]:
+            skill_ids = [s.get("id") or s.get("name", "") for s in result["injected_skills"]]
+            _cache_skills(session_id, [s for s in skill_ids if s])
             logger.info(
                 "Injected %d skills for %s: %s",
                 len(result["injected_skills"]),
                 agent_role,
-                [s["name"] for s in result["injected_skills"]],
+                skill_ids,
             )
             return _format_skills_section(result["injected_skills"], context_tier)
 
         logger.debug("No Azure skills matched for %s, using trigger-based injection", agent_role)
-        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier)
+        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier, session_id)
 
     except ImportError:
         logger.debug("Skills injection system not available, using trigger-based injection")
-        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier)
+        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier, session_id)
     except Exception as exc:
         logger.warning("Skills injection failed: %s, using trigger-based injection", exc)
-        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier)
+        return _trigger_and_fallback_prompt(fallback_skills, mission_description, context_tier, session_id)
 
 
 def _trigger_and_fallback_prompt(
     fallback_skills: list[str] | None,
     mission_description: str | None,
     context_tier: str = "L1",
+    session_id: str = "",
 ) -> str:
     """
     Build skills prompt by combining:
@@ -113,6 +138,7 @@ def _trigger_and_fallback_prompt(
     if injected:
         logger.info("Trigger-matched skills for mission: %s", injected)
 
+    _cache_skills(session_id, all_ids)
     return _load_skills_prompt(all_ids, context_tier)
 
 
