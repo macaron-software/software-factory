@@ -5,15 +5,7 @@
 cd _SOFTWARE_FACTORY
 pip install -r requirements.txt
 python -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
-# ⚠ NO --reload (shadows stdlib `platform`) · --ws none (SSE only)
-# DB: data/platform.db (SQLite) or PG_DSN (PostgreSQL) — auto-created
-```
-
-## ENV
-```
-AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT  # primary LLM
-MINIMAX_API_KEY                                # fb MiniMax-M2.5
-PLATFORM_LLM_PROVIDER / PLATFORM_LLM_MODEL    # override default
+# NO --reload (shadows stdlib `platform`) . --ws none (SSE only)
 ```
 
 ## ARCH — FastAPI + Jinja2 + HTMX + SSE (no WS, zero build step)
@@ -22,94 +14,95 @@ Web (routes, templates/123)  → HTMX endpoints, Jinja2 HTML
 Sessions (runner.py)         → User↔Agent bridge, SSE events
 Agents (executor.py)         → Tool-call loop (max 15 rds)
 Orchestrator (engine.py)     → 26 pattern impls (solo→fractal→mob)
-Epic Orch (epic_orch.py)     → Mission phases, sprint loop, platform-aware prompts
+Epic Orch (epic_orch.py)     → 15-phase product-lifecycle, sprint loop
 A2A (bus.py, veto.py)        → Inter-agent msg + veto hierarchy
 LLM (client.py)              → 5-provider auto-fallback (azure→minimax→local)
 Memory (manager.py)          → 4-layer: project/global/vector/short-term
-Bricks (bricks/)             → Modular infra: docker, github, sonarqube, rag
-DB (adapter.py)              → PG16 WAL+FTS5 (61 tables) | SQLite fb
-Security (security/)         → prompt_guard, output_validator, audit, sanitize
+Traceability (traceability/) → E2E UUID chain: persona→feature→story→AC→code→test
+Security (security/)         → 25 SBD controls, prompt_guard, output_validator
 AC (ac/)                     → reward(14-dim), convergence, experiments, skill_thompson
-PUA (pua.py)                 → Pressure escalation L1-L4, 5-step debug, cross-agent pressure
-Traceability (traceability/) → legacy_items, links, coverage, validation + scheduled sweep
 ```
 
-## EXECUTOR — agents/executor.py
-Loop: sys_prompt → LLM(tools) → tool_calls? exec → feed back → repeat (max 15 rds)
-Dev agents keep tools penultimate rd (non-dev → synthesis at rd N-2)
-Tools: code_read/write/edit/search, build, test, git_*, memory_*, deep_search, list_files
-`_TOOL_SCHEMAS` cached global — restart to refresh
+## PRODUCT-LIFECYCLE — 15 Phases
+ideation(network) → strategic-committee(HITL) → project-setup(sequential) → architecture(aggregator) → design-system(sequential) → dev-sprint(hierarchical) → build-verify(sequential) → cicd(sequential) → ux-review(loop) → qa-campaign(loop) → qa-execution(parallel) → deploy-prod(HITL) → **traceability-check**(sequential) → tma-router(router) → tma-fix(loop)
 
-## PUA MOTIVATION — agents/pua.py (source: tanweai/pua, MIT)
-Pressure escalation on adversarial retry: L1=mild → L2=soul → L3=review+5-step → L4=graduation
-Iron Rules + Proactivity injected into ALL agent prompts via prompt_builder.py
-Debug 5-step: Smell → Elevate → Mirror → Execute → Retrospective
-Cross-agent pressure: peer success/failure context from run.nodes
-build_retry_prompt() assembles: feedback + pressure + debug + peer + task + protocol
+## TRACEABILITY — E2E UUID Chain
+```
+Persona → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
+  → IHM(route,CRUD,RBAC) → Code(// Ref: feat-XXXX) → TU(// Verify: ac-XXXX) → E2E
+```
+Team: trace-lead(Nadia,VETO) trace-auditor(Mehdi) trace-writer(Sophie) trace-monitor(Lucas)
+DB: features, user_stories, acceptance_criteria, legacy_items, traceability_links
+Tools: legacy_scan, traceability_link, traceability_coverage, traceability_validate
+Auto-persist: _auto_persist_backlog() parses PM markdown → features/stories in DB
 
-## RLM — agents/rlm.py (arXiv:2512.24601)
-WRITE-EXECUTE-OBSERVE-DECIDE loop, 10 iter max, 8K findings cap
-Triggered by `deep_search` — deterministic sub-agents (no LLM)
+## ADVERSARIAL GUARD (Swiss Cheese)
+L0 det (0ms): 25 checks. L1 LLM semantic. Score: <5=pass 5-6=soft >=7=reject
+MAX_RETRIES=1 + PUA escalation. Force reject: HALLUC/SLOP/STACK_MISMATCH/FAKE_BUILD
 
-## LLM — llm/client.py
-Fallback: azure-oai → azure-ai → minimax → nvidia → local-mlx
-Azure: `max_completion_tokens` (not max_tokens) · MiniMax: auto-strips `<think>`
-Think-strip safety: NEVER produce empty — keep original as fallback
-GPT-5.x: reasoning models, budget ≥16K (reasoning eats from budget)
-Singleton: `get_llm_client()` · Rate: 15rpm (Redis or in-mem)
+## SECURITY — 25 SBD Controls (v1.1, SOC2+ISO27001)
+L1: Input validation, Prompt injection, CSP/headers
+L2: Auth(Argon2id), Authz(default-DENY), Least privilege
+L3: Secrets mgmt, Crypto(AES-256-GCM), Data minimization
+L4: Audit logging, Rate limiting, SSRF prevention, Error handling
+L5: Deps security, CI/CD integrity, Model integrity, Prompt protection, RAG security,
+    Output validation, CORS, Fail secure, Governance, Asset inventory, Incident response, Privacy
 
-## ADVERSARIAL GUARD — agents/adversarial.py (Swiss Cheese)
-**L0 det (0ms):** SLOP · MOCK · FAKE_BUILD(+7) · HALLUCINATION · LIE ·
-  STACK_MISMATCH(+7) · CODE_SLOP · ECHO · REPETITION · HARDCODED_SECRET ·
-  FILE_TOO_LARGE(>200L,+4) · GOD_FILE(>3types,+3) · COGNITIVE_COMPLEXITY(>25,+4) ·
-  DEEP_NESTING(>4lvl,+3) · HIGH_COUPLING(>12imp,+2) · LOC_REGRESSION(+6) ·
-  MISSING_UUID_REF · MISSING_TRACEABILITY · FAKE_TESTS · NO_TESTS ·
-  SECURITY_VULN · PII_LEAK · PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE
-**L1 LLM semantic:** semi-formal reasoning (arXiv:2603.01896) — premises→trace→verdict
-**Score:** <5=pass · 5-6=soft · ≥7=reject · HALLUC/SLOP/FAKE_BUILD/STACK_MISMATCH → force reject
-MAX_ADVERSARIAL_RETRIES=1 (2 attempts) — PUA escalation on retry — exhausted → FAILED
+## COMPLIANCE
+SOC2: CC1-CC8 all implemented. ISO27001 Annex A: 13 controls mapped.
+RBAC: admin cto pm lead_dev developer qa devops security trace_lead viewer auditor scrum_master
 
-## STACK ENFORCEMENT — epic orch + adversarial
-`_detect_project_platform(ws, brief)` → rust-native | macos-native | ios-native | android-native | web-node | web-docker | web-static
-Priority: brief keywords → .stack file → filesystem (Cargo.toml, package.json, etc.)
-STACK_MISMATCH L0 rejects wrong-lang code → score +7
+## UX LAWS (30 — lawsofux.com)
+Hick's(min choices) Fitts's(44px targets) Doherty(<400ms) Jakob's(familiar)
+Miller's(7±2) Peak-End(positive end) Postel's(liberal in/strict out)
+Gestalt: Proximity Similarity CommonRegion Pragnanz UniformConnectedness
+Cognitive: Load Bias Chunking MentalModel WorkingMemory
 
-## PATTERNS — patterns/engine.py + impls/ (26)
-solo · sequential · parallel · hierarchical · loop · network/debate · router ·
-aggregator · wave · fractal_{worktree,qa,stories,tests} · backprop_merge ·
-human_in_the_loop · tournament · escalation · voting · speculative · red_blue ·
-relay · mob · map_reduce · blackboard · composite
-Protocols: DECOMPOSE(lead) · EXEC(dev) · QA · REVIEW · RESEARCH · CICD
-Role match: "dev","lead","veloppeur","engineer","coder","tdd","worker","fullstack"
+## A11Y — WAI-ARIA APG (30 patterns)
+Accordion Alert AlertDialog Breadcrumb Button Carousel Checkbox Combobox Dialog Disclosure
+Feed Grid Landmarks Link Listbox Menu MenuButton Meter RadioGroup Slider Spinbutton
+Switch Table Tabs Toolbar Tooltip TreeView Treegrid WindowSplitter
+Rules: semantic HTML . keyboard . accessible name . focus mgmt . not color-only . 4.5:1 contrast
 
-## TRACEABILITY — traceability/ + ops/traceability_scheduler.py
-Dedicated team: trace-lead(Nadia) · trace-auditor(Mehdi) · trace-writer(Sophie) · trace-monitor(Lucas)
-Role: "traceability" in _classify_agent_role → full tool set (legacy_scan, link, coverage, validate)
-Scheduler: every 6h, all active projects, Phase 1=lightweight scan, Phase 2=launch mission if <80%
-Workflow: traceability-sweep.yaml (4 phases: audit→fix→validate→memory-sync)
-PM v2 guidance: auto-insert traceability-check after dev phases, always for migration projects
+## i18n — 40 Languages + RTL
+LTR(34): en fr es pt de it nl pl ro cs sk hu hr bg uk ru el tr vi th ko ja zh-CN zh-TW id ms tl hi bn sw am ha yo ig
+RTL(6): ar he fa ur ps ku — CSS logical properties, dir="rtl", flexbox auto-reverses
 
-## QUALITY — metrics/quality.py (KISS)
-QualityScanner.scan_architecture: LOC(>200) · GOD_FILE(>3types) ·
-COGNITIVE_COMPLEXITY(>25) · DEEP_NESTING(>5lvl) · HIGH_COUPLING(>12imp)
-Det only, no ext deps — indent-tracking + regex
+## UI — 60 Components + Design Tokens
+Atoms(12) Molecules(28) Organisms(12). Icons: SVG Feather ONLY. No emoji.
+Skeleton: every data component needs .sk variant. aria-busy="true". shimmer 1.5s.
+Tokens: --bg-primary:#0f0a1a --purple:#a855f7 --success:#10b981 --error:#ef4444
+  JetBrains Mono. Space: xs-2xl(0.25-3rem). Radius: sm-full. Z: 100-500.
 
-## BRICKS — bricks/ (modular infra)
-docker.py · github.py · sonarqube.py · rag.py — self-contained, wirable as tools
+## OBSERVABILITY
+OTEL traces: mission/phase/agent/tool spans. Prometheus metrics.
+Alerts: MissionStuck(>2h) LLMFailing(>10fb/5m) HighRejectRate(>80%)
+Health: /api/health /api/ready(503 drain) /api/metrics
 
-## SCHEDULED OPS (15 bg tasks from server.py lifespan)
-auto_resume(5min) · evolution(02:00 nightly) · traceability(6h) · auto_heal(60s)
-platform_watchdog · endurance_watchdog · zombie_cleanup · mcp_watchdog
-heal_seed · darwin_seed · simulator_seed · redis_sse · pg_notify
+## DR — RTO/RPO
+Critical(15min/0): auth,DB. Important(1h/5m): missions. Standard(4h/1h): analytics.
+Blue-green Docker. PG WAL streaming. Backup: hourly(48h) daily(30d) weekly(90d).
+
+## API — OpenAPI + Rate Limits
+Versioning: URL /api/v2/. Rate: auth=5/min read=60/min write=30/min LLM=5/min.
+JWT Bearer. Swagger /docs. Errors: {"error","code","details"}. 429+Retry-After.
+
+## GDPR
+Collection→Processing→Storage→Retention→Deletion. Art.17 erasure procedure.
+Data classification: Public/Internal/Confidential/Restricted. 30/90/365d retention.
+
+## SKILLS (7 deep skills)
+ux-laws-deep.md(30 laws) ui-components-deep.md(60 comp+tokens) a11y-wai-aria-deep.md(30 patterns)
+secure-by-design-deep.md(25 SBD) i18n-rtl-40lang.md(40 lang+RTL) patterns-antipatterns-deep.md(26+22)
+observability-api-data-dr-deep.md(OTEL+API+GDPR+DR)
 
 ## CONVENTIONS
-- `@dataclass` + Store singletons (not Pydantic) — `get_agent_store()`, `get_llm_client()`
-- Relative imports: `from ..db.migrations import get_db`
-- NEVER `import platform` top-level (shadows stdlib)
-- Templates: `base.html` → `{% block content %}` · HTMX hx-get/post/swap
-- CSS vars: `--bg-primary:#0f0a1a` `--purple:#a855f7` · JetBrains Mono
-- Views: card/card-simple/list/list-compact via `partials/view_switcher.html`
-- `from __future__ import annotations` for fwd refs
+- @dataclass + Store singletons. Relative imports.
+- NEVER `import platform` top-level. No emoji. SSE only (--ws none).
+- Templates: base.html → {% block content %} . HTMX hx-get/post/swap
+- CSS vars. JetBrains Mono. card/list views via view_switcher.html
 
 ## STATS
-~215 agents · 26 patterns · 29 phase tpl · 50 workflows · 57 tool mods · 1091 skills · 4 bricks · 123 templates · 375py/148KLOC · 61 PG tables · 17 ops mods · 5 LLM providers
+~215 agents . 26 patterns . 29 phase tpl . 50 wf . 57 tool mods . 1098 skills
+60 UI comp . 30 UX laws . 30 A11Y patterns . 25 SBD controls . 59 tokens . 12 RBAC roles
+40 i18n langs . 375py/148KLOC . 61 PG tbl . 17 ops . 5 LLM providers

@@ -3,12 +3,9 @@
 ## Distributed
 ```
 PG advisory lock   auto_resume.py   pg_run_lock(int64) conn-scoped non-blocking
-                   prevents double-exec . fb=no-op if not PG
 Redis rate limit   rate_limit.py    slowapi -> REDIS_URL shared . fb: in-memory
 Leader election    evolution_sched  Redis SET NX EX ttl -> first wins
-                   key=leader:{task} val=SF_NODE_ID ttl=3600s(GA)/300s(sim) fb=True
 Graceful drain     server.py        _drain_flag + asyncio.wait(DRAIN_S)
-                   /api/ready->503 -> nginx proxy_next_upstream
 Health probes      /api/health(DB+Redis) . /api/ready(503 drain — auth bypass)
 ```
 
@@ -17,152 +14,137 @@ Health probes      /api/health(DB+Redis) . /api/ready(503 drain — auth bypass)
 POST /missions/start -> pg_run_lock(run_id) -> _safe_run()
   -> _mission_semaphore(N) -> run_phases()
     -> sprint_loop(max) -> run_pattern() -> adversarial_guard
-    -> PUA retry(L1→L4) -> gate(all_approved|no_veto|always) -> next_phase
+    -> PUA retry(L1→L4) -> gate -> next_phase
 ```
-Semaphore: cfgable. MAX_LLM_RETRIES=2. Auto-resume on restart w/ stagger.
-WSJF=(BV+TC+RR)/JD. Feature pull: sorted -> head. MAX_SPRINTS=20.
+product-lifecycle: 15 phases (ideation→strategic→setup→arch→design→dev→build→cicd→ux→qa-plan→qa-exec→deploy→**traceability-check**→tma-router→tma-fix)
 
-## Epic Orchestrator — services/epic_orchestrator.py
-Phase task via _build_phase_prompt() (NOT workflows/store.py).
-Platform detect: _detect_project_platform(ws, brief) ->
-  rust-native|macos-native|ios-native|android-native|web-node|web-docker|web-static
-Priority: brief keywords -> .stack -> filesystem (Cargo.toml, package.json)
+## Adversarial Guard (Swiss Cheese) — agents/adversarial.py
+L0 det (0ms): 25 checks — SLOP MOCK FAKE_BUILD(+7) HALLUC LIE STACK_MISMATCH(+7)
+  CODE_SLOP ECHO REPETITION SECRET FILE_TOO_LARGE(>200L,+4) GOD_FILE(>3types,+3)
+  COGNITIVE(>25,+4) DEEP_NEST(>4lvl,+3) HIGH_COUPLING(>12imp,+2) LOC_REGRESSION(+6)
+  MISSING_UUID_REF MISSING_TRACE FAKE_TESTS NO_TESTS SECURITY_VULN PII_LEAK
+  PROMPT_INJECT IDENTITY_CLAIM RESOURCE_ABUSE
+L1 LLM semantic: semi-formal reasoning (arXiv:2603.01896)
+Score: <5=pass 5-6=soft >=7=reject. Force: HALLUC/SLOP/STACK_MISMATCH/FAKE_BUILD
 
-## Adversarial Guard — agents/adversarial.py (Swiss Cheese)
-L0 det (0ms): SLOP . MOCK . FAKE_BUILD(+7) . HALLUC . LIE . STACK_MISMATCH(+7)
-  CODE_SLOP . ECHO . REPETITION . SECRET . FILE_TOO_LARGE(>200L,+4)
-  GOD_FILE(>3types,+3) . COGNITIVE(>25,+4) . DEEP_NEST(>4lvl,+3)
-  HIGH_COUPLING(>12imp,+2) . LOC_REGRESSION(+6) . MISSING_UUID_REF
-  MISSING_TRACE . FAKE_TESTS . NO_TESTS . SECURITY_VULN . PII_LEAK
-  PROMPT_INJECT . IDENTITY_CLAIM . RESOURCE_ABUSE
-L1 LLM: skip for network/debate/aggregator/HITL
-Score: <5=pass . 5-6=soft . >=7=reject
-Force reject: HALLUC/SLOP/STACK_MISMATCH/FAKE_BUILD
-MAX_RETRIES=1 (2 attempts) + PUA escalation -> FAILED, output discarded
+## Traceability — E2E UUID Chain
+```
+Persona → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
+    → IHM(route,CRUD,RBAC) → Code(// Ref: feat-XXXX) → TU(// Verify: ac-XXXX) → E2E
+```
+Team: trace-lead(Nadia,VETO) trace-auditor(Mehdi) trace-writer(Sophie) trace-monitor(Lucas)
+Phase: traceability-check in product-lifecycle (phase 13, sequential, gate=no_veto)
+DB: features, user_stories, acceptance_criteria, legacy_items, traceability_links
+Tools: legacy_scan, traceability_link, traceability_coverage, traceability_validate
+Scheduler: 6h sweep, mission if coverage <80%
 
-## PUA Motivation — agents/pua.py (source: tanweai/pua, MIT)
-Pressure escalation on adversarial retry: L1=disappointment L2=soul L3=review+5step L4=graduation
-Iron Rules + Proactivity injected ALL agent prompts via prompt_builder.py
-Debug 5-step: Smell->Elevate->Mirror->Execute->Retrospective
-Cross-agent pressure: peer success/failure from run.nodes
-build_retry_prompt(): feedback+pressure+debug+peer+task+protocol
+## Security — 25 SBD Controls (securebydesign v1.1)
+L1-Input: SBD-01(validation) SBD-02(prompt injection) SBD-03(CSP/headers)
+L2-Identity: SBD-04(auth Argon2id) SBD-05(authz default-DENY) SBD-06(least privilege)
+L3-Data: SBD-07(secrets mgmt) SBD-08(crypto AES-256-GCM) SBD-09(data minimization)
+L4-Resilience: SBD-10(audit log) SBD-11(rate limit) SBD-12(SSRF) SBD-13(error handling)
+L5-Architecture: SBD-14(deps) SBD-15(CI/CD) SBD-16(model integrity) SBD-17(prompt protection)
+  SBD-18(RAG) SBD-19(output validation) SBD-20(CORS) SBD-21(fail secure)
+  SBD-22(governance) SBD-23(asset inventory) SBD-24(incident response) SBD-25(privacy)
+Tiers: LOW(static/demos) STANDARD(SaaS/APIs) REGULATED(finance/health/gov)
 
-## Stack Enforcement Chain
-1. _detect_project_platform() -> type from brief/memory/fs
-2. _build_phase_prompt() -> platform-specific wf (Cargo vs npm)
-3. full_task: "STACK: Rust" -> adversarial guard
-4. L0 _check_stack_mismatch() -> wrong-lang=+7
-5. Exhaustion -> FAILED, bad code discarded
+## Compliance — SOC2 + ISO27001
+SOC2: CC1.1(RBAC) CC1.2(CTO agent) CC3.1(adversarial) CC4.1(AC reward) CC5.1(tool ACL)
+  CC6.1(JWT auth) CC6.8(CI/CD gates) CC7.1(watchdog) CC7.2(PUA+auto-heal) CC8.1(traceability)
+ISO27001: A.5.1(security module) A.5.8(adversarial/phase) A.5.15(RBAC 5-layer)
+  A.5.17(JWT+bcrypt) A.5.24(auto-heal) A.5.34(sanitize) A.8.1(agent store) A.8.25(quality gates)
 
-## Agent Protocols — patterns/engine.py
-DECOMPOSE(Lead): list_files->deep_search->subtasks. No lang mix.
-EXEC(Dev): list_files->deep_search->memory->code_write. Never fake.
-QA: build/test mandatory. Android: build->test->lint. Web: screenshot>=1.
-RESEARCH: deep_search+memory. Read only.
-Role match: dev|lead|veloppeur|engineer|coder|tdd|worker|fullstack|back|front
+## RBAC Roles
+admin(full) cto(strategic) pm(backlog) lead_dev(code review) developer(code)
+qa(tests) devops(infra) security(audit) trace_lead(coverage,veto)
+viewer(read-only) auditor(compliance) scrum_master(ceremonies)
 
-## Traceability — traceability/ + ops/traceability_scheduler.py
-Team: trace-lead(Nadia) . trace-auditor(Mehdi) . trace-writer(Sophie) . trace-monitor(Lucas)
-Role: "traceability" in classifier → tools: legacy_scan, link, coverage, validate + code + git
-Scheduler: every 6h all active projects. Phase1=lightweight(no LLM). Phase2=mission if <80%
-Workflow: traceability-sweep.yaml (4 phases: audit→fix→validate→memory-sync)
-PM v2: auto-insert traceability-check after dev, always for migrations
-DB: legacy_items(uuid,project,category,name,metadata_json) + traceability_links(src→tgt)
-Tools: legacy_scan . traceability_link . traceability_coverage . traceability_validate
+## UX Laws (30 from lawsofux.com)
+Hick's(minimize choices) Fitts's(44px targets) Doherty(<400ms) Jakob's(familiar patterns)
+Miller's(7±2 items) Peak-End(positive endings) Postel's(liberal in, strict out)
+Gestalt: Proximity Similarity CommonRegion Pragnanz UniformConnectedness
+Cognitive: Load Bias Chunking MentalModel WorkingMemory
+Behavior: Flow GoalGradient ActiveUser Zeigarnik Parkinson SerialPosition
+Design: Occam's Tesler's VonRestorff AestheticUsability Pareto ChoiceOverload SelectiveAttention
+
+## A11Y — WAI-ARIA APG (30 patterns)
+Accordion Alert AlertDialog Breadcrumb Button Carousel Checkbox Combobox
+Dialog Disclosure Feed Grid Landmarks Link Listbox Menu MenuButton
+Meter RadioGroup Slider MultiThumbSlider Spinbutton Switch Table Tabs
+Toolbar Tooltip TreeView Treegrid WindowSplitter
+Rules: semantic HTML first . keyboard accessible . accessible name . focus management
+  state communicated to AT . color alone never conveys meaning . contrast 4.5:1/3:1
+
+## i18n — 40 Languages + RTL
+LTR(34): en fr es pt de it nl pl ro cs sk hu hr bg uk ru el tr vi th ko ja zh-CN zh-TW id ms tl hi bn sw am ha yo ig
+RTL(6): ar he fa ur ps ku
+CSS: logical properties (margin-inline-start not margin-left). Flexbox auto-reverses.
+CLDR plurals. Babel date/number formatting. ICU message format.
+
+## UI Components (60) — Atomic Design
+Atoms: Button Badge Icon Label Link Input Separator Spacer Toggle Heading Image VisuallyHidden
+Molecules: Accordion Alert Avatar Breadcrumb Card Combobox DateInput Drawer Dropdown EmptyState
+  FileUpload Pagination Popover ProgressBar Radio Search Select Skeleton Slider Spinner Stepper Tabs Toast Tooltip
+Organisms: Carousel DataTable Footer Form Header Hero Modal Navigation RTE TreeView VideoPlayer
+Icons: SVG Feather ONLY. No emoji. No FontAwesome.
+Skeleton: every component with data needs skeleton variant. .sk shimmer 1.5s. aria-busy="true"
+
+## Design Tokens
+Colors: --bg-primary:#0f0a1a --purple:#a855f7 --success:#10b981 --warning:#f59e0b --error:#ef4444 --info:#3b82f6
+Typo: JetBrains Mono. --font-size-{xs:0.75,sm:0.875,base:1,lg:1.125,xl:1.25,2xl:1.5,3xl:1.875}rem
+Space: --space-{xs:0.25,sm:0.5,md:1,lg:1.5,xl:2,2xl:3}rem
+Radius: --radius-{sm:0.25,md:0.5,lg:0.75,xl:1,full:9999}rem
+Shadow: sm/md/lg. Animation: fast:150ms base:300ms slow:500ms. Z: dropdown:100 sticky:200 modal:300 toast:400 tooltip:500
+
+## Observability — OTEL
+Traces: mission.execute, phase.execute, agent.invoke, tool.call
+Metrics: mission.duration, phase.duration, llm.latency, adversarial.reject_count, quality.score
+Alerts: MissionStuck(>2h) LLMFailing(>10fb/5m) HighRejectRate(>80%) DBExhausted(>90%)
+Health: /api/health /api/ready /api/metrics
+
+## DR — RTO/RPO
+Critical(15min/0): auth, DB, API. Important(1h/5m): missions, SSE. Standard(4h/1h): analytics.
+Failover: nginx lb → proxy_next_upstream. Blue-green Docker. PG WAL streaming.
+Backup: hourly pg_dump(48h) daily(30d) weekly(90d) monthly(1y). Monthly restore drill.
+
+## API — OpenAPI + Rate Limits
+Versioning: URL /api/v2/ for breaking. Header Accept for content negotiation.
+Rate: auth=5/min/IP, read=60/min, write=30/min, LLM-heavy=5/min. 429+Retry-After.
+Errors: {"error","code","details"}. JWT Bearer. Swagger /docs.
+
+## GDPR Data Lifecycle
+Collection(consent,minimize) → Processing(audit,lawful) → Storage(encrypt,access) → Retention(30/90/365d) → Deletion(purge,verify)
+Art.17 erasure: delete PII, anonymize audit logs, delete sessions, schedule backup purge.
+
+## Patterns (26) + Anti-Patterns
+Patterns: solo seq par hier loop network router aggregator wave hitl mr bb
+  comp tournament escalation voting speculative red-blue relay mob
+  fractal_{qa,stories,tests,worktree} backprop_merge
+Anti: GodFile DeepNesting HighCoupling CogComplexity CodeSlop Echo FakeTests LOCRegression
+  MonolithCreep DistributedMonolith GoldenHammer PrematureOpt NIH HallucinationAcceptance
+  PromptInjectionBlindness TokenWaste ModelWorship StackMismatch WaterfallDisguise TestAfterDeploy
 
 ## Adaptive Intelligence
-```
-Thompson   selection.py    Beta(w+1,l+1) . cold<5->uniform [0.4,0.6]
-Darwin     darwin.py       team tournament . elim bottom-N . mutate top
-Evolution  evolution.py    GA genome=PhaseSpec[] . fitness=success*quality . pop=40 . nightly
-RL         rl_policy.py    Q-learning . state=(wf,phase,rej%,quality) . e=0.1
-Skills     skill_health.py det tools+LLM judge -> improve
-AC         ac/             reward(14d) convergence experiments skill_thompson
-```
-DB: agent_scores . evolution_proposals/runs . rl_experience . ac_cycles . ac_project_state
-
-## Jarvis (CTO + A2A)
-strat-cto = exec CTO -> delegates RTE/PO/SM/teams.
-A2A (LF v1.0): /.well-known/agent.json . POST /a2a/tasks . GET /a2a/events(SSE)
-MCP: mcp_lrm/mcp_jarvis.py -> jarvis_ask() jarvis_status()
-LLM routing (AZURE_DEPLOY=1): reason->5.2 . code->5.2-codex . default->5-mini
-CTO tools: create_{project,mission,sprint,feature,story} . launch_epic_run . check_run_status
-
-## Scheduled Ops (15 bg tasks from server.py lifespan)
-auto_resume(5min) . evolution(02:00 nightly GA+RL) . traceability(6h sweep+mission)
-auto_heal(60s) . platform_watchdog . endurance_watchdog . zombie_cleanup . mcp_watchdog
-heal_seed . darwin_seed . simulator_seed . redis_sse . pg_notify
-
-## Innovation Cluster
-```
-n2(nginx lb) sfadmin@40.89.174.75  SSH=~/.ssh/sf_innovation_ed25519
-n1(primary)  sfadmin@10.0.1.4      via ProxyJump n2
-n3(PG+Redis) 10.0.1.6
-nginx: upstream sf_api_ha (n1:8090+n2:8090) proxy_next_upstream http_503
-Deploy: rsync+chown+systemctl . CI: deploy-demo.yml
-```
-
-## Security — arXiv:2602.20021
-```
-L0 adversarial(det)   -> PROMPT_INJECT.IDENTITY.RESOURCE.PII.SECRET
-L1 adversarial(LLM)   -> semi-formal (arXiv:2603.01896)
-Tool guards(pre)      -> path/file blocklist . MAX_TOOL_CALLS=50
-Memory sanitize       -> sanitize_agent_output + URL warn
-A2A validation        -> from_agent identity + scope log
-Audit trail           -> admin_audit_log destructive actions
-Sandbox(Docker)       -> per-agent UID . --network none . mem 512m
-```
-
-## Auth — auth/
-JWT+bcrypt+rate-limit. Password reset: 6-digit code via AWS SES (auth/ses.py)
-Code hashed SHA-256, 15min expiry, max 5 attempts. No email enumeration.
-Routes: forgot-password, verify-reset-code, reset-password (all PUBLIC_PATHS)
-
-## DB — db/adapter.py
-is_postgresql() gates PG feats (advisory lock, NOTIFY/LISTEN).
-PgConnectionWrapper from pool . SQLite fb: data/platform.db.
-schema_pg.sql(61tbl) first -> migrations.py second (incremental).
-executescript() w/ savepoints. execute() full rollback on err.
-
-## Skeleton Loading — web/static/css/components.css + templates/partials/skeleton.html
-```
-CSS: .sk shimmer gradient 1.5s . .sk-line(3 sizes) . .sk-circle . .sk-badge . .sk-card
-     .sk-metric . .sk-loaded fade-in 0.3s . .sk-grid-{2,3,4,agents}
-Macros (20): skeleton_{item_grid,agents,missions,stat_cards,chart,kpi_row,table,
-  teams_table,strategic,pipeline,marketplace,kanban,timeline,feed,hub_cards,
-  projects,ck_card,tab_panel,ds_tokens,block}
-Deferred: hx-get="/partial/X" hx-trigger="load" hx-swap="innerHTML"
-Partials (api/partials.py): /partial/{portfolio/metrics,agents/grid,projects/grid,
-  sessions/grid,patterns/grid,missions/grid,cockpit/pipeline,cockpit/projects}
-Cache: cache.py TTL get/put/invalidate(prefix*) — agents 60s missions 30s runs 15s wf 120s
-HTTP: Cache-Control immutable versioned(?v=) . 1h unversioned . ETag on partials
-Coverage: 31/88 tpl . DS /design-system -> Skeleton tab
-```
+Thompson(Beta selection) Darwin(team tournament) Evolution(GA pop=40 nightly)
+RL(Q-learning state-action) Skills(det+LLM judge) AC(reward 14d convergence experiments)
 
 ## LLM — FROZEN
-```
-local-mlx   Qwen3.5-mlx(:8080)         ollama-compat
-minimax     M2.5                        native tool_calls . no mangle . no temp
-azure-oai   gpt-5-mini/5.2/5.2-codex   AZURE_DEPLOY=1
-azure-ai    gpt-5.2                     swedencentral
-nvidia      Kimi-K2                     integrate.api.nvidia.com
-```
-MiniMax: `<think>`+json fences stripped (NEVER produce empty — keep original fb)
-parallel_tool_calls=False . GPT-5.x: reasoning . max_completion_tokens . budget>=16K
+local-mlx Qwen3.5-mlx . minimax M2.5 . azure-oai gpt-5-mini/5.2/5.2-codex
+azure-ai gpt-5.2 . nvidia Kimi-K2
+MiniMax: native tool_calls no temp `<think>` stripped NEVER empty. GPT-5.x: reasoning budget>=16K
+
+## Infra
+OVH: 54.36.183.124 blue-green Docker. Azure: 3-node nginx lb n2→n1+n2 PG+Redis n3(10.0.1.6)
+Deploy: rsync+docker-compose --force-recreate. CI: deploy-demo.yml
 
 ## Gotchas
-- NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE
-- HTTP 400 tool msg ordering (role=tool after tool_calls) — non-fatal
-- Container: /app/macaron_platform/ not /app/platform/
-- PG advisory lock: conn-scoped -> dedicated conn/mission
-- Leader election: fb=True if Redis down (idempotent safe)
-- /api/ready in PUBLIC_PATHS (auth bypass)
-- SSE: `curl --max-time` — urllib blocks
-- Epic orch: _build_phase_prompt() not workflows/store.py
-- Role "Lead Developpeur": "lead"+"veloppeur" (accent-safe)
-- Think-strip: NEVER return empty — 3-layer safety (client→executor→engine)
+NodeStatus: PENDING/RUNNING/COMPLETED/VETOED/FAILED — no DONE
+Container: /app/platform/ (OVH blue) or /app/macaron_platform/ (Azure)
+PG advisory lock conn-scoped. SSE: curl --max-time. `platform/` shadows stdlib.
+Think-strip: NEVER empty — 3-layer safety. Epic orch: _build_phase_prompt() not wf/store.py
 
 ## Stats
-~215 agents · 26 patterns · 29 phase tpl · 50 workflows · 57 tool mods · 1091 skills
-4 bricks · 123 tpl · 375py/148KLOC · 61 PG tbl · 17 ops · 5 LLM providers · 15 bg tasks
-20 skeleton macros · 31/88 tpl skeletonized · 8 partial endpoints
+~215 agents . 26 patterns . 29 phase tpl . 50 wf . 57 tool mods . 1098 skills
+4 bricks . 123 tpl . 375py/148KLOC . 61 PG tbl . 17 ops . 5 LLM providers
+30 UX laws . 60 UI components . 30 A11Y patterns . 25 SBD controls . 59 design tokens
+12 RBAC roles . 40 i18n languages . 15 bg tasks . 20 skeleton macros
