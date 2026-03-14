@@ -200,7 +200,7 @@ async def list_missions_api(request: Request):
 
     epic_store = get_epic_store()
     run_store = get_epic_run_store()
-    missions = epic_store.list_missions(limit=200)
+    missions = epic_store.list_missions(limit=1000)
     runs = run_store.list_runs(limit=200)
     runs_by_parent = {}
     for r in runs:

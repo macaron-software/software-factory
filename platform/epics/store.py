@@ -180,12 +180,12 @@ class EpicStore:
         try:
             if project_id:
                 rows = db.execute(
-                    "SELECT * FROM epics WHERE project_id = ? ORDER BY wsjf_score DESC, created_at DESC LIMIT ?",
+                    "SELECT * FROM epics WHERE project_id = ? AND (parent_epic_id IS NULL OR parent_epic_id = '') ORDER BY COALESCE(wsjf_score, 0) DESC, created_at DESC NULLS LAST LIMIT ?",
                     (project_id, limit),
                 ).fetchall()
             else:
                 rows = db.execute(
-                    "SELECT * FROM epics ORDER BY wsjf_score DESC, created_at DESC LIMIT ?",
+                    "SELECT * FROM epics WHERE parent_epic_id IS NULL OR parent_epic_id = '' ORDER BY COALESCE(wsjf_score, 0) DESC, created_at DESC NULLS LAST LIMIT ?",
                     (limit,),
                 ).fetchall()
             result = [_row_to_mission(r) for r in rows]
@@ -262,7 +262,7 @@ class EpicStore:
         finally:
             db.close()
         from ..cache import invalidate
-        invalidate("missions:all:50")
+        invalidate("missions:*")
         return m
 
     def update_mission_status(self, mission_id: str, status: str) -> bool:
@@ -455,7 +455,7 @@ class EpicStore:
             db.close()
         if deleted:
             from ..cache import invalidate
-            invalidate("missions:all:50")
+            invalidate("missions:*")
         return deleted
 
     def list_children(self, parent_epic_id: str) -> list[MissionDef]:

@@ -736,7 +736,7 @@ class ProjectStore:
         )
         conn.commit()
         conn.close()
-        invalidate("projects:all")
+        invalidate("projects:all*")
         # Scaffold workspace (idempotent — safe to call even if partially exists)
         try:
             scaffold_project(p)
@@ -804,8 +804,7 @@ class ProjectStore:
         )
         conn.commit()
         conn.close()
-        invalidate("projects:all")
-        proj = self.get(project_id)
+        invalidate("projects:all*")
         if proj:
             # Recompute mission statuses for new phase
             try:
