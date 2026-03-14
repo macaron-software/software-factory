@@ -223,6 +223,7 @@ async def list_missions_api(request: Request):
         result.append(
             {
                 "id": m.id,
+                "run_id": run.id if run else None,
                 "name": m.name,
                 "status": m.status,
                 "type": m.type,

@@ -45,8 +45,19 @@ _RATE_LIMIT_WINDOW = 60  # seconds
 _login_attempts: dict[str, collections.deque] = {}
 
 
+_LOOPBACK_IPS = frozenset(("127.0.0.1", "::1", "localhost", "0:0:0:0:0:0:0:1"))
+
+
 def _check_rate_limit(ip: str) -> bool:
-    """Return True if IP has exceeded the login rate limit."""
+    """Return True if IP has exceeded the login rate limit.
+
+    Localhost is always exempt so that local E2E / CI test suites are not
+    throttled by the brute-force window (SBD-04 still applies to remote IPs).
+    Override with SF_ENFORCE_LOCALHOST_RATE_LIMIT=1 to re-enable for all IPs.
+    """
+    enforce_all = os.environ.get("SF_ENFORCE_LOCALHOST_RATE_LIMIT", "") == "1"
+    if not enforce_all and ip in _LOOPBACK_IPS:
+        return False
     now = time.monotonic()
     bucket = _login_attempts.setdefault(ip, collections.deque())
     while bucket and now - bucket[0] > _RATE_LIMIT_WINDOW:

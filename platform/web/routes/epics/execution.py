@@ -1424,7 +1424,12 @@ async def mission_skills_audit(run_id: str):
     """
     from ....epics.store import get_epic_run_store
 
-    run = get_epic_run_store().get(run_id)
+    run_store = get_epic_run_store()
+    run = run_store.get(run_id)
+    if not run:
+        # run_id might actually be a mission/epic ID — find its latest run
+        all_runs = run_store.list_runs(limit=200)
+        run = next((r for r in all_runs if r.parent_epic_id == run_id), None)
     if not run:
         return JSONResponse({"error": "Run not found"}, status_code=404)
 
