@@ -2271,6 +2271,14 @@ async def _execute_tool(
         return await _tool_request_validation(args, ctx)
     if name == "get_project_context":
         return await _tool_get_project_context(args, ctx)
+    # ── TLA+ formal verification tools ──
+    if name in ("tla_check", "tla_list"):
+        from ..tools.tla_tools import run_tla_check, run_tla_list
+
+        if name == "tla_check":
+            return await run_tla_check(args)
+        return await run_tla_list(args)
+
     # ── Traceability tools ──
     if name in ("legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate"):
         return await _tool_traceability(name, args, ctx)

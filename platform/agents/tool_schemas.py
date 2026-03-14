@@ -2917,6 +2917,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_guidelines_search",
         "lrm_guidelines_get",
         "lrm_guidelines_stack",
+        "tla_check",
+        "tla_list",
     ],
     "ux": [
         "code_read",
@@ -3008,6 +3010,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_playwright_browser_take_screenshot",
         "mcp_playwright_browser_type",
         "mcp_memory_search_nodes",
+        "tla_check",
+        "tla_list",
     ],
     "devops": [
         "code_read",
@@ -3070,6 +3074,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_guidelines_summary",
         "lrm_guidelines_search",
         "lrm_guidelines_stack",
+        "tla_check",
+        "tla_list",
     ],
     "cdp": [
         "memory_search",

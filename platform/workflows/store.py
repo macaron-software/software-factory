@@ -707,6 +707,11 @@ _PHASE_TEMPLATES = [
      "description": "Single-story TDD sprint. Dev implements L2 story from FRACTAL_DECOMP.md. "
                     "testeur writes and runs tests. Loop until story AC green. "
                     "Each story sprint is composed dynamically by PM after fractal-decomp."},
+    {"id": "formal-verify", "name": "Formal Verification (TLA+)", "pattern": "loop",
+     "team_roles": ["architecte", "qa_lead"], "gate": "all_approved", "feedback": ["tools"],
+     "description": "Write/update TLA+ specs from code, run TLC model checker, fix design until 0 violations. "
+                    "Use tla_list to discover specs, tla_check to verify invariants. "
+                    "If violations found, update .tla specs or fix platform code, then re-check."},
 ]
 
 
