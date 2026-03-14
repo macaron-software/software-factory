@@ -99,3 +99,14 @@ rules:
       - "Ownership: 'on our end' for server errors, neutral for connectivity"
       - "Actionable next step: Retry button, or auto-retry with progress"
       - "Reassurance: data is safe, nothing lost"
+
+  icons:
+    - "NO emoji in UI — VETO-level violation"
+    - "Use Feather SVG icons (https://feathericons.com, MIT, 287 icons)"
+    - "Decorative icon (next to text): <svg aria-hidden='true' focusable='false' class='feather feather-[name]'>"
+    - "Icon-only button: must have aria-label on the <button>, icon is aria-hidden"
+    - "CSS: .feather { width:1em; height:1em; stroke:currentColor; stroke-width:2; fill:none; flex-shrink:0 }"
+    - "Use SVG sprite: <use href='/assets/feather-sprite.svg#icon-name'/>"
+
+skills:
+  - design-system-components

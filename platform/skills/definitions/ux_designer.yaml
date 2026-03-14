@@ -41,6 +41,7 @@ system_prompt: |
 skills:
   - ux-best-practices
   - ux-laws
+  - design-system-components
   - accessibility-audit
   - frontend-design
   - figma-design-sync

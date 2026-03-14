@@ -118,5 +118,6 @@ hierarchy_rank: 40
 skills:
   - network-resilience
   - error-handling-ux
+  - design-system-components
   - pwa-offline-first
   - accessibility-audit
