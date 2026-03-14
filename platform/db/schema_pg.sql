@@ -1005,3 +1005,39 @@ CREATE TABLE IF NOT EXISTS traceability_links (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tlink_pair ON traceability_links(source_id, target_id, link_type);
 CREATE INDEX IF NOT EXISTS idx_tlink_source ON traceability_links(source_id);
 CREATE INDEX IF NOT EXISTS idx_tlink_target ON traceability_links(target_id);
+
+-- Acceptance criteria (individually UUID-tagged, linked to features/stories)
+CREATE TABLE IF NOT EXISTS acceptance_criteria (
+    id          TEXT PRIMARY KEY,
+    feature_id  TEXT NOT NULL,
+    story_id    TEXT DEFAULT '',
+    title       TEXT NOT NULL DEFAULT '',
+    given_text  TEXT NOT NULL DEFAULT '',
+    when_text   TEXT NOT NULL DEFAULT '',
+    then_text   TEXT NOT NULL DEFAULT '',
+    and_text    TEXT DEFAULT '',
+    status      TEXT DEFAULT 'pending',
+    verified_by TEXT DEFAULT '',
+    created_at  TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ac_feature ON acceptance_criteria(feature_id);
+CREATE INDEX IF NOT EXISTS idx_ac_story   ON acceptance_criteria(story_id);
+CREATE INDEX IF NOT EXISTS idx_ac_status  ON acceptance_criteria(status);
+
+-- User journeys (UUID-tagged, linked to projects/personas)
+CREATE TABLE IF NOT EXISTS user_journeys (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    persona_id  TEXT DEFAULT '',
+    title       TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
+    steps_json  TEXT DEFAULT '[]',
+    pain_points TEXT DEFAULT '',
+    opportunities TEXT DEFAULT '',
+    status      TEXT DEFAULT 'draft',
+    created_at  TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_journey_project ON user_journeys(project_id);
+CREATE INDEX IF NOT EXISTS idx_journey_persona ON user_journeys(persona_id);

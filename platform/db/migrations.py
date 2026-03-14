@@ -656,6 +656,46 @@ def _migrate_pg(conn):
 
     conn.commit()
 
+    # Acceptance criteria + User journeys tables (traceability chain, 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS acceptance_criteria (
+            id          TEXT PRIMARY KEY,
+            feature_id  TEXT NOT NULL,
+            story_id    TEXT DEFAULT '',
+            title       TEXT NOT NULL DEFAULT '',
+            given_text  TEXT NOT NULL DEFAULT '',
+            when_text   TEXT NOT NULL DEFAULT '',
+            then_text   TEXT NOT NULL DEFAULT '',
+            and_text    TEXT DEFAULT '',
+            status      TEXT DEFAULT 'pending',
+            verified_by TEXT DEFAULT '',
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ac_feature ON acceptance_criteria(feature_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ac_story   ON acceptance_criteria(story_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ac_status  ON acceptance_criteria(status)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_journeys (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            persona_id  TEXT DEFAULT '',
+            title       TEXT NOT NULL DEFAULT '',
+            description TEXT DEFAULT '',
+            steps_json  TEXT DEFAULT '[]',
+            pain_points TEXT DEFAULT '',
+            opportunities TEXT DEFAULT '',
+            status      TEXT DEFAULT 'draft',
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_journey_project ON user_journeys(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_journey_persona ON user_journeys(persona_id)")
+    conn.commit()
+
 
 def _ensure_darwin_tables(conn) -> None:
     """Create Darwin/adaptive-AI tables if missing (called for existing DBs)."""

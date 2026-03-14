@@ -305,10 +305,14 @@
     {% if journeys %}
       {% for j in journeys %}
       <div class="pv-journey">
-        <div class="pv-journey-title">{{ j.title }}</div>
-        {% if j.persona %}
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <div class="pv-journey-title">{{ j.title }}</div>
+          {% if j.id %}<code style="font-size:.6rem;color:var(--text-tertiary)">{{ j.id }}</code>{% endif %}
+          {% if j.status %}<span class="hub-type" style="font-size:.55rem">{{ j.status }}</span>{% endif %}
+        </div>
+        {% if j.persona_id %}
         <div class="pv-journey-persona">
-          <svg class="icon icon-xs"><use href="#icon-user"/></svg> {{ j.persona }}
+          <svg class="icon icon-xs"><use href="#icon-user"/></svg> {{ j.persona_id }}
         </div>
         {% endif %}
 
@@ -317,7 +321,7 @@
           {% for step in j.steps %}
           <div class="pv-journey-step">
             <div class="pv-journey-dot">{{ loop.index }}</div>
-            <div class="pv-journey-step-text">{{ step }}</div>
+            <div class="pv-journey-step-text">{% if step is mapping %}{{ step.action or step.name or step }}{% else %}{{ step }}{% endif %}</div>
           </div>
           {% endfor %}
         </div>
@@ -325,20 +329,12 @@
 
         {% if j.pain_points %}
         <div class="pv-journey-section">Points de friction</div>
-        <div>
-          {% for pain in j.pain_points %}
-          <span class="pv-journey-tag pv-journey-pain">{{ pain }}</span>
-          {% endfor %}
-        </div>
+        <div style="font-size:.78rem;color:var(--text-secondary)">{{ j.pain_points }}</div>
         {% endif %}
 
         {% if j.opportunities %}
         <div class="pv-journey-section">Opportunites</div>
-        <div>
-          {% for opp in j.opportunities %}
-          <span class="pv-journey-tag pv-journey-opp">{{ opp }}</span>
-          {% endfor %}
-        </div>
+        <div style="font-size:.78rem;color:var(--text-secondary)">{{ j.opportunities }}</div>
         {% endif %}
       </div>
       {% endfor %}
@@ -447,15 +443,36 @@
         <span class="pv-trace-stat-lbl">Features</span>
       </div>
       <div class="pv-trace-stat">
-        {% set code_pct = (traceability.features_with_code / traceability.features_total * 100)|int if traceability.features_total > 0 else 0 %}
+        <span class="pv-trace-stat-val">{{ traceability.ac_total }}</span>
+        <span class="pv-trace-stat-lbl">AC (total)</span>
+      </div>
+      <div class="pv-trace-stat">
+        {% set ac_pct = traceability.ac_coverage_pct or 0 %}
+        <span class="pv-trace-stat-val {% if ac_pct >= 80 %}pv-cov-high{% elif ac_pct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ ac_pct }}%</span>
+        <span class="pv-trace-stat-lbl">AC pass</span>
+      </div>
+      <div class="pv-trace-stat">
+        {% set code_pct = traceability.code_pct or 0 %}
         <span class="pv-trace-stat-val {% if code_pct >= 80 %}pv-cov-high{% elif code_pct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ code_pct }}%</span>
         <span class="pv-trace-stat-lbl">Avec code</span>
       </div>
       <div class="pv-trace-stat">
-        {% set test_pct = (traceability.features_with_tests / traceability.features_total * 100)|int if traceability.features_total > 0 else 0 %}
+        {% set test_pct = traceability.test_pct or 0 %}
         <span class="pv-trace-stat-val {% if test_pct >= 80 %}pv-cov-high{% elif test_pct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ test_pct }}%</span>
         <span class="pv-trace-stat-lbl">Avec tests</span>
       </div>
+    </div>
+
+    <!-- Traceability chain legend -->
+    <div style="font-size:.72rem;color:var(--text-tertiary);margin-bottom:.75rem;display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
+      <span style="font-weight:600">Chaine:</span>
+      <span>Persona</span> <span style="color:var(--border)">&rarr;</span>
+      <span>Feature</span> <span style="color:var(--border)">&rarr;</span>
+      <span>User Story</span> <span style="color:var(--border)">&rarr;</span>
+      <span>AC <code style="font-size:.62rem">ac-xxxxxxxx</code></span> <span style="color:var(--border)">&rarr;</span>
+      <span>Code <code style="font-size:.62rem"># Ref:</code></span> <span style="color:var(--border)">&rarr;</span>
+      <span>TU</span> <span style="color:var(--border)">&rarr;</span>
+      <span>E2E</span>
     </div>
 
     <!-- Matrix table -->
@@ -464,22 +481,31 @@
       <thead>
         <tr>
           <th>Feature</th>
+          <th>ID</th>
           <th>Stories</th>
-          <th>Fichiers code</th>
-          <th>Tests</th>
-          <th>Couverture</th>
+          <th>AC</th>
+          <th>AC Pass</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
         {% for row in traceability.matrix %}
         <tr>
           <td style="font-weight:600">{{ row.feature }}</td>
+          <td><code style="font-size:.65rem;color:var(--text-tertiary)">{{ row.feature_id }}</code></td>
           <td style="font-size:.75rem">{{ row.stories }}</td>
-          <td style="font-size:.75rem">{{ row.code_files }}</td>
-          <td style="font-size:.75rem">{{ row.tests }}</td>
+          <td style="font-size:.75rem">{{ row.ac_total }}</td>
           <td>
-            {% set cov = row.coverage or 0 %}
-            <span class="{% if cov >= 80 %}pv-cov-high{% elif cov >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">{{ cov }}%</span>
+            {% set apct = row.ac_pct or 0 %}
+            <span class="{% if apct >= 80 %}pv-cov-high{% elif apct >= 50 %}pv-cov-med{% else %}pv-cov-low{% endif %}">
+              {{ row.ac_passed }}/{{ row.ac_total }} ({{ apct }}%)
+            </span>
+          </td>
+          <td style="font-size:.72rem">
+            {% if row.status == 'done' %}<span style="color:var(--green)">Done</span>
+            {% elif row.status == 'in_progress' %}<span style="color:var(--yellow)">En cours</span>
+            {% elif row.status == 'blocked' %}<span style="color:var(--red)">Bloque</span>
+            {% else %}<span style="color:var(--text-tertiary)">{{ row.status }}</span>{% endif %}
           </td>
         </tr>
         {% endfor %}

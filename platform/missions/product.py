@@ -95,7 +95,7 @@ class ProductBacklog:
 
     def create_feature(self, feat: FeatureDef) -> FeatureDef:
         if not feat.id:
-            feat.id = f"feat-{uuid.uuid4().hex[:6]}"
+            feat.id = f"feat-{uuid.uuid4().hex[:8]}"
         if not feat.created_at:
             feat.created_at = datetime.utcnow().isoformat()
         db = get_db()
@@ -148,7 +148,7 @@ class ProductBacklog:
 
     def create_story(self, story: UserStoryDef) -> UserStoryDef:
         if not story.id:
-            story.id = f"us-{uuid.uuid4().hex[:6]}"
+            story.id = f"us-{uuid.uuid4().hex[:8]}"
         if not story.created_at:
             story.created_at = datetime.utcnow().isoformat()
         db = get_db()

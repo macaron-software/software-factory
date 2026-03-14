@@ -443,6 +443,7 @@ async def project_product(request: Request, project_id: str):
     from ...missions.store import get_mission_store
     from ...agents.store import get_agent_store
     from ...memory.project_files import get_project_memory
+    from ...traceability.artifacts import get_ac_store, get_journey_store
 
     ps = get_project_store()
     project = ps.get(project_id)
@@ -468,26 +469,56 @@ async def project_product(request: Request, project_id: str):
     config = project.config if isinstance(project.config, dict) else {}
     personas = config.get("personas", []) or []
 
-    # Journeys
-    journeys = config.get("journeys", []) or []
+    # Journeys — from DB table (UUID-tagged)
+    journey_store = get_journey_store()
+    journeys_db = journey_store.list_by_project(project_id)
+    journeys = [
+        {"id": j.id, "title": j.title, "persona_id": j.persona_id,
+         "description": j.description, "steps": j.steps,
+         "pain_points": j.pain_points, "opportunities": j.opportunities,
+         "status": j.status}
+        for j in journeys_db
+    ]
+    # Migrate legacy config journeys if DB empty but config has them
+    config_journeys = config.get("journeys", []) or []
+    if not journeys and config_journeys:
+        journey_store.migrate_from_config(project_id, config_journeys)
+        journeys_db = journey_store.list_by_project(project_id)
+        journeys = [
+            {"id": j.id, "title": j.title, "persona_id": j.persona_id,
+             "description": j.description, "steps": j.steps,
+             "pain_points": j.pain_points, "opportunities": j.opportunities,
+             "status": j.status}
+            for j in journeys_db
+        ]
 
     # Features from SAFe backlog
     features = []
+    feature_ids = []
     try:
-        from ...missions.product import get_product_backlog
-        pb = get_product_backlog(project_id)
-        if pb:
-            for feat in pb.features[:50]:
+        from ...missions.product import ProductBacklog
+        pb = ProductBacklog()
+        # Get features for all project epics
+        for m in proj_m:
+            for feat in pb.list_features(m.id):
                 features.append({
-                    "name": feat.get("name", feat.get("title", "—")),
-                    "epic_name": feat.get("epic_name", feat.get("epic", "—")),
-                    "priority": feat.get("wsjf", feat.get("priority", 0)),
-                    "status": feat.get("status", "backlog"),
-                    "story_points": feat.get("story_points", 0),
-                    "stories_count": len(feat.get("stories", [])),
+                    "id": feat.id,
+                    "name": feat.name,
+                    "epic_name": m.name,
+                    "priority": feat.priority,
+                    "status": feat.status,
+                    "story_points": feat.story_points,
+                    "stories_count": len(pb.list_stories(feat.id)),
                 })
+                feature_ids.append(feat.id)
     except Exception:
         pass
+
+    # AC coverage from DB (UUID-tagged)
+    ac_store = get_ac_store()
+    ac_coverage = ac_store.coverage_summary(feature_ids) if feature_ids else {
+        "total_ac": 0, "passed": 0, "failed": 0, "pending": 0, "coverage_pct": 0,
+    }
 
     # Architecture docs from memory
     arch_docs = []
@@ -503,27 +534,30 @@ async def project_product(request: Request, project_id: str):
     except Exception:
         pass
 
-    # Traceability summary
-    feat_total = len(features)
-    feat_with_code = sum(1 for f in features if f.get("status") not in ("backlog", "new"))
-    feat_with_tests = sum(1 for f in features if f.get("stories_count", 0) > 0)
+    # Traceability matrix with AC coverage per feature
     traceability = {
-        "features_total": feat_total,
-        "features_with_code": feat_with_code,
-        "features_with_tests": feat_with_tests,
-        "code_pct": round(feat_with_code / max(feat_total, 1) * 100),
-        "test_pct": round(feat_with_tests / max(feat_total, 1) * 100),
-        "matrix": [
-            {
-                "feature": f["name"],
-                "stories": f.get("stories_count", 0),
-                "code_files": "—",
-                "tests": "—",
-                "coverage": f.get("status", "—"),
-            }
-            for f in features[:30]
-        ],
+        "features_total": len(features),
+        "features_with_code": sum(1 for f in features if f.get("status") not in ("backlog", "new")),
+        "features_with_tests": sum(1 for f in features if f.get("stories_count", 0) > 0),
+        "ac_total": ac_coverage["total_ac"],
+        "ac_passed": ac_coverage["passed"],
+        "ac_coverage_pct": ac_coverage["coverage_pct"],
+        "code_pct": round(sum(1 for f in features if f.get("status") not in ("backlog", "new")) / max(len(features), 1) * 100),
+        "test_pct": round(sum(1 for f in features if f.get("stories_count", 0) > 0) / max(len(features), 1) * 100),
+        "matrix": [],
     }
+    for f in features[:30]:
+        fid = f.get("id", "")
+        f_ac = ac_store.coverage_by_feature(fid) if fid else {"total": 0, "passed": 0, "coverage_pct": 0}
+        traceability["matrix"].append({
+            "feature": f["name"],
+            "feature_id": fid,
+            "stories": f.get("stories_count", 0),
+            "ac_total": f_ac["total"],
+            "ac_passed": f_ac["passed"],
+            "ac_pct": f_ac["coverage_pct"],
+            "status": f.get("status", "—"),
+        })
 
     # PO agent
     po_agent = None
@@ -553,6 +587,7 @@ async def project_product(request: Request, project_id: str):
                 "journeys": len(journeys),
                 "features": len(features),
                 "memory_files": len(memory_files),
+                "ac_total": ac_coverage["total_ac"],
             },
         },
     )
