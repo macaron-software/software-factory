@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 # Load .env from project root (before any os.environ access)
 _env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(_env_path, override=True)
+load_dotenv(_env_path, override=False)
 
 # Paths
 PLATFORM_ROOT = Path(__file__).parent
