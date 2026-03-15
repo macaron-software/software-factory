@@ -14,9 +14,36 @@ Health probes      /api/health(DB+Redis) . /api/ready(503 drain — auth bypass)
 POST /missions/start -> pg_run_lock(run_id) -> _safe_run()
   -> _mission_semaphore(N) -> run_phases()
     -> sprint_loop(max) -> run_pattern() -> adversarial_guard
-    -> PUA retry(L1→L4) -> gate -> next_phase
+    -> PUA retry(L1→L4) -> gate -> store_phase_summary() -> next_phase
 ```
 product-lifecycle: 15 phases (ideation→strategic→setup→arch→design→dev→build→cicd→ux→qa-plan→qa-exec→deploy→**traceability-check**→tma-router→tma-fix)
+
+## Token Optimization — Hybrid 3-lever (arXiv:2603.05488)
+```
+Problem: 88% tokens = re-injected history ("conversation tax")
+  SRE(844 calls, 3.6M tok, 0 LOC) + RTE(626 calls, 2.8M tok, 0 LOC) = 42% total for 0 code
+
+Lever 1 — Tier history (engine.py _build_node_context):
+  producers=30 reviewers=15 coordinators=8 msg limit
+  _ORG_ROLES: lead/architect/manager/product/chef/cto/rte → coordinator tier
+  _REVIEW_ROLES: qa/test/review/securite/audit → reviewer tier
+
+Lever 2 — Per-agent no-think (executor.py):
+  _NOTHINK_TAGS: orchestrator/coordination/safe/art/planning/review/quality/audit
+  _NOTHINK_ROLES: coordinator/rte/sre/review/audit/critic
+  Priority: phase_config > agent tags > project config
+
+Lever 3 — Per-phase no-think (product-lifecycle.yaml):
+  disable_thinking: true in phase config → forces all agents in phase to skip CoT
+
+Lever 4 — Phase memory (llm/phase_memory.py):
+  build_phase_digest(): rule-based extraction (decisions/artifacts/tools) ~50-100 tok
+  format_digest_telegraphic(): P:{id} pattern={p} status={s} q={q}% DECISIONS/FILES/TOOLS
+  store_phase_summary(): as message_type=phase_summary from_agent=phase_memory priority=10
+  load_phase_summaries(): filtered by session_id, ordered by created_at
+  build_compact_context(): combines all → "# MISSION MEMORY (prior phases — telegraphic)"
+  backfill_missing_summaries(): crash-recovery at resume (fills gaps from phase results)
+```
 
 ## Adversarial Guard (Swiss Cheese) — agents/adversarial.py
 L0 det (0ms): 25 checks — SLOP MOCK FAKE_BUILD(+7) HALLUC LIE STACK_MISMATCH(+7)
@@ -29,13 +56,15 @@ Score: <5=pass 5-6=soft >=7=reject. Force: HALLUC/SLOP/STACK_MISMATCH/FAKE_BUILD
 
 ## Traceability — E2E UUID Chain
 ```
-Persona → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
+Persona(pers-XXXX) → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
     → IHM(route,CRUD,RBAC) → Code(// Ref: feat-XXXX) → TU(// Verify: ac-XXXX) → E2E
 ```
 Team: trace-lead(Nadia,VETO) trace-auditor(Mehdi) trace-writer(Sophie) trace-monitor(Lucas)
 Phase: traceability-check in product-lifecycle (phase 13, sequential, gate=no_veto)
 DB: features, user_stories, acceptance_criteria, legacy_items, traceability_links
 Tools: legacy_scan, traceability_link, traceability_coverage, traceability_validate
+Stores: AcceptanceCriteriaStore(CRUD+coverage) JourneyStore(CRUD+migrate) MigrationStore(links+orphans+matrix) WhyLogStore(lineage)
+Tests: tests/test_traceability.py — make_id() + all 4 stores
 Scheduler: 6h sweep, mission if coverage <80%
 
 ## Security — 25 SBD Controls (securebydesign v1.1)
@@ -144,7 +173,7 @@ PG advisory lock conn-scoped. SSE: curl --max-time. `platform/` shadows stdlib.
 Think-strip: NEVER empty — 3-layer safety. Epic orch: _build_phase_prompt() not wf/store.py
 
 ## Stats
-~215 agents . 26 patterns . 29 phase tpl . 50 wf . 57 tool mods . 1098 skills
-4 bricks . 123 tpl . 375py/148KLOC . 61 PG tbl . 17 ops . 5 LLM providers
+~221 agents . 26 patterns . 32 phase tpl . 69 wf . 54 tool mods . 139 skills
+4 bricks . 123 tpl . 375py/148KLOC . 62 PG tbl . 17 ops . 5 LLM providers
 30 UX laws . 60 UI components . 30 A11Y patterns . 25 SBD controls . 59 design tokens
 12 RBAC roles . 40 i18n languages . 15 bg tasks . 20 skeleton macros

@@ -12,13 +12,14 @@ python -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 Web (routes, templates/123)  → HTMX endpoints, Jinja2 HTML
 Sessions (runner.py)         → User↔Agent bridge, SSE events
-Agents (executor.py)         → Tool-call loop (max 15 rds)
-Orchestrator (engine.py)     → 26 pattern impls (solo→fractal→mob)
-Epic Orch (epic_orch.py)     → 15-phase product-lifecycle, sprint loop
+Agents (executor.py)         → Tool-call loop (max 15 rds) + per-agent no-think inference
+Orchestrator (engine.py)     → 26 pattern impls (solo→fractal→mob) + tier-based history
+Epic Orch (epic_orch.py)     → 15-phase product-lifecycle, sprint loop + phase memory storage
 A2A (bus.py, veto.py)        → Inter-agent msg + veto hierarchy
 LLM (client.py)              → 5-provider auto-fallback (azure→minimax→local)
+Phase Memory (phase_memory)  → Rule-based telegraphic digests (~100 tok/phase, 0 LLM cost)
 Memory (manager.py)          → 4-layer: project/global/vector/short-term
-Traceability (traceability/) → E2E UUID chain: persona→feature→story→AC→code→test
+Traceability (traceability/) → E2E UUID chain + stores(AC/Journey/Migration/WhyLog)
 Security (security/)         → 25 SBD controls, prompt_guard, output_validator
 AC (ac/)                     → reward(14-dim), convergence, experiments, skill_thompson
 ```
@@ -26,15 +27,29 @@ AC (ac/)                     → reward(14-dim), convergence, experiments, skill
 ## PRODUCT-LIFECYCLE — 15 Phases
 ideation(network) → strategic-committee(HITL) → project-setup(sequential) → architecture(aggregator) → design-system(sequential) → dev-sprint(hierarchical) → build-verify(sequential) → cicd(sequential) → ux-review(loop) → qa-campaign(loop) → qa-execution(parallel) → deploy-prod(HITL) → **traceability-check**(sequential) → tma-router(router) → tma-fix(loop)
 
+## TOKEN OPTIMIZATION — Hybrid 3-lever (arXiv:2603.05488)
+```
+Lever 1: Tier-based history — producers=30 reviewers=15 coordinators=8 msg cap
+Lever 2: Per-agent no-think — tags(orchestrator/coordination/review/audit) auto-infer
+Lever 3: Per-phase no-think — disable_thinking:true in workflow YAML phase config
+Lever 4: Phase memory — rule-based digests (~100tok/phase) between phases (0 LLM cost)
+         → backfill_missing_summaries() on crash-recovery resume
+         → _build_node_context() prepends "MISSION MEMORY" to all agents
+```
+Files: llm/phase_memory.py . engine.py(_build_node_context) . executor.py(disable_thinking) . epic_orch.py(store+backfill)
+Context tiers: L0=routing(no memory) L1=executor(limited) L2=organizer(full)
+
 ## TRACEABILITY — E2E UUID Chain
 ```
-Persona → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
+Persona(pers-XXXX) → Feature(feat-XXXX) → Story(us-XXXX) → AC(ac-XXXX,Gherkin)
   → IHM(route,CRUD,RBAC) → Code(// Ref: feat-XXXX) → TU(// Verify: ac-XXXX) → E2E
 ```
 Team: trace-lead(Nadia,VETO) trace-auditor(Mehdi) trace-writer(Sophie) trace-monitor(Lucas)
 DB: features, user_stories, acceptance_criteria, legacy_items, traceability_links
 Tools: legacy_scan, traceability_link, traceability_coverage, traceability_validate
+Stores: AcceptanceCriteriaStore(CRUD+coverage) JourneyStore(CRUD+migrate) MigrationStore(links+orphans+matrix)
 Auto-persist: _auto_persist_backlog() parses PM markdown → features/stories in DB
+Tests: tests/test_traceability.py — AC/Journey/Migration/WhyLog stores + make_id()
 
 ## ADVERSARIAL GUARD (Swiss Cheese)
 L0 det (0ms): 25 checks. L1 LLM semantic. Score: <5=pass 5-6=soft >=7=reject
@@ -103,6 +118,6 @@ observability-api-data-dr-deep.md(OTEL+API+GDPR+DR)
 - CSS vars. JetBrains Mono. card/list views via view_switcher.html
 
 ## STATS
-~215 agents . 26 patterns . 29 phase tpl . 50 wf . 57 tool mods . 1098 skills
+~221 agents . 26 patterns . 32 phase tpl . 69 wf . 54 tool mods . 139 skills
 60 UI comp . 30 UX laws . 30 A11Y patterns . 25 SBD controls . 59 tokens . 12 RBAC roles
-40 i18n langs . 375py/148KLOC . 61 PG tbl . 17 ops . 5 LLM providers
+40 i18n langs . 375py/148KLOC . 62 PG tbl . 17 ops . 5 LLM providers
