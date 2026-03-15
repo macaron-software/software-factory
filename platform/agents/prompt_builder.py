@@ -264,6 +264,18 @@ RULES:
 - prefers-reduced-motion: reduce → disable animations
 - Mobile-first responsive (min-width breakpoints)
 - All colors via CSS custom properties (tokens), NEVER hardcoded hex/rgb""")
+        # Universal tool-use mandate for ALL execution agents (dev, qa, devops, security)
+        # Prevents hallucination: agents describing work instead of doing it
+        if role_cat in ("dev", "qa", "devops", "security"):
+            parts.append("""
+## Tool Usage (MANDATORY — zero tolerance)
+You are an EXECUTION agent. Every response MUST include tool calls.
+1. READ first: code_read / list_files to understand the workspace
+2. WRITE code: code_write / code_edit to create or modify files
+3. VERIFY: build / test to confirm your changes work
+NEVER describe what you would do — DO IT with tool calls.
+Text-only responses WITHOUT tool calls = automatic REJECTION.
+If a tool fails, try a different approach — do NOT give up and describe instead.""")
     else:
         parts.append(
             "\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team."
