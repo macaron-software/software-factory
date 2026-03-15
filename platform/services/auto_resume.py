@@ -305,25 +305,30 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     try:
         _slot_db = get_db()
+        # Only count recent missions (last 48h) as inflight — old paused zombies
+        # should not block new launches.
         _counts = _slot_db.execute(
-            "SELECT status, COUNT(*) FROM epic_runs WHERE status IN ('running','paused') GROUP BY status"
+            "SELECT status, COUNT(*) FROM epic_runs "
+            "WHERE status IN ('running','paused') "
+            "AND updated_at >= datetime('now', '-48 hours') "
+            "GROUP BY status"
         ).fetchall()
         _slot_db.close()
     except Exception:
         _counts = []
 
     _currently_running = sum(n for s, n in _counts if s == "running")
-    _currently_inflight = sum(n for _, n in _counts)   # running + paused
+    _currently_inflight = sum(n for _, n in _counts)   # running + paused (recent only)
 
     if _max_run > 0 and _currently_running >= _max_run:
-        logger.info(
+        logger.warning(
             "auto_resume: slot gate — running=%d >= max_running=%d, deferring",
             _currently_running, _max_run,
         )
         return 0
 
     if _max_q > 0 and _currently_inflight >= _max_q:
-        logger.info(
+        logger.warning(
             "auto_resume: slot gate — inflight=%d >= max_queued=%d, deferring",
             _currently_inflight, _max_q,
         )
