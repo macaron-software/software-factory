@@ -55,7 +55,7 @@ async def run_human_in_the_loop(engine, run, task: str):
             })
             run.flow_step = "Checkpoint humain — en attente"
             # YOLO mode: auto-approve, just log the checkpoint and continue
-            if _yolo:
+            if _is_yolo():
                 store.add_message(MessageDef(
                     session_id=run.session_id,
                     from_agent="system",
@@ -96,7 +96,7 @@ async def run_human_in_the_loop(engine, run, task: str):
                 "requires_input": True,
             })
             # YOLO mode: auto-approve checkpoint edge
-            if _yolo:
+            if _is_yolo():
                 store.add_message(MessageDef(
                     session_id=run.session_id,
                     from_agent="system",
