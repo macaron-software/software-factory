@@ -1440,6 +1440,10 @@ async def run_workflow(
         # Collect tool_calls from phase for PM evidence
         _phase_tool_calls: list[dict] = []
 
+        # Track phase timing + message offset for phase memory digest
+        _phase_start_time = _time.monotonic()
+        _pre_phase_msg_count = len(store.get_messages(session_id, limit=10000))
+
         # Build lineage for traceability: agents know WHY they exist in this workflow phase
         _lineage = []
         if run.workflow:
@@ -1457,6 +1461,7 @@ async def run_workflow(
                     phase_task,
                     project_id,
                     project_path=_project_path,
+                    phase_config=_merged_config,
                     lineage=_lineage,
                 ),
                 timeout=phase_timeout,
@@ -1512,6 +1517,34 @@ async def run_workflow(
                         f"[{phase.name}] {m.from_agent}: {summary}"
                     )
                     break
+
+            # ── Phase memory: store compact digest (arXiv:2603.10062) ────
+            try:
+                from ..llm.phase_memory import build_phase_digest, store_phase_summary
+
+                _pm_msgs = store.get_messages(session_id, limit=1000)
+                _pm_start = _pre_phase_msg_count if "_pre_phase_msg_count" in dir() else 0
+                _pm_phase_msgs = _pm_msgs[_pm_start:]
+                _pm_dur = _time.monotonic() - _phase_start_time if "_phase_start_time" in dir() else 0
+                _pm_agents = phase_agents or []
+                _pm_quality = getattr(result, "quality_score", 0) or 0
+                _pm_digest = build_phase_digest(
+                    phase_id=phase.id or f"phase-{i}",
+                    phase_name=phase.name,
+                    pattern=phase.pattern_id,
+                    status="done" if result.success else "failed",
+                    agents=_pm_agents,
+                    quality=_pm_quality,
+                    messages=_pm_phase_msgs,
+                    duration_s=_pm_dur,
+                )
+                store_phase_summary(session_id, _pm_digest)
+                logger.warning(
+                    "PHASE_MEMORY stored phase=%s decisions=%d artifacts=%d",
+                    phase.id, len(_pm_digest.decisions), len(_pm_digest.artifacts),
+                )
+            except Exception as _pm_err:
+                logger.warning("PHASE_MEMORY digest FAILED phase=%s: %s", phase.id, _pm_err)
 
             # Sandbox build validation after code generation phases
             if result.success and _is_code_phase(phase.name) and project_id:
@@ -1681,6 +1714,7 @@ async def run_workflow(
                                 retry_task,
                                 project_id,
                                 project_path=_project_path,
+                                phase_config=_merged_config,
                                 lineage=_lineage,
                             ),
                             timeout=phase_timeout,
