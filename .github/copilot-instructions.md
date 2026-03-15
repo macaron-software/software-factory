@@ -118,6 +118,34 @@ LLM model configuration is frozen — do not change models. Current providers: M
 - CI actions are pinned to SHA (not mutable tags) to prevent supply-chain attacks.
 - Prompt injection guard in `platform/security/prompt_guard.py`.
 
+## Traceability SQLite DB (session-scoped, live data)
+
+UDID scheme: `FT-SF-NNN` (features) · `US-SF-NNN` (stories) · `AC-SF-NNN` (acceptance) · `TU-SF-NNN` / `TE-SF-NNN` (tests) · `CO-{CAT}-NNN` (concepts)
+
+### Tables & Counts
+| Table | Count | Schema |
+|-------|-------|--------|
+| `trace_features` | 49 | id,name,desc,priority,status,persona_id,soc2,iso27001 |
+| `trace_stories` | 57 | id,feature_id(FK),title,desc,story_points,status,acceptance_gherkin |
+| `trace_acceptance` | 38 | id,story_id(FK),criterion,gherkin,status |
+| `trace_tests_unit` | 21 | id,file_path,test_name,ac_id(FK),story_id,status |
+| `trace_tests_e2e` | 10 | id,file_path,test_name,story_id,ihm_id,persona_id,status |
+| `trace_links` | 61 | source_type,source_id,target_type,target_id,link_type |
+| `concepts` | 140 | udid,name,category,source_file,description |
+| `feature_tests` | 30 | id,feature,test_type,status,details |
+
+### Coverage
+- 49/49 features → stories (100%)
+- 33/57 stories → ACs (58%)
+- 38/38 ACs pass · 21/21 unit tests pass · 10/10 E2E pass
+- 175 unique UDIDs · 0 orphans · 0 broken links
+
+### GossipSub (platform/ac/gossip.py)
+Cross-project mutation broadcasting: 4 types (skill_variant, instinct, genome, meta_insight)
+Producers: skill_thompson→broadcast_skill_win · instinct→broadcast_instinct_promotion
+Consumer: get_recent_gossip for cherry-picking · record_adoption for tracking
+DB: gossip_ledger (auto-created) · API: /api/cockpit/summary includes gossip stats
+
 ## Gotchas
 
 - **Container path**: inside Docker it's `/app/macaron_platform/`, not `/app/platform/`

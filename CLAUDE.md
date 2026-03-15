@@ -293,7 +293,7 @@ Engine: platform/ops/project_audit.py — deterministic (no LLM), grep-based, sc
 DB: audit_reports + audit_checks tables (project-scoped, time-series)
 Integrates: QualityScanner(10 dims) + traceability_scheduler + security grep checks
 
-## Engineering Concepts (139 concepts · 13 categories · UDID CO-{CAT}-NNN)
+## Engineering Concepts (140 concepts · 13 categories · UDID CO-{CAT}-NNN)
 Methodologies(14): SAFe TDD BDD Lean Agile Scrum Kanban XP KISS YAGNI DRY WSJF INVEST Gherkin
 Architecture(7): CQRS EventSourcing Hexagonal CleanArch DDD Microservices Ports&Adapters
 AI/ML(20): ThompsonSampling GA(pop=40) Q-Learning CoT ReAct Few-shot Adversarial(L0+L1)
@@ -309,10 +309,23 @@ Data(9): PG16(62tbl) FTS5 WAL AdvisoryLocks Redis7 TTLCache MultiTenant Migratio
 UX(9): AtomicDesign Tokens(59) WCAG-AA DarkMode Skeleton 30UXLaws 30ARIA Responsive i18n(40)
 Governance(7): SOC2(92%) ISO27001(88%) GDPR SecureByDesign(96%) AGPL-3.0 OpenAPI3.1 Traceability
 Formal(4): TLA+ StateInvariants ModelChecking TemporalLogic
-AgentProtocol(4): A2ANegotiation HierarchicalVeto PMCheckpoint PhaseQueue
+AgentProtocol(5): A2ANegotiation HierarchicalVeto PMCheckpoint PhaseQueue GossipSub
 Observability(3): SemanticErrorClustering LLMCostTracing EnduranceWatchdog
 Cockpit: section 12 badge cloud card — 13 color-coded categories
 DB: concepts table UDID CO-{CAT}-NNN with source_file+description
+
+## Traceability SQLite DB (session, live data)
+UDID: FT-SF-NNN(feat) · US-SF-NNN(story) · AC-SF-NNN(accept) · TU/TE-SF-NNN(tests) · CO-{CAT}-NNN(concepts)
+Tables: trace_features(49) · trace_stories(57) · trace_acceptance(38) · trace_tests_unit(21) · trace_tests_e2e(10) · trace_links(61) · concepts(140) · feature_tests(30)
+Coverage: 49/49 feat→story(100%) · 33/57 story→AC(58%) · 38/38 AC pass · 21/21 TU pass · 10/10 TE pass
+Integrity: 175 unique UDIDs · 0 orphans · 0 broken links
+
+## GossipSub (platform/ac/gossip.py)
+Cross-project mutation broadcast: 4 types (skill_variant instinct genome meta_insight)
+Producers: skill_thompson→broadcast_skill_win · instinct→broadcast_instinct_promotion
+Consumer: get_recent_gossip(cherry-pick) · record_adoption(tracking)
+DB: gossip_ledger(auto-create) · API: /api/cockpit/summary → gossip stats
+Wired: skill_thompson.py(on win) · instinct.py(on promote) · cockpit.py(stats)
 
 ## Gotchas
 - `platform/` shadows stdlib — NEVER `import platform`
