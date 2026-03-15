@@ -817,6 +817,11 @@ def _row_to_epic_run(row) -> EpicRun:
         cancel_reason = row["cancel_reason"] or None
     except (IndexError, KeyError):
         pass
+    reloop_count = 0
+    try:
+        reloop_count = int(row["reloop_count"] or 0)
+    except (IndexError, KeyError, TypeError, ValueError):
+        pass
     started_at = None
     try:
         v = row["started_at"]
@@ -838,6 +843,7 @@ def _row_to_epic_run(row) -> EpicRun:
         phases=phases,
         brief=row["brief"] or "",
         llm_cost_usd=cost,
+        reloop_count=reloop_count,
         cancel_reason=cancel_reason,
         started_at=started_at,
         created_at=row["created_at"]
@@ -951,7 +957,8 @@ class EpicRunStore:
             cur = db.execute(
                 """UPDATE epic_runs SET status=?, current_phase=?, phases_json=?,
                    session_id=?, workspace_path=?, updated_at=?, completed_at=?,
-                   llm_cost_usd=?, cancel_reason=?, started_at=COALESCE(started_at, ?) WHERE id=?""",
+                   llm_cost_usd=?, cancel_reason=?, reloop_count=?,
+                   started_at=COALESCE(started_at, ?) WHERE id=?""",
                 (
                     run.status.value if hasattr(run.status, 'value') else str(run.status),
                     run.current_phase,
@@ -962,6 +969,7 @@ class EpicRunStore:
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.llm_cost_usd,
                     run.cancel_reason,
+                    run.reloop_count,
                     run.started_at.isoformat() if run.started_at else None,
                     run.id,
                 ),

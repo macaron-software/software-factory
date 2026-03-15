@@ -525,7 +525,10 @@ CREATE TABLE IF NOT EXISTS epic_runs (
     parent_epic_id TEXT DEFAULT '',
     resume_attempts INTEGER DEFAULT 0,
     last_resume_at TEXT,
-    human_input_required INTEGER DEFAULT 0
+    human_input_required INTEGER DEFAULT 0,
+    reloop_count INTEGER DEFAULT 0,
+    llm_cost_usd REAL DEFAULT 0,
+    cancel_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_epic_runs_project ON epic_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_epic_runs_status ON epic_runs(status);

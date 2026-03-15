@@ -374,6 +374,7 @@ class EpicRun(BaseModel):
     phases: list[PhaseRun] = Field(default_factory=list)
     brief: str = ""
     llm_cost_usd: float = 0.0  # accumulated LLM cost for this mission
+    reloop_count: int = 0  # persisted across resumes — caps at MAX_RELOOPS
     cancel_reason: Optional[str] = None  # error/reason when failed or cancelled
     started_at: Optional[datetime] = None  # when run first transitioned to running
     created_at: datetime = Field(default_factory=datetime.utcnow)
