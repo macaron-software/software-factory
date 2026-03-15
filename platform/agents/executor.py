@@ -755,6 +755,8 @@ class AgentExecutor:
                 else None
             )
 
+            deep_search_used = False
+
             # Route provider: Darwin LLM Thompson Sampling + routing config
             # cheap_mode: if allowed_tools are all cheap (memory/read), use MiniMax
             from .routing import CHEAP_TOOLS as _CHEAP_TOOLS
