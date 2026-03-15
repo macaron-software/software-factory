@@ -25,6 +25,7 @@ PATTERN TYPES DETECTED:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -445,6 +446,18 @@ def promote_global_instincts(min_projects: int = 2, min_confidence: float = 0.7)
                         ),
                     )
                     promoted += 1
+                    # GossipSub: broadcast promoted instinct
+                    try:
+                        from ..ac.gossip import broadcast_instinct_promotion
+                        asyncio.get_event_loop().create_task(
+                            broadcast_instinct_promotion(
+                                row["trigger"], row["action"], row["agent_id"] or "",
+                                min(0.9, float(row["avg_conf"]) + 0.05),
+                                int(row["project_count"]),
+                            )
+                        )
+                    except Exception:
+                        pass
             db.commit()
             if promoted:
                 logger.info("promote_global_instincts: promoted %d instincts", promoted)

@@ -22,6 +22,7 @@ Table: ac_skill_scores
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import time
@@ -220,6 +221,16 @@ def ac_skill_record(
         prev_cycle_score,
         "win" if improved else "loss",
     )
+
+    # GossipSub: broadcast winning mutations to peer projects
+    if improved and tier:
+        try:
+            from .gossip import broadcast_skill_win
+            asyncio.get_event_loop().create_task(
+                broadcast_skill_win(skill_id, variant, project_id, cycle_score, prev_cycle_score, tier)
+            )
+        except Exception:
+            pass
 
 
 def ac_skill_stats(skill_id: str, project_id: Optional[str] = None) -> list[dict]:
