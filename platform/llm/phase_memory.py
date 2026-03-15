@@ -241,3 +241,90 @@ def build_compact_context(summaries: list[dict]) -> str:
     header = "# MISSION MEMORY (prior phases — telegraphic)\n"
     body = "\n\n".join(s["content"] for s in summaries)
     return header + body
+
+
+def backfill_missing_summaries(mission_id: str, session_id: str) -> int:
+    """Backfill phase summaries for completed phases that lack one.
+
+    Called on mission resume after server crash — detects phases marked
+    'done' in phases_json that have no corresponding phase_summary message.
+    Returns count of summaries backfilled.
+    """
+    from ..db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Get phases_json for this mission
+        row = db.execute(
+            "SELECT phases_json FROM epic_runs WHERE id = ?",
+            (mission_id,),
+        ).fetchone()
+        if not row:
+            return 0
+
+        phases_json = row[0]
+        if isinstance(phases_json, str):
+            phases = json.loads(phases_json)
+        else:
+            phases = phases_json  # already parsed (PG jsonb)
+
+        # Get existing summaries
+        existing = set()
+        summ_rows = db.execute(
+            """SELECT metadata_json FROM messages
+               WHERE session_id = ? AND message_type = ?""",
+            (session_id, PHASE_SUMMARY_TYPE),
+        ).fetchall()
+        for sr in summ_rows:
+            meta = sr[0]
+            if isinstance(meta, str):
+                meta = json.loads(meta)
+            pid = meta.get("phase_id", "") if isinstance(meta, dict) else ""
+            if pid:
+                existing.add(pid)
+
+        # Find done phases without summaries
+        backfilled = 0
+        from ..sessions.store import get_session_store
+        ss = get_session_store()
+        all_msgs = ss.get_messages(session_id, limit=2000)
+
+        for idx, phase in enumerate(phases):
+            status = phase.get("status", "")
+            phase_id = phase.get("phase_id", phase.get("id", f"phase-{idx}"))
+            if status not in ("done", "done_with_issues"):
+                continue
+            if phase_id in existing:
+                continue
+
+            # Build digest from available data
+            agents = phase.get("agents", [])
+            if isinstance(agents, str):
+                try:
+                    agents = json.loads(agents)
+                except Exception:
+                    agents = []
+
+            digest = build_phase_digest(
+                phase_id=phase_id or f"phase-{idx}",
+                phase_name=phase.get("phase_name", phase.get("name", phase_id or f"Phase {idx+1}")),
+                pattern=phase.get("pattern_id", "unknown"),
+                status=status,
+                agents=agents if isinstance(agents, list) else [],
+                quality=phase.get("quality_score", 0) or 0,
+                messages=all_msgs,  # use all messages as fallback
+                duration_s=0,
+            )
+            store_phase_summary(session_id, digest)
+            backfilled += 1
+            logger.warning(
+                "PHASE_MEMORY backfilled phase=%s for mission=%s",
+                phase_id, mission_id,
+            )
+
+        return backfilled
+    except Exception as exc:
+        logger.error("PHASE_MEMORY backfill failed: %s", exc)
+        return 0
+    finally:
+        db.close()

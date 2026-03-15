@@ -502,6 +502,18 @@ class EpicOrchestrator:
         MAX_RELOOPS = 2
         reloop_errors = []
 
+        # ── Crash-recovery: backfill missing phase summaries ──────
+        try:
+            from ..llm.phase_memory import backfill_missing_summaries
+            _backfilled = backfill_missing_summaries(mission.id, session_id)
+            if _backfilled:
+                logger.warning(
+                    "PHASE_MEMORY backfilled %d missing summaries for mission=%s",
+                    _backfilled, mission.id,
+                )
+        except Exception as _bf_err:
+            logger.error("PHASE_MEMORY backfill error: %s", _bf_err)
+
         # Evidence gate: acceptance criteria for dev phases
         from ..services.evidence import (
             format_evidence_report,
