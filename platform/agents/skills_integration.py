@@ -4,6 +4,9 @@ Skills Injection Integration - Bridge between agent loop and skills injection sy
 
 Integrates automatic skills injection into the agent execution loop.
 Called from AgentLoop._build_execution_context() to enrich agent prompts.
+
+Superpowers-inspired auto-trigger: skills fire based on task context
+(debug, review, implement, plan) without explicit invocation.
 """
 # Ref: feat-skills
 
@@ -11,6 +14,55 @@ import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Superpowers-style context patterns — mandatory skills by task phase
+# These activate automatically based on mission_description keywords.
+# Inspired by obra/superpowers: mandatory workflows, not suggestions.
+# ---------------------------------------------------------------------------
+_CONTEXT_PATTERNS: dict[str, list[str]] = {
+    # Phase → skill IDs auto-injected when mission matches
+    "debug": [
+        "systematic-debugging",      # 4-phase root cause process
+        "debugging-strategies",      # debug methodology
+        "ac-adversarial",            # quality gates
+    ],
+    "review": [
+        "code-review",               # review checklist
+        "ac-adversarial-v2",         # adversarial quality check
+        "ac-security",               # security review
+    ],
+    "implement": [
+        "automated-testing",         # TDD enforcement
+        "software-architecture",     # arch patterns
+    ],
+    "plan": [
+        "ac-architect",              # architecture supervision
+        "architecture-design",       # design guidance
+    ],
+    "test": [
+        "automated-testing",         # test methodology
+        "debugging-strategies",      # debug failing tests
+    ],
+    "security": [
+        "ac-security",               # security review
+        "api-security-testing",      # vulnerability patterns
+    ],
+    "deploy": [
+        "ac-cicd",                   # CI/CD checks
+    ],
+}
+
+# Keyword → context phase mapping (lowercased)
+_PHASE_KEYWORDS: dict[str, list[str]] = {
+    "debug": ["debug", "bug", "fix", "error", "crash", "failure", "broken", "traceback", "exception"],
+    "review": ["review", "audit", "inspect", "quality", "critique", "veto", "approve"],
+    "implement": ["implement", "build", "create", "develop", "code", "feature", "sprint"],
+    "plan": ["plan", "design", "architect", "spec", "inception", "brainstorm"],
+    "test": ["test", "tdd", "coverage", "assertion", "pytest", "jest", "playwright"],
+    "security": ["security", "vulnerability", "cve", "owasp", "pentest", "injection", "xss"],
+    "deploy": ["deploy", "release", "pipeline", "ci/cd", "staging", "production"],
+}
 
 # ---------------------------------------------------------------------------
 # Session-scoped skills cache — tracks injected skills per session for traceability
@@ -121,25 +173,61 @@ def _trigger_and_fallback_prompt(
 ) -> str:
     """
     Build skills prompt by combining:
+    - Context-pattern skills (auto-triggered by task phase detection)
     - Manually declared skills (fallback_skills from agent YAML)
     - Trigger-matched skills from mission_description
-    Deduplicates by skill ID; declared skills always included.
+    Deduplicates by skill ID; context patterns always included first.
     """
+    # 1. Auto-trigger: detect context phase and inject mandatory skills
+    context_ids: list[str] = []
+    if mission_description:
+        phases = _detect_context_phase(mission_description)
+        for phase in phases:
+            for sid in _CONTEXT_PATTERNS.get(phase, []):
+                if sid not in context_ids:
+                    context_ids.append(sid)
+        if context_ids:
+            logger.info("Context auto-trigger [%s]: %s", ",".join(phases), context_ids)
+
+    # 2. Declared skills from agent YAML
     declared_ids = list(fallback_skills or [])
+
+    # 3. Trigger-matched skills from keyword analysis
     trigger_ids = _match_skills_by_trigger(mission_description) if mission_description else []
 
-    # Merge: declared first, then trigger-matched that aren't already listed
-    all_ids = declared_ids + [sid for sid in trigger_ids if sid not in declared_ids]
+    # Merge: context-patterns first, then declared, then trigger-matched (deduped)
+    all_ids: list[str] = list(context_ids)
+    for sid in declared_ids:
+        if sid not in all_ids:
+            all_ids.append(sid)
+    for sid in trigger_ids:
+        if sid not in all_ids:
+            all_ids.append(sid)
 
     if not all_ids:
         return ""
 
-    injected = list(trigger_ids)
+    injected = [sid for sid in (context_ids + trigger_ids) if sid not in declared_ids]
     if injected:
-        logger.info("Trigger-matched skills for mission: %s", injected)
+        logger.info("Auto-injected skills: %s", injected)
 
     _cache_skills(session_id, all_ids)
     return _load_skills_prompt(all_ids, context_tier)
+
+
+def _detect_context_phase(text: str) -> list[str]:
+    """
+    Detect task phase from mission text. Returns matching phase names.
+    Superpowers-inspired: mandatory skill activation by context.
+    """
+    if not text:
+        return []
+    text_lower = text.lower()
+    phases = []
+    for phase, keywords in _PHASE_KEYWORDS.items():
+        if any(kw in text_lower for kw in keywords):
+            phases.append(phase)
+    return phases
 
 
 def _match_skills_by_trigger(mission_description: str) -> list[str]:

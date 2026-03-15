@@ -270,7 +270,74 @@ async def run_fractal_worktree(engine, run, task: str) -> None:
         f"- **{leaf.task[:60]}**: {leaf.result[:120]}..."
         for leaf in leaves if leaf.result
     )
+
+    # ── Phase 3: Finish — merge/PR/keep/discard per branch ──
+    branches_created = [leaf.branch for leaf in leaves if leaf.branch]
+    if branches_created and repo_path:
+        finish_summary = await _finish_worktree_branches(repo_path, branches_created, session_id)
+        results_summary += f"\n\n**Branch status:**\n{finish_summary}"
+
     await _sse(run, {
         "type": "message",
-        "content": f"✅ **Fractal complete** — {len(leaves)} tasks executed\n\n{results_summary}",
+        "content": f"**Fractal complete** — {len(leaves)} tasks executed\n\n{results_summary}",
     })
+
+
+async def _finish_worktree_branches(
+    repo_path: str,
+    branches: list[str],
+    session_id: str,
+) -> str:
+    """
+    Finish workflow for fractal worktree branches.
+    Inspired by obra/superpowers finishing-a-development-branch.
+
+    Auto-merges branches where tests pass; keeps others for manual review.
+    """
+    results = []
+    for branch in branches:
+        try:
+            # Check if branch has commits ahead of main
+            diff_result = subprocess.run(
+                ["git", "-C", repo_path, "log", "--oneline", f"main..{branch}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            commits = diff_result.stdout.strip().splitlines() if diff_result.returncode == 0 else []
+
+            if not commits:
+                # No commits — discard empty branch
+                subprocess.run(
+                    ["git", "-C", repo_path, "branch", "-D", branch],
+                    capture_output=True, timeout=10,
+                )
+                results.append(f"- `{branch}`: discarded (no commits)")
+                continue
+
+            # Check for merge conflicts
+            merge_check = subprocess.run(
+                ["git", "-C", repo_path, "merge-tree", "--write-tree", "main", branch],
+                capture_output=True, text=True, timeout=10,
+            )
+
+            if merge_check.returncode == 0:
+                # Clean merge possible — auto-merge
+                subprocess.run(
+                    ["git", "-C", repo_path, "merge", "--no-ff", branch,
+                     "-m", f"fractal: merge {branch} ({len(commits)} commits)"],
+                    capture_output=True, timeout=15,
+                )
+                # Clean up branch
+                subprocess.run(
+                    ["git", "-C", repo_path, "branch", "-d", branch],
+                    capture_output=True, timeout=10,
+                )
+                results.append(f"- `{branch}`: merged ({len(commits)} commits)")
+            else:
+                # Conflicts — keep branch for manual resolution
+                results.append(f"- `{branch}`: kept (merge conflicts, {len(commits)} commits)")
+
+        except Exception as exc:
+            results.append(f"- `{branch}`: error ({exc})")
+            logger.warning("Worktree finish failed for %s: %s", branch, exc)
+
+    return "\n".join(results) if results else "No branches to finish"
