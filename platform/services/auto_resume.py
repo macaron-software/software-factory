@@ -305,20 +305,15 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     try:
         _slot_db = get_db()
-        # Only count recent missions (last 48h) as inflight — old paused zombies
-        # should not block new launches.
-        _counts = _slot_db.execute(
-            "SELECT status, COUNT(*) FROM epic_runs "
-            "WHERE status IN ('running','paused') "
-            "AND updated_at >= datetime('now', '-48 hours') "
-            "GROUP BY status"
-        ).fetchall()
+        # Only count RUNNING missions — paused missions are not consuming
+        # resources (no active orchestrator task, no rate limit usage).
+        _row = _slot_db.execute(
+            "SELECT COUNT(*) FROM epic_runs WHERE status = 'running'"
+        ).fetchone()
         _slot_db.close()
+        _currently_running = _row[0] if _row else 0
     except Exception:
-        _counts = []
-
-    _currently_running = sum(n for s, n in _counts if s == "running")
-    _currently_inflight = sum(n for _, n in _counts)   # running + paused (recent only)
+        _currently_running = 0
 
     if _max_run > 0 and _currently_running >= _max_run:
         logger.warning(
@@ -327,17 +322,10 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         )
         return 0
 
-    if _max_q > 0 and _currently_inflight >= _max_q:
-        logger.warning(
-            "auto_resume: slot gate — inflight=%d >= max_queued=%d, deferring",
-            _currently_inflight, _max_q,
-        )
-        return 0
-
     # How many launches are allowed this cycle?
     _launch_budget = min(
         (_max_run - _currently_running) if _max_run > 0 else len(to_resume),
-        (_max_q   - _currently_inflight) if _max_q  > 0 else len(to_resume),
+        len(to_resume),
     )
     to_resume = to_resume[:_launch_budget]
     # ------------------------------------------------------------------------
@@ -690,6 +678,10 @@ async def handle_failed_runs(*, at_startup: bool = False) -> int:
                 AND (updated_at IS NULL OR updated_at < datetime('now', '-30 minutes'))
             """)
         phantom_count = phantom.rowcount
+        logger.warning(
+            "handle_failed_runs: at_startup=%s, phantom_count=%d",
+            at_startup, phantom_count,
+        )
         if phantom_count:
             db.commit()
             logger.warning(
