@@ -1,7 +1,7 @@
 # SF Platform — Quick Ref
 
 ## WHAT
-Multi-agent SAFe orch. ~324 agents · 26 patterns · 69 wf · 32 phase tpl · 54 tool mods · 2389 skills.
+Multi-agent SAFe orch. ~324 agents · 26 patterns · 69 wf · 32 phase tpl · 55 tool mods · 2389 skills.
 FastAPI+HTMX+SSE. PG16(62tbl)+Redis7. 375py/148KLOC. Port 8099(dev)/8090(prod).
 
 ## ALWAYS — Start of Session
@@ -40,6 +40,7 @@ platform/                    375py 148KLOC
                              skills_integration — 3-tier: context->declared->trigger
                              subagent_prompts — implementer/spec-reviewer/code-quality/finish
                              pua — L0-L4 pressure · retry · debug methodology
+                             cognitive — 4-layer: atoms(7)×archetypes(8)×figures(15)×pressure(L0-L4)
                              selection(Thompson) · evolution(GA) · rl(Q) · darwin · skill_broker
   patterns/engine.py         26 topo: solo seq par loop hier net router aggr wave hitl mr bb
                              fractal_{qa,stories,tests,worktree} backprop
@@ -50,7 +51,7 @@ platform/                    375py 148KLOC
   security/                  prompt_guard · output_validator · audit · sanitize
   auth/                      service(JWT+bcrypt) · middleware(RBAC) · ses(AWS SES)
   db/                        adapter(PG+SQLite) · schema(62tbl) · migrations · tenant
-  tools/(54)                 code git deploy build web sec mem mcp trace ast lint lsp ds
+  tools/(55)                 code git deploy build web sec mem mcp trace ast lint lsp ds worktree
   ops/(17)                   auto_heal · traceability · knowledge · project_audit
   web/routes/                missions pages sessions wf agents projects auth · tpl(124)
 skills/                      2389 skills (139 YAML + GitHub cache)
@@ -76,6 +77,47 @@ JWT+bcrypt. Cookie: access 15min + refresh 7d. Rate limit: 5/60s per IP.
 POST /api/auth/login · /register · /refresh · /logout · /forgot-password · /reset-password
 OAuth: GitHub(/auth/github) · Azure AD(/auth/azure) · Demo(/api/auth/demo)
 
+## Cognitive Architecture (agents/cognitive.py)
+4-layer composable profiles. All 324 agents assigned. AgentCeption-inspired (MIT).
+
+### Layers
+```
+L0: Atoms (7)       epistemic_style · cognitive_rhythm · uncertainty_handling
+                     collaboration_posture · creativity_level · quality_bar · scope_instinct
+L1: Archetypes (8)   architect scholar pragmatist hacker guardian mentor operator visionary
+L2: Figures (15)     turing von_neumann dijkstra knuth hopper linus_torvalds kent_beck
+                     rob_pike guido_van_rossum feynman martin_fowler bruce_schneier
+                     don_norman steve_jobs jeff_dean
+L3: Pressure (L0-L4) PUA-driven atom shifting under consecutive failures
+```
+
+### Syntax
+`"pragmatist"` · `"turing,don_norman"` (blend, last-wins) · `"hacker+quality_bar=craftsperson"` (override)
+
+### API
+`resolve_cognitive_arch(str)` -> CognitiveProfile · `render_cognitive_prompt(profile)` -> str
+`apply_pressure_shift(profile, level)` -> CognitiveProfile (overrides survive)
+`infer_archetype_for_role(role)` -> str (49 patterns, longest-match)
+`diff_profiles(a, b)` · `cognitive_ab_variants(a, b)` — A/B testing
+
+### Distribution: pragmatist:216 mentor:45 scholar:23 visionary:12 operator:12 architect:11 guardian:4 hacker:1
+
+### Pressure Shifts
+L1→iterative · L2→+conservative,pragmatic · L3→+minimal,conservative · L4→deep_focus,perfectionist,consultative
+
+## PUA — Pressure Unified Architecture (pua.py)
+`get_pressure_level(fails)` -> int (0=L0..4=L4)
+L0(0-1) · L1(2)=switch · L2(3)=root-cause · L3(4)=7pt · L4(5+)=escalate
+`build_retry_prompt(task=, feedback=, consecutive_failures=, agent_name=)`
+
+## Git Worktree Isolation
+`git_worktree` tool: create/list/remove. 11 git tools total.
+Fractal pattern: decompose → parallel worktrees → auto-merge clean branches.
+
+## LSP Tools (tools/lsp_tools.py)
+10 tools: 7 Python (definition refs diagnostics symbols call_hierarchy rename hover) + 3 TS.
+Backend: Jedi. 400-3600x faster than grep. Params: `file` (not file_path), absolute paths.
+
 ## Superpowers (obra/superpowers-inspired)
 
 ### Context Auto-Trigger (agents/skills_integration.py)
@@ -93,15 +135,37 @@ OAuth: GitHub(/auth/github) · Azure AD(/auth/azure) · Demo(/api/auth/demo)
 Phase 3: `_finish_worktree_branches(repo, branches, session)`
 Auto-merge clean · keep conflicting · discard empty.
 
-## PUA — Pressure Unified Architecture (pua.py)
-`get_pressure_level(fails)` -> int (0=L0..4=L4)
-L0(0-1) · L1(2)=switch · L2(3)=root-cause · L3(4)=7pt · L4(5+)=escalate
-`build_retry_prompt(task=, feedback=, consecutive_failures=, agent_name=)`
-
 ## Skills Tiered Loading (llm/context_tiers.py)
 L0=120ch · L1=600ch · L2=1500ch
 `select_tier(hierarchy_rank=, capability_grade=, task_type=)` -> ContextTier
 `format_skill_tiered(name, content, tier)` -> str
+
+## Traceability — UUID-Linked (live PG → session SQLite)
+
+### UUID Scheme
+Features: `feat-{id}` (676) · Stories: `us-{id}` (248) · ACs: `ac-{id}` (193)
+Personas: `p-{role}` (16) · Trace links: `tl-{type}-{id}` (590)
+
+### E2E Chain (8 layers · 70 integrity tests)
+Persona(16) → Feature(676) → Story(248) → AC(193, Gherkin)
+→ IHM(43) → Code(45) → UnitTest(17) → E2E(14)
++ CRUD(655: 403G/202P/27D/13PA/10PU) + RBAC(49/49)
+
+### Cognitive Arch Traceability (100%)
+7 features · 21 stories · 39 ACs · 24 trace links · 42/42 tests
+cognitive.py · prompt_builder.py · store.py · pua.py · git_tools.py · migrations.py
+
+### Session SQLite Tables
+| Table | Rows | Key Columns |
+|-------|------|-------------|
+| features | 676 | id,name,status,story_count,ac_count,has_{ihm,code,unit_test,e2e,crud,rbac},coverage_pct |
+| user_stories | 248 | id,title,feature_id(FK),status,ac_count |
+| acceptance_criteria | 193 | id,feature_id,story_id(FK),title,given/when/then_text,status |
+| personas | 16 | id,name,role,feature_count |
+| trace_links | 590 | id,source_type,source_id,target_type,target_id,link_type,verified |
+| traceability_matrix | 27 | id,layer,total,covered,pct,details |
+
+### Annotations: .py=`# Ref: feat-*` · .html=`<!-- Ref: feat-* -->` · .ts=`// Ref: feat-*`
 
 ## Lighthouse — 100/100/100/91+
 GZipMiddleware(capital Z) · meta description · /robots.txt · heading hierarchy · contrast 4.5:1+
@@ -112,32 +176,6 @@ on_complete: 41 wf auto-chain. Checkpoint: quality<50% retry. Cap: 20.
 
 NEVER done if: build fail · tests fail · src<3 · adversarial reject(>=7) · AC unresolved
   · frontend missing design-system/ux-review · responsive/themes/WCAG missing
-
-## Traceability — UUID-Linked (live PG -> session SQLite)
-
-### UUID Scheme
-Features: `feat-{uuid}` (669) · Stories: `us-{uuid8}` (227) · ACs: `ac-{uuid8}` (154)
-Personas: `p-{role}` (16) · Trace links: `tl-{type}-{uuid8}` (566)
-
-### E2E Chain (8 layers · 28 integrity tests)
-Persona(16) -> Feature(669) -> Story(227) -> AC(154, Gherkin)
--> IHM(43) -> Code(38) -> UnitTest(17) -> E2E(14)
-+ CRUD(655: 403G/202P/27D/13PA/10PU) + RBAC(49/49)
-
-### Session SQLite Tables
-| Table | Rows | Key Columns |
-|-------|------|-------------|
-| features | 669 | id,name,status,story_count,ac_count,has_{ihm,code,unit_test,e2e_test,crud,rbac},coverage_pct |
-| user_stories | 227 | id,title,feature_id(FK),status,ac_count |
-| acceptance_criteria | 154 | id,feature_id,story_id(FK),title,given/when/then_text,status |
-| personas | 16 | id,name,role,feature_count |
-| trace_links | 566 | id,source_type,source_id,target_type,target_id,link_type,verified |
-| traceability_matrix | 14 | id,layer,total,covered,pct,details |
-
-### Gaps
-Feature->Story: 70/669 (10.5%) · Story->AC: 154/227 (67.8%)
-Fully traced (all 8 layers): 8 features
-Annotations: .py=`# Ref: feat-*` · .html=`<!-- Ref: feat-* -->` · .ts=`// Ref: feat-*`
 
 ## Quality Gates (17)
 1-4 HARD: guardrails · veto · prompt_inject · tool_acl
@@ -175,3 +213,5 @@ OVH: blue-green slots/{blue,green}/ · Azure: systemd sf-platform · az vm run-c
 - PG advisory lock conn-scoped · Container: /app/macaron_platform/
 - SSE: `curl --max-time` · GZipMiddleware(capital Z)
 - AgentStore: DB agents = bare-string persona; YAML = PersonaConfig dict
+- LSP: `file` param not `file_path` · absolute paths · jedi>=0.19.0
+- Cognitive: figures tried before archetypes · `resolve("")` = empty (no crash)
