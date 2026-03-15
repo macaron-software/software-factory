@@ -327,16 +327,19 @@ async def lifespan(app: FastAPI):
 
         _loop = _a.get_event_loop()
         _prov_count = 0
-        for proj in ps.list_all():
-            try:
-                created = await _loop.run_in_executor(None, ps.heal_epics, proj)
-                _prov_count += len(created)
-            except Exception as e:
-                logger.warning("heal_epics failed for %s: %s", proj.id, e)
-        if _prov_count:
-            logger.warning(
-                "heal_epics: created %d missions across all projects", _prov_count
-            )
+        if os.environ.get("HEAL_EPICS", "1") != "0":
+            for proj in ps.list_all():
+                try:
+                    created = await _loop.run_in_executor(None, ps.heal_epics, proj)
+                    _prov_count += len(created)
+                except Exception as e:
+                    logger.warning("heal_epics failed for %s: %s", proj.id, e)
+            if _prov_count:
+                logger.warning(
+                    "heal_epics: created %d missions across all projects", _prov_count
+                )
+        else:
+            logger.warning("heal_epics: DISABLED via HEAL_EPICS=0")
 
         # Scaffold all projects: ensure workspace + git + docker + docs + code exist
         from .projects.manager import heal_all_projects as _heal

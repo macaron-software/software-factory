@@ -665,10 +665,14 @@ async def handle_failed_runs(*, at_startup: bool = False) -> int:
         # At startup: ALL running missions are orphans (no tasks survived restart).
         # During normal operation: only stale >30min (avoid interfering with active tasks).
         if at_startup:
+            # Grace period: don't pause missions created/updated in the last 120s
+            # to avoid killing missions that were just launched after server start
             phantom = db.execute("""
                 UPDATE epic_runs SET status='paused', updated_at=datetime('now')
                 WHERE status = 'running'
                 AND workflow_id IS NOT NULL
+                AND (created_at IS NULL OR created_at < datetime('now', '-120 seconds'))
+                AND (updated_at IS NULL OR updated_at < datetime('now', '-120 seconds'))
             """)
         else:
             phantom = db.execute("""
