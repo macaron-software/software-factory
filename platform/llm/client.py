@@ -316,8 +316,24 @@ class LLMClient:
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = httpx.AsyncClient(timeout=300.0)
+            self._http = httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0),
+                limits=httpx.Limits(
+                    max_connections=30,
+                    max_keepalive_connections=5,
+                    keepalive_expiry=30.0,
+                ),
+            )
         return self._http
+
+    async def _reset_http(self):
+        """Close and recreate the HTTP client to clear stale connections."""
+        if self._http and not self._http.is_closed:
+            try:
+                await self._http.aclose()
+            except Exception:
+                pass
+        self._http = None
 
     async def close(self):
         if self._http and not self._http.is_closed:
@@ -611,6 +627,10 @@ class LLMClient:
                         is_transient or (is_rate_limit and not _is_azure)
                     ):
                         import random
+
+                        # Reset HTTP client on connection errors to clear stale pool
+                        if is_transient and not is_rate_limit:
+                            await self._reset_http()
 
                         # Exponential backoff with jitter: 10s, 20s, 40s, 80s
                         base = (2**attempt) * (10 if is_rate_limit else 3)
@@ -987,6 +1007,10 @@ class LLMClient:
                     ):
                         import random
 
+                        # Reset HTTP client on connection errors to clear stale pool
+                        if is_transient and not is_rate_limit:
+                            await self._reset_http()
+
                         delay = min((2**attempt) * 10 + random.uniform(0, 5), 90)
                         logger.warning(
                             "LLM stream %s/%s %s (attempt %d/%d) — retrying in %ds",
@@ -1114,7 +1138,7 @@ class LLMClient:
 
         # Use a separate client for streaming to avoid blocking the shared client
         stream_http = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+            timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
         )
         try:
             async with stream_http.stream(
