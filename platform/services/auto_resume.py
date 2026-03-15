@@ -125,7 +125,7 @@ async def auto_resume_epics() -> None:
 
     # First: repair all failed runs (reset to paused + create TMA incidents)
     try:
-        await handle_failed_runs()
+        await handle_failed_runs(at_startup=True)
     except Exception as e:
         logger.error("auto_resume: handle_failed_runs error: %s", e)
 
@@ -651,12 +651,16 @@ _TMA_WORKFLOW_ID = "tma-maintenance"
 _MAX_RETRIES = 3  # after that, don't auto-retry
 
 
-async def handle_failed_runs() -> int:
+async def handle_failed_runs(*, at_startup: bool = False) -> int:
     """
     Repair failed epic_runs so the watchdog can retry them.
     - Init failures (no progress) → reset to paused, reset pending phases
     - Phase failures (had progress) → reset to paused + create TMA incident run
-    - Phantom running runs (stale > 30min) → reset to paused immediately
+    - Phantom running runs → reset to paused so watchdog picks them up
+
+    at_startup=True: reset ALL running missions (no active tasks survive restart).
+    at_startup=False: only reset stale >30min (normal watchdog cycle).
+
     Called once at startup (before the watchdog loop starts retrying paused runs).
     Returns number of runs repaired.
     """
@@ -664,13 +668,22 @@ async def handle_failed_runs() -> int:
 
     db = get_db()
     try:
-        # First: reset phantom running runs (stale > 30min) → paused so watchdog picks them up
-        phantom = db.execute("""
-            UPDATE epic_runs SET status='paused', updated_at=datetime('now')
-            WHERE status = 'running'
-            AND workflow_id IS NOT NULL
-            AND (updated_at IS NULL OR updated_at < datetime('now', '-30 minutes'))
-        """)
+        # Reset phantom running runs → paused so watchdog picks them up.
+        # At startup: ALL running missions are orphans (no tasks survived restart).
+        # During normal operation: only stale >30min (avoid interfering with active tasks).
+        if at_startup:
+            phantom = db.execute("""
+                UPDATE epic_runs SET status='paused', updated_at=datetime('now')
+                WHERE status = 'running'
+                AND workflow_id IS NOT NULL
+            """)
+        else:
+            phantom = db.execute("""
+                UPDATE epic_runs SET status='paused', updated_at=datetime('now')
+                WHERE status = 'running'
+                AND workflow_id IS NOT NULL
+                AND (updated_at IS NULL OR updated_at < datetime('now', '-30 minutes'))
+            """)
         phantom_count = phantom.rowcount
         if phantom_count:
             db.commit()
