@@ -70,6 +70,7 @@ class PatternRun:
     project_id: str = ""
     project_path: str = ""  # workspace filesystem path for tools
     phase_id: str = ""  # mission phase_id for SSE routing
+    phase_config: dict = field(default_factory=dict)  # per-phase config from workflow YAML
     nodes: dict[str, NodeState] = field(default_factory=dict)
     iteration: int = 0
     max_iterations: int = 5
@@ -686,6 +687,7 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
+    phase_config: dict | None = None,
     lineage: list[str] | None = None,
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
@@ -695,6 +697,7 @@ async def run_pattern(
         project_id=project_id,
         project_path=project_path,
         phase_id=phase_id,
+        phase_config=phase_config or {},
         max_iterations=pattern.config.get("max_iterations", 5),
     )
     # Lineage context: prepend to initial_task so agents know their place in the workflow
@@ -1854,19 +1857,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
 async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionContext:
     """Build execution context for a node's agent."""
     store = get_session_store()
-    history = store.get_messages(run.session_id, limit=30)
-    history_dicts = [
-        {
-            "from_agent": m.from_agent,
-            "content": m.content,
-            "message_type": m.message_type,
-        }
-        for m in history
-    ]
-
-    project_context = ""
-    vision = ""
-    project_path = ""
 
     # ── Compute context tier early (before memory loads) ──────────
     from ..llm.context_tiers import (
@@ -1886,6 +1876,36 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         task_type=task_type,
     )
     tier_budget = TierBudget.for_tier(tier)
+
+    # ── Tier-based history limits ─────────────────────────────────
+    # Producers (devs) need full history; coordinators/reviewers need less.
+    # This saves ~40% of input tokens for non-producing agents.
+    _COORD_TAGS = {"orchestrator", "coordination", "safe", "art", "planning"}
+    agent_tags = set(getattr(agent, "tags", []) or [])
+    is_coordinator = bool(agent_tags & _COORD_TAGS) or cap_grade == "organizer"
+    is_reviewer = task_type == "review"
+    is_producer = not is_coordinator and not is_reviewer
+
+    if is_producer:
+        history_limit = 30   # full history for code-producing agents
+    elif is_reviewer:
+        history_limit = 15   # reviewers need recent context but not everything
+    else:
+        history_limit = 8    # coordinators (RTE, SRE, brain) get minimal history
+
+    history = store.get_messages(run.session_id, limit=history_limit)
+    history_dicts = [
+        {
+            "from_agent": m.from_agent,
+            "content": m.content,
+            "message_type": m.message_type,
+        }
+        for m in history
+    ]
+
+    project_context = ""
+    vision = ""
+    project_path = ""
 
     if run.project_id:
         try:
@@ -2072,14 +2092,16 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         savings = tier_savings_estimate(len(agent.skills), tier)
         logger.warning(
             "CONTEXT_TIER agent=%s tier=%s cap=%s task=%s "
-            "skills=%d saved_tok=%d (%d%%)",
+            "skills=%d saved_tok=%d (%d%%) history=%d/%s",
             agent.id, tier.value, cap_grade, task_type,
             len(agent.skills), savings["saved_tokens"], savings["savings_pct"],
+            history_limit, "producer" if is_producer else "reviewer" if is_reviewer else "coordinator",
         )
     else:
         logger.warning(
-            "CONTEXT_TIER agent=%s tier=%s cap=%s task=%s skills=0",
+            "CONTEXT_TIER agent=%s tier=%s cap=%s task=%s skills=0 history=%d/%s",
             agent.id, tier.value, cap_grade, task_type,
+            history_limit, "producer" if is_producer else "reviewer" if is_reviewer else "coordinator",
         )
 
     return ExecutionContext(
@@ -2094,6 +2116,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         tools_enabled=tools_for_agent,
         allowed_tools=allowed_tools,
         context_tier=tier.value,
+        phase_config=run.phase_config,
     )
 
 

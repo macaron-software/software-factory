@@ -113,6 +113,8 @@ class ExecutionContext:
     max_rounds: int = 0
     # Files written by code_write/code_edit during this execution (for auto-commit)
     code_files_written: list[str] = field(default_factory=list)
+    # Phase-level config (from workflow YAML phase.config)
+    phase_config: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -766,9 +768,24 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode
             )
 
-            # Per-project LLM overrides (e.g. disable_thinking for token savings)
+            # Per-phase, per-agent, or per-project LLM overrides (hybrid thinking)
+            # Priority: phase_config > agent tags > project config
             _project_disable_thinking = None
-            if ctx.project_id:
+            if ctx.phase_config and ctx.phase_config.get("disable_thinking"):
+                _project_disable_thinking = True
+            else:
+                # Auto-infer: coordinators and reviewers don't need thinking
+                _agent_tags = set(getattr(agent, "tags", []) or [])
+                _NOTHINK_TAGS = {"orchestrator", "coordination", "safe", "art", "planning",
+                                 "review", "quality", "audit"}
+                _agent_role = (agent.role or "").lower()
+                _NOTHINK_ROLES = ("coordinator", "orchestrat", "rte", "sre",
+                                  "review", "audit", "critic")
+                if (_agent_tags & _NOTHINK_TAGS or
+                        any(r in _agent_role for r in _NOTHINK_ROLES)):
+                    _project_disable_thinking = True
+
+            if _project_disable_thinking is None and ctx.project_id:
                 try:
                     from ..projects.manager import get_project_store
                     _proj = get_project_store().get_by_id(ctx.project_id)
@@ -777,8 +794,6 @@ class AgentExecutor:
                 except Exception:
                     pass
 
-            # Tool-calling loop
-            deep_search_used = False
             for round_num in range(MAX_TOOL_ROUNDS):
                 # Sanitize tool pairs before every LLM call to prevent
                 # MiniMax HTTP 400 "tool result's tool id not found"
@@ -1360,9 +1375,22 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
-            # Per-project LLM overrides (e.g. disable_thinking for token savings)
+            # Per-phase, per-agent, or per-project LLM overrides (hybrid thinking)
             _project_disable_thinking = None
-            if ctx.project_id:
+            if ctx.phase_config and ctx.phase_config.get("disable_thinking"):
+                _project_disable_thinking = True
+            else:
+                _agent_tags = set(getattr(agent, "tags", []) or [])
+                _NOTHINK_TAGS = {"orchestrator", "coordination", "safe", "art", "planning",
+                                 "review", "quality", "audit"}
+                _agent_role = (agent.role or "").lower()
+                _NOTHINK_ROLES = ("coordinator", "orchestrat", "rte", "sre",
+                                  "review", "audit", "critic")
+                if (_agent_tags & _NOTHINK_TAGS or
+                        any(r in _agent_role for r in _NOTHINK_ROLES)):
+                    _project_disable_thinking = True
+
+            if _project_disable_thinking is None and ctx.project_id:
                 try:
                     from ..projects.manager import get_project_store
                     _proj = get_project_store().get_by_id(ctx.project_id)

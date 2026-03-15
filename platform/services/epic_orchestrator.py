@@ -993,6 +993,7 @@ class EpicOrchestrator:
                                     project_id=mission.project_id or mission.id,
                                     project_path=mission.workspace_path,
                                     phase_id=phase.phase_id,
+                                    phase_config=cfg,
                                 ),
                                 timeout=PHASE_TIMEOUT,
                             )

@@ -12,6 +12,7 @@ phases:
     parcours utilisateur. L'Architecte évalue la faisabilité technique. Débat structuré puis synthèse par le PO.
   gate: always
   config:
+    disable_thinking: true
     agents:
     - metier
     - ux_designer
@@ -26,6 +27,7 @@ phases:
     GO, NOGO ou PIVOT.'
   gate: all_approved
   config:
+    disable_thinking: true
     agents:
     - strat-cpo
     - strat-cto
