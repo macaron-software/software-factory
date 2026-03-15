@@ -2,12 +2,18 @@
 """
 Cognitive Architecture for SF Platform agents.
 
-Inspired by AgentCeption (cgcardona/agentception, MIT).
-Composable cognitive profiles: atoms × archetypes × skills → prompt injection.
+4-layer composable cognitive profiles inspired by AgentCeption (MIT):
+  Layer 0: Atoms — primitive cognitive dimensions (7 axes)
+  Layer 1: Archetypes — abstract thinking styles (8 types)
+  Layer 2: Figures — historical thinkers extending archetypes (15 curated)
+  Layer 3: Pressure adaptation — PUA-driven dynamic atom shifting
 
 Usage:
-    profile = resolve_cognitive_arch("analyst,pragmatist")
-    prompt_block = render_cognitive_prompt(profile)
+    profile = resolve_cognitive_arch("pragmatist")           # archetype
+    profile = resolve_cognitive_arch("turing,don_norman")     # figure blending
+    profile = resolve_cognitive_arch("turing+quality_bar=pragmatic")  # override
+    prompt  = render_cognitive_prompt(profile)
+    shifted = apply_pressure_shift(profile, pressure_level=3) # PUA adaptation
 """
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Atom Definitions ─────────────────────────────────────────────────────────
+# ── Layer 0: Atom Definitions ────────────────────────────────────────────────
 # Each atom is a cognitive dimension with typed values.
 # Values contribute prompt fragments to shape agent reasoning.
 
@@ -69,7 +75,7 @@ ATOMS: dict[str, dict[str, str]] = {
 ATOM_NAMES = list(ATOMS.keys())
 
 
-# ── Archetypes ───────────────────────────────────────────────────────────────
+# ── Layer 1: Archetypes ──────────────────────────────────────────────────────
 # Abstract thinking styles. Each defines default atom values.
 
 ARCHETYPES: dict[str, dict[str, str]] = {
@@ -148,14 +154,218 @@ ARCHETYPES: dict[str, dict[str, str]] = {
 }
 
 
+# ── Layer 2: Figures ─────────────────────────────────────────────────────────
+# Historical thinkers extending archetypes with specific atom overrides.
+# Each figure has: extends (base archetype), atom overrides, brief description.
+
+@dataclass
+class FigureDef:
+    extends: str
+    overrides: dict[str, str]
+    description: str = ""
+
+FIGURES: dict[str, FigureDef] = {
+    # --- Systems & Algorithms ---
+    "turing": FigureDef(
+        extends="architect",
+        overrides={"quality_bar": "perfectionist", "scope_instinct": "minimal"},
+        description="Core algorithms, type systems, formal computation.",
+    ),
+    "von_neumann": FigureDef(
+        extends="architect",
+        overrides={"cognitive_rhythm": "burst", "scope_instinct": "expansive"},
+        description="Systems-level thinking. Full problem in working memory.",
+    ),
+    "dijkstra": FigureDef(
+        extends="scholar",
+        overrides={"epistemic_style": "deductive", "quality_bar": "perfectionist",
+                   "collaboration_posture": "autonomous"},
+        description="Correctness-obsessed. Epistemic precision. Formal verification.",
+    ),
+    "knuth": FigureDef(
+        extends="scholar",
+        overrides={"cognitive_rhythm": "deep_focus", "quality_bar": "perfectionist"},
+        description="Algorithm implementation. Literate programming. Perfectionist.",
+    ),
+    # --- Pragmatic Builders ---
+    "hopper": FigureDef(
+        extends="pragmatist",
+        overrides={"collaboration_posture": "collaborative", "quality_bar": "pragmatic"},
+        description="Ship under constraints. Empirical. 'It's easier to ask forgiveness.'",
+    ),
+    "linus_torvalds": FigureDef(
+        extends="hacker",
+        overrides={"quality_bar": "craftsperson", "collaboration_posture": "directive"},
+        description="Decisive. High quality bar. Direct communication. Systems programming.",
+    ),
+    "kent_beck": FigureDef(
+        extends="pragmatist",
+        overrides={"cognitive_rhythm": "iterative", "creativity_level": "incremental"},
+        description="TDD. Red-green-refactor. Iterative. Extreme Programming.",
+    ),
+    "rob_pike": FigureDef(
+        extends="pragmatist",
+        overrides={"creativity_level": "conservative", "scope_instinct": "minimal"},
+        description="Simplicity. Less is more. Clear over clever.",
+    ),
+    "guido_van_rossum": FigureDef(
+        extends="pragmatist",
+        overrides={"quality_bar": "craftsperson", "creativity_level": "conservative"},
+        description="Readability counts. Explicit over implicit. One obvious way.",
+    ),
+    # --- Mentors & Communicators ---
+    "feynman": FigureDef(
+        extends="scholar",
+        overrides={"epistemic_style": "analogical", "creativity_level": "inventive",
+                   "collaboration_posture": "collaborative"},
+        description="Analogical thinker. Deep explanations. Teaching orientation.",
+    ),
+    "martin_fowler": FigureDef(
+        extends="mentor",
+        overrides={"epistemic_style": "inductive", "quality_bar": "craftsperson"},
+        description="Refactoring. Design patterns. Communicative architecture.",
+    ),
+    # --- Security & Defense ---
+    "bruce_schneier": FigureDef(
+        extends="guardian",
+        overrides={"epistemic_style": "deductive", "creativity_level": "conservative"},
+        description="Threat-model first. Trust nothing. Defense in depth.",
+    ),
+    # --- Product & Vision ---
+    "don_norman": FigureDef(
+        extends="architect",
+        overrides={"epistemic_style": "empirical", "creativity_level": "inventive",
+                   "collaboration_posture": "collaborative", "scope_instinct": "expansive"},
+        description="User-centered design. Affordances. Emotional design.",
+    ),
+    "steve_jobs": FigureDef(
+        extends="visionary",
+        overrides={"quality_bar": "perfectionist", "collaboration_posture": "directive"},
+        description="Taste-driven. Radical simplicity. Product excellence.",
+    ),
+    # --- Scale & Performance ---
+    "jeff_dean": FigureDef(
+        extends="architect",
+        overrides={"cognitive_rhythm": "burst", "uncertainty_handling": "aggressive",
+                   "scope_instinct": "expansive"},
+        description="Scale thinking. 10x solutions. Infrastructure that enables.",
+    ),
+}
+
+
+# ── Layer 3: Pressure Adaptation ─────────────────────────────────────────────
+# PUA pressure levels shift cognitive atoms to adapt agent behavior under stress.
+# Higher pressure → more conservative, focused, iterative.
+
+PRESSURE_SHIFTS: dict[int, dict[str, str]] = {
+    # L0: no shift (normal operation)
+    0: {},
+    # L1: light pressure — shift to iterative rhythm
+    1: {
+        "cognitive_rhythm": "iterative",
+    },
+    # L2: medium pressure — conservative + pragmatic
+    2: {
+        "cognitive_rhythm": "iterative",
+        "uncertainty_handling": "conservative",
+        "quality_bar": "pragmatic",
+    },
+    # L3: heavy pressure — minimal scope, conservative creativity
+    3: {
+        "cognitive_rhythm": "iterative",
+        "uncertainty_handling": "cautious",
+        "creativity_level": "conservative",
+        "quality_bar": "pragmatic",
+        "scope_instinct": "minimal",
+    },
+    # L4: critical — full defensive mode
+    4: {
+        "cognitive_rhythm": "deep_focus",
+        "uncertainty_handling": "cautious",
+        "creativity_level": "conservative",
+        "quality_bar": "perfectionist",
+        "scope_instinct": "minimal",
+        "collaboration_posture": "consultative",
+    },
+}
+
+
+# ── Role → Archetype Auto-Assignment ─────────────────────────────────────────
+# Map agent roles to default cognitive archetypes for bulk assignment.
+
+ROLE_ARCHETYPE_MAP: dict[str, str] = {
+    # Development
+    "developer": "pragmatist",
+    "dev": "pragmatist",
+    "engineer": "pragmatist",
+    "fullstack": "pragmatist",
+    "frontend": "pragmatist",
+    "backend": "pragmatist",
+    "worker": "pragmatist",
+    "implementer": "pragmatist",
+    "coder": "pragmatist",
+    # Architecture
+    "architect": "architect",
+    "architecte": "architect",
+    "tech_lead": "architect",
+    "lead_dev": "architect",
+    "cto": "visionary",
+    # Quality
+    "qa": "scholar",
+    "tester": "scholar",
+    "testeur": "scholar",
+    "qa_lead": "scholar",
+    "reviewer": "scholar",
+    "critic": "guardian",
+    "code-critic": "guardian",
+    # Security
+    "security": "guardian",
+    "pentester": "hacker",
+    "security-critic": "guardian",
+    "pentester-lead": "hacker",
+    # Ops
+    "devops": "operator",
+    "sre": "operator",
+    "ops": "operator",
+    "infra": "operator",
+    "dba": "operator",
+    # Management
+    "product": "mentor",
+    "po": "mentor",
+    "scrum_master": "mentor",
+    "rte": "operator",
+    "release_train_engineer": "operator",
+    "pm": "mentor",
+    "manager": "mentor",
+    # Design
+    "designer": "visionary",
+    "ux": "visionary",
+    "ui": "pragmatist",
+    # Strategy
+    "brain": "visionary",
+    "strategist": "visionary",
+    "innovation": "visionary",
+    # Documentation
+    "documenter": "mentor",
+    "tech_writer": "mentor",
+    # Data
+    "data_engineer": "pragmatist",
+    "data_scientist": "scholar",
+    "ml_engineer": "scholar",
+    "analyst": "scholar",
+}
+
+
 # ── Cognitive Profile ────────────────────────────────────────────────────────
 
 @dataclass
 class CognitiveProfile:
     """Resolved cognitive profile for an agent."""
     archetypes: list[str] = field(default_factory=list)
+    figures: list[str] = field(default_factory=list)
     atoms: dict[str, str] = field(default_factory=dict)
     overrides: dict[str, str] = field(default_factory=dict)
+    pressure_level: int = 0
 
     def get_atom(self, atom_name: str) -> Optional[str]:
         return self.atoms.get(atom_name)
@@ -168,14 +378,20 @@ class CognitiveProfile:
         return atom_def.get(value)
 
     def fingerprint(self) -> str:
-        """Short fingerprint: arch(atoms) e.g. 'pragmatist(empirical/iterative/pragmatic)'."""
-        arch_str = "+".join(self.archetypes) if self.archetypes else "custom"
+        """Short fingerprint e.g. 'turing(deductive/deep_focus/perfectionist)'."""
+        if self.figures:
+            name_str = "+".join(self.figures)
+        elif self.archetypes:
+            name_str = "+".join(self.archetypes)
+        else:
+            name_str = "custom"
         key_atoms = [
             self.atoms.get("epistemic_style", "?"),
             self.atoms.get("cognitive_rhythm", "?"),
             self.atoms.get("quality_bar", "?"),
         ]
-        return f"{arch_str}({'/'.join(key_atoms)})"
+        suffix = f"/P{self.pressure_level}" if self.pressure_level else ""
+        return f"{name_str}({'/'.join(key_atoms)}{suffix})"
 
 
 # ── Resolution ───────────────────────────────────────────────────────────────
@@ -184,15 +400,17 @@ def resolve_cognitive_arch(arch_string: str) -> CognitiveProfile:
     """
     Resolve a cognitive architecture string into a profile.
 
-    Format: "archetype1,archetype2" or "archetype1,archetype2+override_atom=value"
-    Examples:
-        "pragmatist"
-        "architect,scholar"
-        "hacker+quality_bar=craftsperson"
-        "guardian,pragmatist+creativity_level=inventive"
+    Supports archetypes, figures, blending, and overrides.
+    Figures are tried first; if not found, falls back to archetype lookup.
 
-    Blending: when multiple archetypes, last-wins for conflicting atoms.
-    Overrides: explicit atom=value after + sign, highest priority.
+    Format: "name1,name2+override_atom=value"
+    Examples:
+        "pragmatist"                          — single archetype
+        "architect,scholar"                   — blended archetypes (last-wins)
+        "turing"                              — figure (extends architect)
+        "turing,don_norman"                   — blended figures
+        "turing+quality_bar=pragmatic"        — figure with override
+        "hacker+quality_bar=craftsperson"     — archetype with override
     """
     if not arch_string or not arch_string.strip():
         return CognitiveProfile()
@@ -204,24 +422,35 @@ def resolve_cognitive_arch(arch_string: str) -> CognitiveProfile:
     if "+" in arch_string:
         arch_string, override_part = arch_string.split("+", 1)
 
-    # Parse archetype list
-    arch_names = [a.strip() for a in arch_string.split(",") if a.strip()]
+    # Parse name list
+    names = [a.strip() for a in arch_string.split(",") if a.strip()]
 
-    # Resolve atoms: walk archetypes, last-wins
+    # Resolve atoms: walk names (figure → archetype fallback), last-wins
     merged_atoms: dict[str, str] = {}
     valid_archs: list[str] = []
+    valid_figures: list[str] = []
 
-    for arch_name in arch_names:
-        arch_def = ARCHETYPES.get(arch_name)
-        if arch_def:
-            merged_atoms.update(arch_def)
-            valid_archs.append(arch_name)
+    for name in names:
+        fig_def = FIGURES.get(name)
+        if fig_def:
+            # Figure: first apply base archetype, then figure overrides
+            base = ARCHETYPES.get(fig_def.extends, {})
+            merged_atoms.update(base)
+            merged_atoms.update(fig_def.overrides)
+            valid_figures.append(name)
+            if fig_def.extends not in valid_archs:
+                valid_archs.append(fig_def.extends)
         else:
-            logger.warning("Unknown archetype %r — skipped", arch_name)
+            arch_def = ARCHETYPES.get(name)
+            if arch_def:
+                merged_atoms.update(arch_def)
+                valid_archs.append(name)
+            else:
+                logger.warning("Unknown archetype/figure %r — skipped", name)
 
-    # Apply explicit overrides
+    # Apply explicit overrides (only if we have a base profile to override)
     overrides: dict[str, str] = {}
-    if override_part:
+    if override_part and merged_atoms:
         for pair in override_part.split(","):
             if "=" in pair:
                 key, val = pair.split("=", 1)
@@ -234,9 +463,67 @@ def resolve_cognitive_arch(arch_string: str) -> CognitiveProfile:
 
     return CognitiveProfile(
         archetypes=valid_archs,
+        figures=valid_figures,
         atoms=merged_atoms,
         overrides=overrides,
     )
+
+
+def apply_pressure_shift(
+    profile: CognitiveProfile, pressure_level: int
+) -> CognitiveProfile:
+    """
+    Apply PUA pressure shift to a cognitive profile.
+
+    Higher pressure → more conservative, focused, iterative atoms.
+    Returns a new profile with shifted atoms (original untouched).
+    Explicit overrides are never shifted (user intent preserved).
+    """
+    if pressure_level <= 0:
+        return profile
+
+    level = min(pressure_level, 4)
+    shifts = PRESSURE_SHIFTS.get(level, {})
+    if not shifts:
+        return profile
+
+    new_atoms = dict(profile.atoms)
+    for atom, value in shifts.items():
+        # Never override explicit user overrides
+        if atom not in profile.overrides:
+            new_atoms[atom] = value
+
+    return CognitiveProfile(
+        archetypes=list(profile.archetypes),
+        figures=list(profile.figures),
+        atoms=new_atoms,
+        overrides=dict(profile.overrides),
+        pressure_level=level,
+    )
+
+
+def infer_archetype_for_role(role: str) -> str:
+    """
+    Infer the best cognitive archetype for a given agent role.
+
+    Checks ROLE_ARCHETYPE_MAP with progressive normalization:
+    exact match → lowercase → prefix match → default 'pragmatist'.
+    """
+    if not role:
+        return "pragmatist"
+
+    r = role.lower().strip().replace("-", "_")
+
+    # Exact match
+    if r in ROLE_ARCHETYPE_MAP:
+        return ROLE_ARCHETYPE_MAP[r]
+
+    # Partial/prefix match
+    for pattern, archetype in ROLE_ARCHETYPE_MAP.items():
+        if pattern in r or r in pattern:
+            return archetype
+
+    return "pragmatist"
 
 
 # ── Prompt Rendering ─────────────────────────────────────────────────────────
@@ -245,6 +532,7 @@ def render_cognitive_prompt(profile: CognitiveProfile) -> str:
     """
     Render cognitive profile as a markdown block for system prompt injection.
 
+    Includes figure descriptions if present.
     Returns empty string if profile has no atoms (no-op).
     """
     if not profile.atoms:
@@ -252,6 +540,13 @@ def render_cognitive_prompt(profile: CognitiveProfile) -> str:
 
     lines = [f"## Cognitive Profile [{profile.fingerprint()}]"]
 
+    # Figure descriptions
+    for fig_name in profile.figures:
+        fig_def = FIGURES.get(fig_name)
+        if fig_def and fig_def.description:
+            lines.append(f"*{fig_name.replace('_', ' ').title()}*: {fig_def.description}")
+
+    # Atom values
     for atom_name in ATOM_NAMES:
         value = profile.atoms.get(atom_name)
         if not value:
@@ -260,6 +555,11 @@ def render_cognitive_prompt(profile: CognitiveProfile) -> str:
         if fragment:
             label = atom_name.replace("_", " ").title()
             lines.append(f"- **{label}** ({value}): {fragment}")
+
+    # Pressure indicator
+    if profile.pressure_level >= 2:
+        lines.append(f"\n> Pressure L{profile.pressure_level}: cognitive atoms shifted "
+                      "toward conservative/focused mode.")
 
     return "\n".join(lines)
 
