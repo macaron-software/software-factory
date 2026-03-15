@@ -498,9 +498,16 @@ class EpicOrchestrator:
         phases_done = 0
         phases_failed = 0
         phase_summaries = []
-        reloop_count = 0
         MAX_RELOOPS = 2
         reloop_errors = []
+        # Persist reloop_count across resumes via phases_json metadata
+        try:
+            _phases_raw = getattr(mission, "phases_json", None) or ""
+            import json as _json
+            _pj = _json.loads(_phases_raw) if isinstance(_phases_raw, str) and _phases_raw.strip().startswith("[") else []
+            reloop_count = int(_pj[0].get("_reloop_count", 0)) if _pj and isinstance(_pj[0], dict) else 0
+        except Exception:
+            reloop_count = 0
 
         # ── Crash-recovery: backfill missing phase summaries ──────
         try:
@@ -2186,6 +2193,15 @@ class EpicOrchestrator:
                 )
                 if is_reloopable:
                     reloop_count += 1
+                    # Persist reloop_count so it survives server restarts/resumes
+                    try:
+                        import json as _json
+                        _pj = _json.loads(mission.phases_json) if isinstance(mission.phases_json, str) else []
+                        if _pj and isinstance(_pj[0], dict):
+                            _pj[0]["_reloop_count"] = reloop_count
+                            mission.phases_json = _json.dumps(_pj)
+                    except Exception:
+                        pass
                     reloop_errors.append(
                         f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}"
                     )
