@@ -1141,9 +1141,11 @@ class LLMClient:
             timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
         )
         try:
-            async with stream_http.stream(
+            _STREAM_HARD_DEADLINE = 300  # 5min absolute max for any streaming call
+            async with asyncio.timeout(_STREAM_HARD_DEADLINE):
+              async with stream_http.stream(
                 "POST", url, json=body, headers=headers
-            ) as resp:
+              ) as resp:
                 if resp.status_code != 200:
                     text = await resp.aread()
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
