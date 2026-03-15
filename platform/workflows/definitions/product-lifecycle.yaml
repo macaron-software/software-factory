@@ -46,8 +46,8 @@ phases:
     Le PM DOIT aussi appeler traceability_link() pour lier chaque feature à son persona source.
   gate: best_effort
   config:
+    disable_thinking: true
     feedback: tools
-  config:
     agents:
     - strat-dirprog
     - product_manager
@@ -61,6 +61,7 @@ phases:
     le DevOps planifie l''infra. L''Architecte agrège toutes les analyses en un document d''architecture consolidé.'
   gate: no_veto
   config:
+    disable_thinking: false
     agents:
     - lead_dev
     - ux_designer
@@ -76,6 +77,7 @@ phases:
     des sprints DOIT utiliser ces tokens.'
   gate: always
   config:
+    disable_thinking: false
     agents:
     - ux_designer
     - lead_dev
@@ -89,6 +91,7 @@ phases:
     Chaque test DOIT référencer le AC qu il valide: // Verify: ac-XXXX.'
   gate: always
   config:
+    disable_thinking: false
     agents:
     - lead_dev
     - dev_frontend
@@ -105,6 +108,7 @@ phases:
   gate: no_veto
   skip_on_failure: true
   config:
+    disable_thinking: true
     agents:
     - trace-auditor
     - trace-writer
@@ -119,6 +123,7 @@ phases:
     doit pouvoir se builder from scratch dans un container Docker propre.'
   gate: no_veto
   config:
+    disable_thinking: false
     agents:
     - devops
     - dev_backend
@@ -131,6 +136,7 @@ phases:
     les scans SAST/DAST. Le DevOps configure les environments staging et prod.'
   gate: always
   config:
+    disable_thinking: true
     agents:
     - pipeline_engineer
     - devsecops
@@ -144,6 +150,7 @@ phases:
     run_e2e_tests() pour captures d''écran des parcours.'
   gate: no_veto
   config:
+    disable_thinking: true
     agents:
     - ux_designer
     - dev_frontend
@@ -156,6 +163,7 @@ phases:
     found): loop back to Test Manager who re-plans fixes. Iterates until APPROVE or max 5 iterations.'
   gate: all_approved
   config:
+    disable_thinking: true
     agents:
     - test_manager
     - qa_lead
@@ -167,6 +175,7 @@ phases:
     Perf Engineer lance k6. Le QA Lead agrège les résultats.'
   gate: all_approved
   config:
+    disable_thinking: true
     agents:
     - qa_lead
     - test_automation
@@ -180,6 +189,7 @@ phases:
     CHECKPOINT: le Chef de Projet valide le GO pour 100% après vérification humaine des métriques.'
   gate: all_approved
   config:
+    disable_thinking: true
     agents:
     - devops
     - sre
@@ -193,6 +203,7 @@ phases:
     le spécialiste approprié: Dev TMA pour les bugs, SRE pour l''infra, Test Automation pour les régressions.'
   gate: always
   config:
+    disable_thinking: true
     agents:
     - responsable_tma
     - dev_tma
@@ -206,6 +217,7 @@ phases:
     TMA avec le feedback. Itère jusqu''à APPROVE.'
   gate: no_veto
   config:
+    disable_thinking: false
     agents:
     - dev_tma
     - qa_lead

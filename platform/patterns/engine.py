@@ -41,6 +41,50 @@ logger = logging.getLogger(__name__)
 CONTEXT_BUDGET = 6000
 # Max chars to keep from each older agent's output when compressing
 COMPRESSED_OUTPUT_SIZE = 400
+# Max chars for agent-to-agent context before compression
+CONTEXT_FROM_THRESHOLD = 1500
+
+
+def _compress_context_from(text: str) -> str:
+    """Compress verbose agent-to-agent context to telegraphic format.
+
+    Rule-based (no LLM cost). Keeps: decisions, file paths, scores, key facts.
+    Strips: verbose prose, repetition, markdown formatting noise.
+    Ref: arXiv:2603.10062 — structured memory access control.
+    """
+    import re
+    lines = text.split("\n")
+    kept = []
+    seen = set()
+    _KEEP_MARKERS = (
+        "decision", "decided", "created", "file", "path", "score", "error", "fail",
+        "success", "approved", "rejected", "veto", "go", "nogo",
+        "architecture", "stack", "tool", "wrote", "generated", "built",
+        "http", "api", "endpoint", "route", "schema", "table",
+        "chose", "selected", "approach", "database", "framework",
+        "✅", "❌", "⚠️", "##", "```",
+    )
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or len(stripped) < 10:
+            continue
+        lower = stripped.lower()
+        # Always keep headings, code blocks, and decision markers
+        if stripped.startswith(("#", "```", "- ", "* ")) or any(m in lower for m in _KEEP_MARKERS):
+            sig = stripped[:60]
+            if sig not in seen:
+                seen.add(sig)
+                kept.append(stripped[:200])
+        # Keep file paths
+        elif re.search(r'\.\w{1,6}(?:\s|$|")', stripped):
+            sig = stripped[:60]
+            if sig not in seen:
+                seen.add(sig)
+                kept.append(stripped[:200])
+    if not kept:
+        # Fallback: first and last 500 chars
+        return text[:500] + "\n...\n" + text[-500:]
+    return "\n".join(kept[:30])
 
 
 class NodeStatus(str, Enum):
@@ -904,6 +948,9 @@ async def _execute_node(
             context_from = sanitize_agent_output(context_from, agent_id=to_agent_id)
         except ImportError:
             pass
+        # Compress verbose agent-to-agent context (arXiv:2603.10062 memory access control)
+        if len(context_from) > 1500:
+            context_from = _compress_context_from(context_from)
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 

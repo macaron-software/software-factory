@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS agents (
     tagline TEXT DEFAULT '',
     persona TEXT DEFAULT '',
     motivation TEXT DEFAULT '',
-    hierarchy_rank INTEGER DEFAULT 50
+    hierarchy_rank INTEGER DEFAULT 50,
+    disable_thinking BOOLEAN DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_agents_role ON agents(role);
 

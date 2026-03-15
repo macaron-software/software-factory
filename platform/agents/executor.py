@@ -768,13 +768,18 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode
             )
 
-            # Per-phase, per-agent, or per-project LLM overrides (hybrid thinking)
-            # Priority: phase_config > agent tags > project config
+            # Per-agent, per-phase, or per-project LLM overrides (hybrid thinking)
+            # Priority: agent.disable_thinking > phase_config > agent tags > project config > env
+            # Ref: arXiv:2603.05488 (performative CoT), arXiv:2603.10062 (memory arch)
             _project_disable_thinking = None
-            if ctx.phase_config and ctx.phase_config.get("disable_thinking"):
-                _project_disable_thinking = True
+            # Level 1: explicit agent field (highest priority)
+            if getattr(agent, "disable_thinking", None) is not None:
+                _project_disable_thinking = agent.disable_thinking
+            # Level 2: phase config
+            elif ctx.phase_config and ctx.phase_config.get("disable_thinking") is not None:
+                _project_disable_thinking = bool(ctx.phase_config["disable_thinking"])
             else:
-                # Auto-infer: coordinators and reviewers don't need thinking
+                # Level 3: auto-infer from agent tags/role
                 _agent_tags = set(getattr(agent, "tags", []) or [])
                 _NOTHINK_TAGS = {"orchestrator", "coordination", "safe", "art", "planning",
                                  "review", "quality", "audit"}
@@ -785,6 +790,7 @@ class AgentExecutor:
                         any(r in _agent_role for r in _NOTHINK_ROLES)):
                     _project_disable_thinking = True
 
+            # Level 4: project config fallback
             if _project_disable_thinking is None and ctx.project_id:
                 try:
                     from ..projects.manager import get_project_store
@@ -1375,11 +1381,18 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
-            # Per-phase, per-agent, or per-project LLM overrides (hybrid thinking)
+            # Per-agent, per-phase, or per-project LLM overrides (hybrid thinking)
+            # Priority: agent.disable_thinking > phase_config > agent tags > project config > env
+            # Ref: arXiv:2603.05488 (performative CoT), arXiv:2603.10062 (memory arch)
             _project_disable_thinking = None
-            if ctx.phase_config and ctx.phase_config.get("disable_thinking"):
-                _project_disable_thinking = True
+            # Level 1: explicit agent field (highest priority)
+            if getattr(agent, "disable_thinking", None) is not None:
+                _project_disable_thinking = agent.disable_thinking
+            # Level 2: phase config
+            elif ctx.phase_config and ctx.phase_config.get("disable_thinking") is not None:
+                _project_disable_thinking = bool(ctx.phase_config["disable_thinking"])
             else:
+                # Level 3: auto-infer from agent tags/role
                 _agent_tags = set(getattr(agent, "tags", []) or [])
                 _NOTHINK_TAGS = {"orchestrator", "coordination", "safe", "art", "planning",
                                  "review", "quality", "audit"}
@@ -1390,6 +1403,7 @@ class AgentExecutor:
                         any(r in _agent_role for r in _NOTHINK_ROLES)):
                     _project_disable_thinking = True
 
+            # Level 4: project config fallback
             if _project_disable_thinking is None and ctx.project_id:
                 try:
                     from ..projects.manager import get_project_store

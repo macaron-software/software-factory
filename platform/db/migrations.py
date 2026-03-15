@@ -702,6 +702,13 @@ def _migrate_pg(conn):
             conn.execute(f"ALTER TABLE wiki_pages ADD COLUMN {col} TEXT DEFAULT {default}")
         except Exception:
             pass
+
+    # Agent disable_thinking (arXiv:2603.05488 per-agent thinking control)
+    try:
+        conn.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS disable_thinking BOOLEAN DEFAULT NULL")
+    except Exception:
+        pass
+
     conn.commit()
 
 

@@ -68,6 +68,7 @@ class AgentDef:
         50  # org hierarchy: 0=CEO, 10=director, 20=lead, 30=senior, 40=mid, 50=junior
     )
     is_builtin: bool = False
+    disable_thinking: bool | None = None  # per-agent thinking override (arXiv:2603.05488)
     created_at: str = ""
     updated_at: str = ""
 
@@ -97,6 +98,7 @@ def _row_to_agent(row) -> AgentDef:
         motivation=row["motivation"] if "motivation" in keys else "",
         hierarchy_rank=row["hierarchy_rank"] if "hierarchy_rank" in keys else 50,
         is_builtin=bool(row["is_builtin"]),
+        disable_thinking=row["disable_thinking"] if "disable_thinking" in keys else None,
         created_at=row["created_at"] or "",
         updated_at=row["updated_at"] or "",
     )
@@ -147,8 +149,8 @@ class AgentStore:
                    provider, model, temperature, max_tokens, skills_json, tools_json,
                    mcps_json, permissions_json, tags_json, icon, color, avatar, tagline,
                    persona, hierarchy_rank, motivation,
-                   is_builtin, created_at, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   is_builtin, disable_thinking, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     agent.id,
                     agent.name,
@@ -172,6 +174,7 @@ class AgentStore:
                     agent.hierarchy_rank,
                     agent.motivation,
                     int(agent.is_builtin),
+                    agent.disable_thinking,
                     agent.created_at,
                     agent.updated_at,
                 ),

@@ -1535,26 +1535,40 @@ class EpicOrchestrator:
 
                 # ── Compact phase memory: store telegraphic digest ────────
                 # Rule-based (no LLM cost), injected into next phase context
+                # Ref: arXiv:2603.10062 — multi-agent cache sharing protocol
                 try:
                     from ..llm.phase_memory import build_phase_digest, store_phase_summary
                     from ..sessions.store import get_session_store as _get_ss2
 
                     _ss2 = _get_ss2()
                     _phase_msgs = _ss2.get_messages(session_id, limit=1000)
-                    _this_phase_msgs = _phase_msgs[_pre_phase_msg_count:]
+                    _msg_start = _pre_phase_msg_count if "_pre_phase_msg_count" in dir() and _pre_phase_msg_count else 0
+                    _this_phase_msgs = _phase_msgs[_msg_start:]
+                    _dur = time.monotonic() - _phase_start_time if "_phase_start_time" in dir() and _phase_start_time else 0
+                    _phase_id = phase.phase_id or f"phase-{i}"
+                    _phase_name = wf_phase.name if hasattr(wf_phase, "name") else _phase_id
+                    _status_str = phase.status.value if hasattr(phase.status, "value") else str(phase.status)
+                    logger.warning(
+                        "PHASE_MEMORY building digest phase=%s msgs=%d (from idx %d/%d)",
+                        _phase_id, len(_this_phase_msgs), _msg_start, len(_phase_msgs),
+                    )
                     _digest = build_phase_digest(
-                        phase_id=phase.phase_id or f"phase-{i}",
-                        phase_name=wf_phase.name if hasattr(wf_phase, "name") else phase.phase_id or "",
+                        phase_id=_phase_id,
+                        phase_name=_phase_name,
                         pattern=pattern_type,
-                        status=phase.status.value if hasattr(phase.status, "value") else str(phase.status),
+                        status=_status_str,
                         agents=aids or [],
                         quality=getattr(phase, "quality_score", 0) or 0,
                         messages=_this_phase_msgs,
-                        duration_s=time.monotonic() - _phase_start_time if "_phase_start_time" in dir() else 0,
+                        duration_s=_dur,
                     )
                     store_phase_summary(session_id, _digest)
+                    logger.warning(
+                        "PHASE_MEMORY stored phase=%s decisions=%d artifacts=%d tools=%d",
+                        _phase_id, len(_digest.decisions), len(_digest.artifacts), len(_digest.tools_used),
+                    )
                 except Exception as _pm_err:
-                    logger.error("Phase memory digest failed: %s", _pm_err)
+                    logger.warning("PHASE_MEMORY digest FAILED phase=%s: %s", phase.phase_id, _pm_err)
 
                 # RL: record experience (phase succeeded → positive reward)
                 try:
