@@ -271,6 +271,12 @@ def _get_tool_registry():
         register_traceability_tools(reg)
     except Exception:
         pass
+    try:
+        from ..tools.lsp_tools import register_lsp_tools
+
+        register_lsp_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
