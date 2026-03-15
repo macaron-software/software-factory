@@ -604,6 +604,89 @@ class GitMergePRTool(BaseTool):
             return f"Error: {e}"
 
 
+class GitWorktreeTool(BaseTool):
+    """Create/list/remove isolated git worktrees for parallel agent work.
+
+    Each agent gets its own filesystem copy via `git worktree add`, enabling
+    safe parallel code modifications without merge conflicts.
+    """
+    name = "git_worktree"
+    description = (
+        "Manage git worktrees for isolated parallel work. "
+        "Actions: create (new branch+worktree), list (active worktrees), "
+        "remove (cleanup after merge)."
+    )
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        cwd = params.get("cwd", os.getcwd())
+        action = params.get("action", "create")
+
+        if action == "list":
+            return self._list(cwd)
+        elif action == "remove":
+            wt_path = params.get("worktree_path", "")
+            if not wt_path:
+                return "Error: worktree_path required for remove action"
+            return self._remove(cwd, wt_path)
+        elif action == "create":
+            branch = params.get("branch", "")
+            agent_id = params.get("_agent_id", "agent")
+            session_id = params.get("_session_id", "default")
+            if not branch:
+                import re
+                task = params.get("task", session_id[:8])
+                slug = re.sub(r'[^a-z0-9]+', '-', task.lower())[:40]
+                branch = f"agent/{agent_id}/{slug}"
+            wt_dir = os.path.join(cwd, ".git", "worktrees-isolated", branch.replace("/", "-"))
+            return self._create(cwd, branch, wt_dir)
+        else:
+            return f"Error: unknown action {action!r}. Use create/list/remove."
+
+    def _create(self, repo_path: str, branch: str, wt_path: str) -> str:
+        try:
+            os.makedirs(os.path.dirname(wt_path), exist_ok=True)
+            result = subprocess.run(
+                ["git", "-C", repo_path, "worktree", "add", "-b", branch, wt_path],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                # Branch may exist — try without -b
+                result = subprocess.run(
+                    ["git", "-C", repo_path, "worktree", "add", wt_path, branch],
+                    capture_output=True, text=True, timeout=30,
+                )
+            if result.returncode != 0:
+                return f"Error creating worktree: {result.stderr.strip()}"
+            return f"Worktree created: {wt_path} (branch: {branch})"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _list(self, repo_path: str) -> str:
+        try:
+            result = subprocess.run(
+                ["git", "-C", repo_path, "worktree", "list", "--porcelain"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                return f"Error: {result.stderr.strip()}"
+            return result.stdout.strip() or "No active worktrees."
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _remove(self, repo_path: str, wt_path: str) -> str:
+        try:
+            result = subprocess.run(
+                ["git", "-C", repo_path, "worktree", "remove", "--force", wt_path],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                return f"Error: {result.stderr.strip()}"
+            return f"Worktree removed: {wt_path}"
+        except Exception as e:
+            return f"Error: {e}"
+
+
 def register_git_tools(registry):
     """Register all git tools."""
     registry.register(GitInitTool())
@@ -616,3 +699,4 @@ def register_git_tools(registry):
     registry.register(GitGetPRDiffTool())
     registry.register(GitPostPRReviewTool())
     registry.register(GitMergePRTool())
+    registry.register(GitWorktreeTool())

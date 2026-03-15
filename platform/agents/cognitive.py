@@ -321,8 +321,8 @@ ROLE_ARCHETYPE_MAP: dict[str, str] = {
     # Security
     "security": "guardian",
     "pentester": "hacker",
-    "security-critic": "guardian",
-    "pentester-lead": "hacker",
+    "security_critic": "guardian",
+    "pentester_lead": "hacker",
     # Ops
     "devops": "operator",
     "sre": "operator",
@@ -507,7 +507,8 @@ def infer_archetype_for_role(role: str) -> str:
     Infer the best cognitive archetype for a given agent role.
 
     Checks ROLE_ARCHETYPE_MAP with progressive normalization:
-    exact match → lowercase → prefix match → default 'pragmatist'.
+    exact match → longest substring match → default 'pragmatist'.
+    Longer patterns match first to avoid 'architect' eating 'security architect'.
     """
     if not role:
         return "pragmatist"
@@ -518,12 +519,16 @@ def infer_archetype_for_role(role: str) -> str:
     if r in ROLE_ARCHETYPE_MAP:
         return ROLE_ARCHETYPE_MAP[r]
 
-    # Partial/prefix match
+    # Longest substring match (prevents "architect" eating "security architect")
+    best_match = ""
+    best_arch = ""
     for pattern, archetype in ROLE_ARCHETYPE_MAP.items():
         if pattern in r or r in pattern:
-            return archetype
+            if len(pattern) > len(best_match):
+                best_match = pattern
+                best_arch = archetype
 
-    return "pragmatist"
+    return best_arch if best_arch else "pragmatist"
 
 
 # ── Prompt Rendering ─────────────────────────────────────────────────────────
