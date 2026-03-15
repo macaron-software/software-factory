@@ -1533,6 +1533,29 @@ class EpicOrchestrator:
                     phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                 phases_done += 1
 
+                # ── Compact phase memory: store telegraphic digest ────────
+                # Rule-based (no LLM cost), injected into next phase context
+                try:
+                    from ..llm.phase_memory import build_phase_digest, store_phase_summary
+                    from ..sessions.store import get_session_store as _get_ss2
+
+                    _ss2 = _get_ss2()
+                    _phase_msgs = _ss2.get_messages(session_id, limit=1000)
+                    _this_phase_msgs = _phase_msgs[_pre_phase_msg_count:]
+                    _digest = build_phase_digest(
+                        phase_id=phase.phase_id or f"phase-{i}",
+                        phase_name=wf_phase.name if hasattr(wf_phase, "name") else phase.phase_id or "",
+                        pattern=pattern_type,
+                        status=phase.status.value if hasattr(phase.status, "value") else str(phase.status),
+                        agents=aids or [],
+                        quality=getattr(phase, "quality_score", 0) or 0,
+                        messages=_this_phase_msgs,
+                        duration_s=time.monotonic() - _phase_start_time if "_phase_start_time" in dir() else 0,
+                    )
+                    store_phase_summary(session_id, _digest)
+                except Exception as _pm_err:
+                    logger.error("Phase memory digest failed: %s", _pm_err)
+
                 # RL: record experience (phase succeeded → positive reward)
                 try:
                     from ..agents.rl_policy import get_rl_policy as _get_rl

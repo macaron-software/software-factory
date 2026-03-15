@@ -1901,7 +1901,25 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             "message_type": m.message_type,
         }
         for m in history
+        if getattr(m, "message_type", "") != "phase_summary"  # skip — loaded separately
     ]
+
+    # ── Compact phase memory: prepend prior phase summaries ───────
+    # Gives every agent a telegraphic view of all completed phases
+    # without replaying full conversation history (~100-200 tok/phase).
+    try:
+        from ..llm.phase_memory import load_phase_summaries, build_compact_context
+        _phase_summaries = load_phase_summaries(run.session_id)
+        if _phase_summaries:
+            _compact_ctx = build_compact_context(_phase_summaries)
+            # Inject as first history entry so it appears before recent messages
+            history_dicts.insert(0, {
+                "from_agent": "phase_memory",
+                "content": _compact_ctx,
+                "message_type": "phase_summary",
+            })
+    except Exception as _pm_exc:
+        logger.error("Phase memory load failed: %s", _pm_exc)
 
     project_context = ""
     vision = ""
