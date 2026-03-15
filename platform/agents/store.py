@@ -68,6 +68,7 @@ class AgentDef:
         50  # org hierarchy: 0=CEO, 10=director, 20=lead, 30=senior, 40=mid, 50=junior
     )
     is_builtin: bool = False
+    cognitive_arch: str = ""  # composable cognitive profile (e.g. "pragmatist,architect+quality_bar=perfectionist")
     disable_thinking: bool | None = None  # per-agent thinking override (arXiv:2603.05488)
     created_at: str = ""
     updated_at: str = ""
@@ -99,6 +100,7 @@ def _row_to_agent(row) -> AgentDef:
         hierarchy_rank=row["hierarchy_rank"] if "hierarchy_rank" in keys else 50,
         is_builtin=bool(row["is_builtin"]),
         disable_thinking=row["disable_thinking"] if "disable_thinking" in keys else None,
+        cognitive_arch=row["cognitive_arch"] if "cognitive_arch" in keys else "",
         created_at=row["created_at"] or "",
         updated_at=row["updated_at"] or "",
     )
@@ -149,8 +151,8 @@ class AgentStore:
                    provider, model, temperature, max_tokens, skills_json, tools_json,
                    mcps_json, permissions_json, tags_json, icon, color, avatar, tagline,
                    persona, hierarchy_rank, motivation,
-                   is_builtin, disable_thinking, created_at, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   is_builtin, disable_thinking, cognitive_arch, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     agent.id,
                     agent.name,
@@ -175,6 +177,7 @@ class AgentStore:
                     agent.motivation,
                     int(agent.is_builtin),
                     agent.disable_thinking,
+                    agent.cognitive_arch,
                     agent.created_at,
                     agent.updated_at,
                 ),
@@ -196,7 +199,7 @@ class AgentStore:
                    provider=?, model=?, temperature=?, max_tokens=?, skills_json=?,
                    tools_json=?, mcps_json=?, permissions_json=?, tags_json=?,
                    icon=?, color=?, avatar=?, tagline=?, persona=?, hierarchy_rank=?,
-                   motivation=?,
+                   motivation=?, cognitive_arch=?,
                    updated_at=?
                    WHERE id=?""",
                 (
@@ -220,6 +223,7 @@ class AgentStore:
                     agent.persona,
                     agent.hierarchy_rank,
                     agent.motivation,
+                    agent.cognitive_arch,
                     agent.updated_at,
                     agent.id,
                 ),
@@ -2605,6 +2609,7 @@ class AgentStore:
                         else "",
                         hierarchy_rank=raw.get("hierarchy_rank", 50),
                         is_builtin=is_builtin,
+                        cognitive_arch=raw.get("cognitive_arch", ""),
                     )
                     existing = self.get(agent_id)
                     if existing:

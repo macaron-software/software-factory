@@ -709,6 +709,12 @@ def _migrate_pg(conn):
     except Exception:
         pass
 
+    # Agent cognitive_arch (composable cognitive profiles, inspired by AgentCeption MIT)
+    try:
+        conn.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS cognitive_arch TEXT DEFAULT ''")
+    except Exception:
+        pass
+
     conn.commit()
 
 

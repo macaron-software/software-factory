@@ -136,6 +136,17 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
     if agent.motivation:
         parts.append(f"\n## Motivation & Drive\n{agent.motivation}")
 
+    # Cognitive architecture — composable profile (inspired by AgentCeption, MIT)
+    if getattr(agent, "cognitive_arch", ""):
+        try:
+            from .cognitive import resolve_cognitive_arch, render_cognitive_prompt
+            _cog_profile = resolve_cognitive_arch(agent.cognitive_arch)
+            _cog_block = render_cognitive_prompt(_cog_profile)
+            if _cog_block:
+                parts.append(f"\n{_cog_block}")
+        except Exception:
+            pass
+
     parts.append(f"\nYou are {agent.name}, role: {agent.role}.")
     if agent.description:
         parts.append(f"Description: {agent.description}")
