@@ -137,10 +137,25 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
         parts.append(f"\n## Motivation & Drive\n{agent.motivation}")
 
     # Cognitive architecture — composable profile (inspired by AgentCeption, MIT)
-    if getattr(agent, "cognitive_arch", ""):
+    # Resolves archetypes/figures, then applies PUA pressure shift if agent is failing.
+    _cog_arch = getattr(agent, "cognitive_arch", "")
+    if not _cog_arch:
+        # Auto-infer from role if not explicitly set
         try:
-            from .cognitive import resolve_cognitive_arch, render_cognitive_prompt
-            _cog_profile = resolve_cognitive_arch(agent.cognitive_arch)
+            from .cognitive import infer_archetype_for_role
+            _cog_arch = infer_archetype_for_role(agent.role)
+        except Exception:
+            pass
+    if _cog_arch:
+        try:
+            from .cognitive import resolve_cognitive_arch, render_cognitive_prompt, apply_pressure_shift
+            _cog_profile = resolve_cognitive_arch(_cog_arch)
+            # Apply PUA pressure adaptation if agent has consecutive failures
+            _pressure = getattr(ctx, "consecutive_failures", 0) or 0
+            if _pressure > 0:
+                from .pua import get_pressure_level
+                _plevel = get_pressure_level(_pressure)
+                _cog_profile = apply_pressure_shift(_cog_profile, _plevel)
             _cog_block = render_cognitive_prompt(_cog_profile)
             if _cog_block:
                 parts.append(f"\n{_cog_block}")
@@ -154,6 +169,16 @@ def _build_system_prompt(ctx: ExecutionContext) -> str:
     # PUA motivation baseline — Iron Rules + Proactivity (source: tanweai/pua MIT)
     from .pua import build_motivation_block
     parts.append(build_motivation_block())
+
+    # Adversarial feedback from prior rejection — injected into system prompt
+    # so the agent's behavioral baseline changes, not just the user message
+    if ctx.adversarial_feedback:
+        parts.append(f"""
+## ADVERSARIAL CORRECTION (PRIORITY ABSOLUE)
+Your previous attempt was REJECTED. You MUST fix these issues:
+{ctx.adversarial_feedback}
+Failure to address these issues = automatic rejection again.
+Do NOT repeat the same approach. Change your behavior fundamentally.""")
 
     if ctx.tools_enabled:
         parts.append("""

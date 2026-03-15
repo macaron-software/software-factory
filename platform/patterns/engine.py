@@ -1072,6 +1072,29 @@ This is BLOCKING: developers cannot start without your design tokens."""
         except Exception:
             pass
 
+    # Auto-install dependencies for build/verify/cicd phases
+    _build_phases = ("build-verify", "cicd", "build", "deploy-prod")
+    if ctx.project_path and run.phase_id in _build_phases:
+        _ws = ctx.project_path
+        _dep_cmds = []
+        if os.path.isfile(os.path.join(_ws, "package.json")) and not os.path.isdir(os.path.join(_ws, "node_modules")):
+            _dep_cmds.append("npm install --legacy-peer-deps")
+        if os.path.isfile(os.path.join(_ws, "requirements.txt")):
+            _dep_cmds.append("pip install -r requirements.txt")
+        if os.path.isfile(os.path.join(_ws, "Cargo.toml")):
+            _dep_cmds.append("cargo fetch")
+        if os.path.isfile(os.path.join(_ws, "go.mod")):
+            _dep_cmds.append("go mod tidy")
+        if _dep_cmds:
+            import subprocess as _sp
+            for _cmd in _dep_cmds:
+                try:
+                    _sp.run(_cmd, shell=True, cwd=_ws, timeout=120,
+                            capture_output=True, text=True)
+                    logger.warning("AUTO_DEPS phase=%s cmd='%s' OK", run.phase_id, _cmd)
+                except Exception as _e:
+                    logger.warning("AUTO_DEPS phase=%s cmd='%s' FAILED: %s", run.phase_id, _cmd, _e)
+
     # Execute with streaming SSE
     executor = get_executor()
     result = None
@@ -1413,6 +1436,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 )
 
                 try:
+                    # Inject adversarial feedback into system prompt for retry
+                    ctx.adversarial_feedback = feedback
                     retry_result = await executor.run(ctx, retry_task)
                     retry_content = retry_result.content or ""
                     # Strip think/tool artifacts — never produce empty
@@ -2131,13 +2156,16 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             pass
 
     has_project = bool(run.project_id)
-    # Tools: every agent gets their configured tools when there's a project workspace
-    # No rank gating — a CTO can search the web, a DSI can read project files
-    tools_for_agent = has_project and bool(project_path)
+    # Tools: enable for any agent with a project OR an execution role.
+    # Workspace path is NOT required — agents can still read/write code,
+    # run builds, and use tools even without a pre-existing workspace.
+    from ..agents.tool_schemas import _get_tools_for_agent, _classify_agent_role
+
+    _exec_roles = {"dev", "qa", "devops", "security", "reviewer", "ux"}
+    agent_role_cat = _classify_agent_role(agent)
+    tools_for_agent = has_project or agent_role_cat in _exec_roles
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
-    from ..agents.tool_schemas import _get_tools_for_agent
-
     allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
     # Enrich project_context with lessons and SI blueprint

@@ -115,6 +115,8 @@ class ExecutionContext:
     code_files_written: list[str] = field(default_factory=list)
     # Phase-level config (from workflow YAML phase.config)
     phase_config: dict = field(default_factory=dict)
+    # Adversarial feedback from prior rejection — injected into system prompt on retry
+    adversarial_feedback: str = ""
 
 
 @dataclass
