@@ -644,10 +644,17 @@ class AgentExecutor:
                         from ..db.migrations import get_db
 
                         with get_db() as db:
-                            db.execute(
-                                "UPDATE epic_runs SET updated_at=datetime('now') WHERE id=?",
-                                (epic_run_id,),
-                            )
+                            # PG: NOW(), SQLite: datetime('now')
+                            try:
+                                db.execute(
+                                    "UPDATE epic_runs SET updated_at=NOW() WHERE id=%s",
+                                    (epic_run_id,),
+                                )
+                            except Exception:
+                                db.execute(
+                                    "UPDATE epic_runs SET updated_at=datetime('now') WHERE id=?",
+                                    (epic_run_id,),
+                                )
                     except Exception:
                         pass
             except asyncio.CancelledError:

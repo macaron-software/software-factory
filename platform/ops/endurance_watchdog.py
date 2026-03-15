@@ -120,43 +120,75 @@ async def _check_health() -> bool:
 
 
 async def _check_stalled_missions() -> list[dict]:
-    """Find mission runs that are running but haven't progressed recently."""
+    """Find mission runs that are running but haven't progressed recently.
+
+    Uses GREATEST(updated_at, last_message_ts) to avoid false positives
+    when heartbeat fails to update updated_at (PG/SQLite SQL compat).
+    """
     stalls = []
     try:
         db = _get_db()
+        # Use latest message timestamp as fallback for freshness
         rows = db.execute("""
-            SELECT mr.id, mr.workflow_name as name, mr.status, mr.current_phase, mr.updated_at
+            SELECT mr.id, mr.workflow_name as name, mr.status,
+                   mr.current_phase, mr.updated_at, mr.session_id
             FROM epic_runs mr
             WHERE mr.status = 'running'
         """).fetchall()
-        db.close()
 
         now = time.time()
         for r in rows:
-            updated = r["updated_at"] or ""
-            if updated:
+            # Check both updated_at AND latest message timestamp
+            best_ts = 0
+            for ts_field in [r["updated_at"]]:
+                if not ts_field:
+                    continue
                 try:
                     from datetime import datetime as dt
-
-                    updated_ts = (
-                        updated.timestamp()
-                        if hasattr(updated, "timestamp")
+                    ts_val = (
+                        ts_field.timestamp()
+                        if hasattr(ts_field, "timestamp")
                         else dt.fromisoformat(
-                            updated.replace("Z", "+00:00")
+                            str(ts_field).replace("Z", "+00:00")
                         ).timestamp()
                     )
-                    age = now - updated_ts
-                    if age > PHASE_STALL_THRESHOLD:
-                        stalls.append(
-                            {
-                                "id": r["id"],
-                                "name": r["name"],
-                                "phase": r["current_phase"],
-                                "stall_seconds": int(age),
-                            }
-                        )
+                    best_ts = max(best_ts, ts_val)
                 except (ValueError, TypeError):
                     pass
+
+            # Also check latest message for this session
+            if r.get("session_id"):
+                try:
+                    msg_row = db.execute(
+                        "SELECT MAX(timestamp) as last_msg FROM messages WHERE session_id=?",
+                        (r["session_id"],),
+                    ).fetchone()
+                    if msg_row and msg_row["last_msg"]:
+                        from datetime import datetime as dt
+                        msg_ts_raw = msg_row["last_msg"]
+                        msg_ts = (
+                            msg_ts_raw.timestamp()
+                            if hasattr(msg_ts_raw, "timestamp")
+                            else dt.fromisoformat(
+                                str(msg_ts_raw).replace("Z", "+00:00")
+                            ).timestamp()
+                        )
+                        best_ts = max(best_ts, msg_ts)
+                except Exception:
+                    pass
+
+            if best_ts > 0:
+                age = now - best_ts
+                if age > PHASE_STALL_THRESHOLD:
+                    stalls.append(
+                        {
+                            "id": r["id"],
+                            "name": r["name"],
+                            "phase": r["current_phase"],
+                            "stall_seconds": int(age),
+                        }
+                    )
+        db.close()
     except Exception as e:
         logger.warning("stall check failed: %s", e)
     return stalls
