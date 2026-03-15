@@ -1,154 +1,134 @@
 # Software Factory — Copilot Instructions
 
-## Critical: The `platform` Import Trap
+## CRITICAL — Import Trap
+`platform/` shadows stdlib. NEVER `import platform` — use `from platform.X import Y`.
+Same issue blocks `--reload`. Always: `--ws none`, no `--reload`.
 
-The `platform/` directory shadows Python's stdlib `platform` module. **Never** write `import platform` at the top level — it will import the project directory, not stdlib.
-
-```python
-# WRONG — imports the project directory
-import platform
-
-# CORRECT — always use explicit submodule imports
-from platform.db.adapter import get_db
-from platform.agents.executor import AgentExecutor
-```
-
-The same issue affects `uvicorn --reload` (it re-imports and hits the shadow). Always run with `--ws none` and without `--reload`.
-
-## Build, Test, Lint
-
+## Run / Test / Lint
 ```bash
-# Dev server (no Docker)
-PYTHONPATH=$(pwd) uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
-
-# Docker
-make run              # docker compose up -d --build → http://localhost:8090
-make logs             # docker compose logs -f platform
-
-# Lint (syntax errors — HARD gate in CI)
-ruff check platform/ --select E9
-
-# Complexity analysis (SOFT gate — CC > 10 = error, LOC > 500 = error, MI < 10 = error)
-python scripts/complexity_gate.py platform/
-
-# Tests — require a running PostgreSQL (CI uses services: postgres:16)
-pytest tests/test_platform_api.py -v                    # API tests
-pytest tests/test_cache.py tests/test_auto_heal.py -v   # Unit tests
-pytest tests/test_demo.py -v                            # Demo mode tests
-
-# Single test file
-pytest tests/test_engine.py -v
-
-# Single test function
-pytest tests/test_platform_api.py::test_health -v
-
-# Full Makefile test suite
-make test
+uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
+make run                                    # Docker → :8090
+ruff check platform/ --select E9            # syntax HARD gate
+python scripts/complexity_gate.py platform/  # CC>10err LOC>500err MI<10err
+pytest tests/ -v                            # needs PG running
+make test                                   # full suite
 ```
 
 ## Architecture
+Multi-agent SAFe orch. ~324 agents · 26 patterns · 69 wf · 32 phase tpl · 54 tools · 2389 skills.
+Py3.11 + FastAPI + Jinja2 + HTMX + SSE. PG16(62tbl) + Redis7.
 
-Multi-agent orchestration platform (SAFe methodology). ~221 AI agents, 26 orchestration patterns, 69 YAML workflows. Python 3.11 + FastAPI + Jinja2 + HTMX + SSE. PostgreSQL 16 (62 tables) + Redis 7.
-
-### Core Layers
-
-- **`platform/server.py`** — FastAPI app, lifespan, auth middleware, 8 background tasks
-- **`platform/agents/`** — Agent engine: executor, store (~221 agents), adversarial review (L0 deterministic + L1 LLM), tool runner (134 tool modules)
-- **`platform/patterns/engine.py`** — 26 orchestration topologies (solo, sequential, parallel, hierarchical, loop, network, router, aggregator, wave, tournament, voting, etc.)
-- **`platform/workflows/`** — Workflow store with PM v2, 32 phase templates, 69 YAML definitions in `defs/`
-- **`platform/services/`** — Epic orchestrator (with on_complete chaining), auto_resume, PM checkpoint, notifications
-- **`platform/a2a/`** — Agent-to-agent bus, veto protocol, negotiation
-- **`platform/llm/client.py`** — 5 LLM providers: azure-ai, azure-openai, nvidia, minimax, local-mlx
-- **`platform/db/`** — DB adapter (PostgreSQL primary, SQLite fallback), schema (62 tables), migrations, multi-tenant
-- **`platform/web/routes/`** — HTMX routes (missions, agents, projects, workflows, sessions, auth)
-- **`platform/tools/`** — 54 tool modules (code, git, deploy, build, web, security, memory, MCP, tracing, AST, lint, LSP, design system)
-- **`platform/ops/`** — 17 operational modules (auto_heal, traceability_scheduler, knowledge_scheduler)
-
-### Supporting Directories
-
-- **`skills/`** — 139 YAML skill definitions injected into agent prompts
-- **`workflows/defs/`** — 69 YAML workflow definitions
-- **`projects/`** — Per-project config (e.g., `sienna.yaml`, `factory.yaml`) with git_url
+### Tree
+```
+platform/
+  server.py              lifespan · GZipMiddleware · auth mw · 8 bg tasks
+  agents/                exec · store(324) · adversarial(L0+L1) · tool_runner(134)
+                         skills_integration.py — 3-tier: context→declared→trigger
+                         subagent_prompts.py — implementer/spec-reviewer/code-quality/finish
+                         pua.py — L0-L4 pressure · retry · debug methodology
+  patterns/engine.py     26 topo: solo seq par loop hier net router aggr wave hitl bb
+                         fractal_worktree.py — decompose+isolate+finish (auto-merge)
+  workflows/             store(PM v2) · defs/(69 YAML)
+  services/              epic_orch · auto_resume · pm_checkpoint · notif
+  llm/                   client(5 providers) · context_tiers.py — L0(120ch)/L1(600ch)/L2(1500ch)
+  db/                    adapter(PG+SQLite) · schema(62tbl) · migrations
+  web/routes/            HTMX routes · templates(124) · static/css/
+  tools/(54)             code git deploy build web sec mem mcp trace ast lint lsp ds
+  ops/(17)               auto_heal · traceability · knowledge · project_audit
+  auth/                  JWT+bcrypt · middleware(RBAC) · OAuth(GitHub/Azure)
+  security/              prompt_guard · output_validator · audit
+skills/                  2389 skills (139 YAML + GitHub cache)
+projects/                per-project config + git_url
+```
 
 ### Data Flow
+Epic → Workflow(YAML phases) → epic_runs(PG) → PM LLM: next|loop|done|skip|phase(dyn).
+compose: pattern + team + gate + feedback → PatternDef + WorkflowPhase → _phase_queue.
 
-Epic → Workflow (YAML phases) → `epic_runs` (PG) → PM LLM decides: next | loop | done | skip | phase(dynamic). Each phase composes pattern + team + gate + feedback → `PatternDef` + `WorkflowPhase` → `_phase_queue`.
+## NEVER
+- `import platform` top-level · `--reload` · WebSocket (SSE only `--ws none`)
+- emoji · gradient bg · inline styles · hardcoded hex · icon fonts (Feather SVG only)
+- mock/fake/stub/dummy data — LIVE DATA ONLY · no test libs that cheat
+- slop (hallucinated code, placeholder TODO, stub impl, `return {}`, `pass` as impl)
+- change LLM models · set `*_API_KEY=dummy` — Infisical/.env only
 
-## Key Conventions
+## DB — LIVE = PostgreSQL
+`data/platform.db` = STALE SQLite — NEVER query for live data.
+PG advisory locks conn-scoped → 1 dedicated conn/mission.
 
-### Database
+## UI / Frontend
+- HTMX partial swaps: `hx-get="/partial/X" hx-trigger="load"` · returns HTML not JSON
+- Skeleton loading: `.sk` shimmer · tiered L0(instant) → L1(gzip) → L2(on-demand)
+- CSS custom props (tokens) · dark-first · `[data-theme]` light/dark/hi-contrast
+- i18n: `{{ t('key') }}` · locales/*.json · 40 langs planned · RTL support (ar,he,fa,ur)
 
-- **PostgreSQL is the live database.** `data/platform.db` is a stale SQLite fallback — never query it for live data.
-- Use `platform/db/adapter.py` for all DB access — it handles PG vs SQLite transparently.
-- PG advisory locks are connection-scoped → one dedicated connection per mission.
+## Code Style
+- PEP 8 (ruff) · type hints public APIs · conventional commits
+- Traceability refs: `# Ref: feat-*` (py) · `<!-- Ref: feat-* -->` (html) · `// Ref: feat-*` (ts)
+- Agent status: PENDING | RUNNING | COMPLETED | VETOED | FAILED — no DONE
 
-### UI / Frontend
+## Superpowers (obra/superpowers-inspired)
+### Context Auto-Trigger (skills_integration.py)
+7 phases: debug/review/implement/plan/test/security/deploy.
+Keywords in mission text → mandatory skills injected before trigger matching.
+3-tier priority: context-pattern → declared → trigger-matched.
+`_detect_context_phase(text) → list[str]` · `_CONTEXT_PATTERNS[phase] → skill_ids`
 
-- **SSE only** — no WebSockets anywhere. Pass `--ws none` to uvicorn.
-- **HTMX partial swaps** — routes return HTML fragments, not JSON. Pattern: `hx-get="/partial/X" hx-trigger="load"`.
-- **Skeleton loading** — CSS class `.sk` with shimmer animation. Use macros from `partials/skeleton.html`. Tiered: L0 skeleton (instant) → L1 summary (fast) → L2 full detail (on-demand).
-- **Feather SVG icons only** — no emoji, no icon fonts. Stroke with `round` linecap, 2px.
-- **CSS custom properties** — all colors, spacing, typography via design tokens. Never hardcode hex colors or use inline styles.
-- **Dark-first** — default theme is dark. Support light + dark + high-contrast via `[data-theme]`.
-- **No gradient backgrounds.**
-- i18n via `{{ t('key') }}` — locales in `platform/i18n/locales/*.json`. Active: en, fr.
+### Subagent Prompts (subagent_prompts.py)
+4 builders: `build_implementer_prompt` (TDD + DONE/NEEDS_CONTEXT/BLOCKED)
+· `build_spec_reviewer_prompt` (APPROVED/REJECTED + MISSING/WRONG/EXTRA)
+· `build_code_quality_reviewer_prompt` (Critical/Important/Minor + APPROVED/CHANGES_REQUESTED)
+· `build_finish_prompt` (Merge/PR/Keep/Discard)
 
-### Code Style
+### Worktree Finish (fractal_worktree.py)
+Phase 3 after leaf execution. `_finish_worktree_branches()`:
+auto-merge clean branches · keep branches w/ conflicts · discard empty branches.
 
-- PEP 8 enforced by `ruff`. Type hints required for public APIs.
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`
-- All source files need traceability: `# Ref: FEAT-xxx` (Python), `<!-- Ref: feat-* -->` (HTML), `// Ref: feat-*` (TS/JS).
-- Agent statuses are `PENDING | RUNNING | COMPLETED | VETOED | FAILED` — there is no `DONE` status.
+## PUA — Pressure Unified Architecture (pua.py)
+L0(0-1 fails)=normal · L1(2)=switch · L2(3)=root-cause · L3(4)=7pt-checklist · L4(5+)=escalate
+`get_pressure_level(fails) → int` · `build_retry_prompt(task=,feedback=,consecutive_failures=,agent_name=)`
+5-step: Smell→Elevate→Mirror→Execute→Retrospective
 
-### Data Integrity
+## Skills Tiered Loading (llm/context_tiers.py)
+L0=120ch (routes/webhooks) · L1=600ch (standard) · L2=1500ch (reviews/top agents)
+`select_tier(hierarchy_rank=, capability_grade=, task_type=) → ContextTier`
+`format_skill_tiered(name, content, tier) → str`
 
-- **No mocks, fakes, stubs, or dummy data.** Tests use real DB (test schema), real LLM calls, real file I/O.
-- If an external service is unavailable, skip the test with a reason — don't fake it.
-- No `return {}` / `return None` / `pass` as implementation — write real logic or `raise NotImplementedError`.
-- No placeholder `TODO` implementations or fallback empty returns.
+## Traceability (live PG → session SQLite)
+### UUID Scheme
+- Features: `feat-{uuid}` (669 in PG) · Stories: `us-{uuid8}` (227) · ACs: `ac-{uuid8}` (154)
+- Trace links: `tl-{type}-{uuid8}` — 566 bidirectional links (code/ihm/test→feature)
 
-### LLM Configuration
+### E2E Chain (8 layers)
+Persona(16) → Feature(669) → Story(227) → AC(154,Gherkin)
+→ IHM(43 feat-linked) → Code(38) → UnitTest(17) → E2E(14)
++ CRUD(655 handlers) + RBAC(49/49 route files)
 
-LLM model configuration is frozen — do not change models. Current providers: MiniMax M2.5, Azure OpenAI (gpt-5-mini, gpt-5.2, gpt-5.2-codex), Azure AI (gpt-5.2), NVIDIA (Kimi-K2), local MLX. API keys come from Infisical or `.env` — never set dummy values.
+### Coverage Gaps (to improve)
+Feature→Story: 70/669 (10.5%) · Story→AC: 154/227 (67.8%)
+Feature→Code: 38/669 · Feature→E2E: 14/669
+Fully traced (all 8 layers): 8/669 features
 
-### Security
+### Integrity Tests (28 pass)
+UUID format · referential integrity · bidirectional links · coverage 0-100%
+gap detection · Gherkin completeness · Feature→Story→AC chain join
 
-- Secrets managed via Infisical — never commit API keys.
-- Auth: JWT (access 15min + refresh 7d cookie) + bcrypt. Rate limiting per endpoint.
-- CI actions are pinned to SHA (not mutable tags) to prevent supply-chain attacks.
-- Prompt injection guard in `platform/security/prompt_guard.py`.
+## Lighthouse (all pages 100/100/100/91+)
+GZipMiddleware · meta description · /robots.txt · heading hierarchy · contrast 4.5:1+
+Login: 100/100/100/100 · Dashboard: 100/100/100/91 · Wiki/Projects: 100/100/100/91
 
-## Traceability SQLite DB (session-scoped, live data)
+## LLM — FROZEN
+minimax M2.5 · azure-openai gpt-5-mini/5.2/5.2-codex · azure-ai gpt-5.2 · nvidia Kimi-K2 · local-mlx
+MiniMax: no temp · no mangle · `<think>` stripped · parallel_tool_calls=False
 
-UDID scheme: `FT-SF-NNN` (features) · `US-SF-NNN` (stories) · `AC-SF-NNN` (acceptance) · `TU-SF-NNN` / `TE-SF-NNN` (tests) · `CO-{CAT}-NNN` (concepts)
-
-### Tables & Counts
-| Table | Count | Schema |
-|-------|-------|--------|
-| `trace_features` | 49 | id,name,desc,priority,status,persona_id,soc2,iso27001 |
-| `trace_stories` | 57 | id,feature_id(FK),title,desc,story_points,status,acceptance_gherkin |
-| `trace_acceptance` | 38 | id,story_id(FK),criterion,gherkin,status |
-| `trace_tests_unit` | 21 | id,file_path,test_name,ac_id(FK),story_id,status |
-| `trace_tests_e2e` | 10 | id,file_path,test_name,story_id,ihm_id,persona_id,status |
-| `trace_links` | 61 | source_type,source_id,target_type,target_id,link_type |
-| `concepts` | 140 | udid,name,category,source_file,description |
-| `feature_tests` | 30 | id,feature,test_type,status,details |
-
-### Coverage
-- 49/49 features → stories (100%)
-- 33/57 stories → ACs (58%)
-- 38/38 ACs pass · 21/21 unit tests pass · 10/10 E2E pass
-- 175 unique UDIDs · 0 orphans · 0 broken links
-
-### GossipSub (platform/ac/gossip.py)
-Cross-project mutation broadcasting: 4 types (skill_variant, instinct, genome, meta_insight)
-Producers: skill_thompson→broadcast_skill_win · instinct→broadcast_instinct_promotion
-Consumer: get_recent_gossip for cherry-picking · record_adoption for tracking
-DB: gossip_ledger (auto-created) · API: /api/cockpit/summary includes gossip stats
+## Security
+JWT(15min access + 7d refresh) + bcrypt · rate limit/endpoint · Infisical secrets
+CI pinned to SHA · prompt_guard.py · RBAC(49 files) · SOC2(92%) · ISO27001(88%)
 
 ## Gotchas
-
-- **Container path**: inside Docker it's `/app/macaron_platform/`, not `/app/platform/`
-- **SSE testing**: use `curl --max-time` — urllib will block forever on SSE streams
-- **Epic orchestration**: prompt building happens in `_build_phase_prompt()`, not in `workflows/store.py`
-- **Epic chat**: calls `_auto_create_planning_run()` if no active run exists
+- Container: `/app/macaron_platform/` not `/app/platform/`
+- SSE test: `curl --max-time` — urllib blocks forever
+- Epic orch: `_build_phase_prompt()` not `workflows/store.py`
+- Epic chat: `_auto_create_planning_run()` if no active run
+- `GZipMiddleware` (capital Z) from `starlette.middleware.gzip`
+- AgentStore: DB agents have bare-string persona (by design); YAML agents use PersonaConfig dict
