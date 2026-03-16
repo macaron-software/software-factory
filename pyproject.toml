@@ -51,4 +51,5 @@ testpaths = ["tests"]
 markers = [
     "live: tests requiring a running platform server",
     "stress: concurrency/load stress tests (subset of live)",
+    "prompt_eval: LLM prompt regression tests (requires API keys)",
 ]
