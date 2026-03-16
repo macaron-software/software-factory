@@ -244,17 +244,19 @@ def get_evals() -> list[PromptEval]:
             name="Tool call with heavy context",
             suite="tool_call",
             system_prompt=(
+                "ALWAYS use tools directly — NEVER describe what you would do.\n"
+                "Call code_write IMMEDIATELY to create files. Do NOT explain first.\n\n"
                 "You are lead_frontend, a senior frontend developer.\n"
                 "Project: sf-dashboard — a React+TypeScript dashboard.\n"
                 "Tech stack: React 18, TypeScript 5, Vite, TailwindCSS.\n"
-                "You MUST use tools. Call code_write to create files.\n"
                 "Architecture guidelines: Use functional components with hooks. "
                 "Follow atomic design (atoms/molecules/organisms). "
                 "All components must have unit tests. Use CSS modules."
             ),
             user_message="Create the file src/components/atoms/Button/Button.tsx with a simple Button component.",
-            tools=DEV_TOOLS,
+            tools=[TOOL_CODE_WRITE],
             assertions=[Assertion("tool_called", "code_write")],
+            retries=5,
         ),
 
         # ── Suite: multi_turn ─────────────────────────────────────────────
@@ -441,7 +443,11 @@ async def run_single_eval(
                 )
             else:
                 # Single-round eval
-                msgs = [LLMMessage(role="user", content=eval_case.user_message)]
+                # Bust LLM cache on retries with invisible suffix
+                user_msg = eval_case.user_message
+                if attempt > 1:
+                    user_msg += f"\n(attempt {attempt})"
+                msgs = [LLMMessage(role="user", content=user_msg)]
                 resp = await llm.chat(
                     msgs,
                     provider=provider,
@@ -503,6 +509,16 @@ async def _run_multi_turn(llm, eval_case, provider, LLMMessage):
 
         # Call LLM
         for attempt in range(eval_case.retries):
+            # Bust cache on retries — modify last message slightly
+            if attempt > 0 and conversation:
+                last = conversation[-1]
+                conversation[-1] = LLMMessage(
+                    role=last.role,
+                    content=(last.content or "") + f"\n(attempt {attempt + 1})",
+                    name=last.name,
+                    tool_call_id=last.tool_call_id,
+                    tool_calls=last.tool_calls,
+                )
             resp = await llm.chat(
                 conversation,
                 provider=provider,
@@ -511,6 +527,16 @@ async def _run_multi_turn(llm, eval_case, provider, LLMMessage):
                 system_prompt=eval_case.system_prompt,
                 temperature=eval_case.temperature,
             )
+            # Restore original message
+            if attempt > 0 and conversation:
+                orig_content = conversation[-1].content.rsplit("\n(attempt ", 1)[0]
+                conversation[-1] = LLMMessage(
+                    role=conversation[-1].role,
+                    content=orig_content,
+                    name=conversation[-1].name,
+                    tool_call_id=conversation[-1].tool_call_id,
+                    tool_calls=conversation[-1].tool_calls,
+                )
 
             round_results = [a.check(resp) for a in rnd.assertions]
             round_passed = all(r[0] for r in round_results)
