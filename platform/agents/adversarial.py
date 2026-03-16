@@ -277,6 +277,36 @@ _FALSE_FALLBACK_PATTERNS = [
      "pass with TODO — implementation missing"),
 ]
 
+# Maintainability anti-patterns (SWE-CI inspired)
+# Shift from "it compiles" to "it is maintainable long-term"
+# Applied to code_write files — checks extensibility, not just correctness
+# Ref: feat-maintainability-detectors
+_MAINTAINABILITY_PATTERNS = [
+    # Magic numbers — hardcoded values that should be named constants
+    (r"""(?:if|while|for|return|==|!=|<|>|<=|>=)\s*\(?[^0-9]*\b\d{3,}\b""",
+     "MAGIC_NUMBER: Large numeric literal in logic — extract to named constant"),
+    # Hardcoded string config — URLs, paths, timeouts that should be config
+    (r"""(?:url|endpoint|host|server)\s*=\s*['"]https?://[^'"]+['"]""",
+     "HARDCODED_CONFIG: URL hardcoded — use environment variable or config"),
+    (r"""(?:timeout|delay|interval|retries)\s*=\s*\d{2,}""",
+     "HARDCODED_CONFIG: Numeric config hardcoded — use constant or env var"),
+    # God function — too many parameters (>5) = poor interface design
+    (r"""def\s+\w+\s*\([^)]{200,}\)""",
+     "GOD_FUNCTION: Function signature >200 chars — too many parameters, use a config object"),
+    # Deep inheritance — extending 3+ levels is fragile
+    (r"""class\s+\w+\s*\(\s*\w+\s*\)\s*:.*class\s+\w+\s*\(\s*\w+\s*\)\s*:""",
+     "DEEP_INHERITANCE: Prefer composition over deep inheritance chains"),
+    # Catch-all error handling — swallows specific errors
+    (r"""except\s*:\s*$""",
+     "BARE_EXCEPT: Bare except catches SystemExit/KeyboardInterrupt — use except Exception"),
+    # String concatenation in loops (performance anti-pattern)
+    (r"""for\s+.*:\s*\n\s+\w+\s*\+=\s*['"]""",
+     "STRING_CONCAT_LOOP: String concatenation in loop — use join() or StringBuilder"),
+    # Mutable default argument (Python footgun)
+    (r"""def\s+\w+\s*\([^)]*=\s*(?:\[\]|\{\})\s*[,)]""",
+     "MUTABLE_DEFAULT: Mutable default argument (list/dict) — use None + conditional"),
+]
+
 # Stack mismatch detection — backend code in wrong language
 # Maps declared stack keywords to expected/forbidden file extensions
 _STACK_RULES = {
@@ -544,6 +574,16 @@ def check_l0(
                     slop_hits += 1
                     if slop_hits >= 3:
                         break  # cap at 3 slop warnings per file
+            # Maintainability checks — extensibility anti-patterns (SWE-CI inspired)
+            # Lower score than test cheating — these are warnings, not hard rejects
+            maintain_hits = 0
+            for pattern, desc in _MAINTAINABILITY_PATTERNS:
+                if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"MAINTAINABILITY: {desc} in {file_path}")
+                    score += 1  # warning — cumulative
+                    maintain_hits += 1
+                    if maintain_hits >= 3:
+                        break  # cap per file
 
     # Quality checks — no tests in code_write, high complexity indicators
     if has_write_tool:
