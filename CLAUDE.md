@@ -143,11 +143,11 @@ L0=120ch · L1=600ch · L2=1500ch
 ## Traceability — UUID-Linked (live PG → session SQLite)
 
 ### UUID Scheme
-Features: `feat-{id}` (676) · Stories: `us-{id}` (248) · ACs: `ac-{id}` (193)
-Personas: `p-{role}` (16) · Trace links: `tl-{type}-{id}` (590)
+Features: `feat-{id}` (685) · Stories: `us-{id}` (262) · ACs: `ac-{id}` (221)
+Personas: `p-{role}` (16) · Trace links: `tl-{type}-{id}` (615)
 
-### E2E Chain (8 layers · 70 integrity tests)
-Persona(16) → Feature(676) → Story(248) → AC(193, Gherkin)
+### E2E Chain (8 layers · 108 integrity tests)
+Persona(16) → Feature(685) → Story(262) → AC(221, Gherkin)
 → IHM(43) → Code(45) → UnitTest(17) → E2E(14)
 + CRUD(655: 403G/202P/27D/13PA/10PU) + RBAC(49/49)
 
@@ -155,17 +155,33 @@ Persona(16) → Feature(676) → Story(248) → AC(193, Gherkin)
 7 features · 21 stories · 39 ACs · 24 trace links · 42/42 tests
 cognitive.py · prompt_builder.py · store.py · pua.py · git_tools.py · migrations.py
 
+### SWE-CI / RC Fixes Traceability (100%)
+9 features · 14 stories · 28 ACs · 25 trace links · 78 tests
+pm_checkpoint.py · adversarial.py · engine.py · human_in_the_loop.py
+
 ### Session SQLite Tables
 | Table | Rows | Key Columns |
 |-------|------|-------------|
-| features | 676 | id,name,status,story_count,ac_count,has_{ihm,code,unit_test,e2e,crud,rbac},coverage_pct |
-| user_stories | 248 | id,title,feature_id(FK),status,ac_count |
-| acceptance_criteria | 193 | id,feature_id,story_id(FK),title,given/when/then_text,status |
+| features | 685 | id,name,status,story_count,ac_count,has_{ihm,code,unit_test,e2e,crud,rbac},coverage_pct |
+| user_stories | 262 | id,title,feature_id(FK),status,ac_count |
+| acceptance_criteria | 221 | id,feature_id,story_id(FK),title,given/when/then_text,status |
 | personas | 16 | id,name,role,feature_count |
-| trace_links | 590 | id,source_type,source_id,target_type,target_id,link_type,verified |
-| traceability_matrix | 27 | id,layer,total,covered,pct,details |
+| trace_links | 615 | id,source_type,source_id,target_type,target_id,link_type,verified |
+| traceability_matrix | 31 | id,layer,total,covered,pct,details |
 
 ### Annotations: .py=`# Ref: feat-*` · .html=`<!-- Ref: feat-* -->` · .ts=`// Ref: feat-*`
+
+## ANC Metric — SWE-CI CI-Loop (services/pm_checkpoint.py)
+NC = (p_i-p_0)/(p_*-p_0) improve · (p_i-p_0)/p_0 regress. ANC = mean(NC).
+`TestResult`: total/passed/failed/skipped. `ANCScore`: baseline/current/target/nc/history/anc.
+`run_test_gate(ws)` — auto pytest/Jest/cargo/Go. `compute_anc()` — NC+ANC.
+`generate_test_gap_requirements()` — CI-loop architect→programmer bridge.
+PM checkpoint: NC<-0.2 → force retry. PMDecision +test_result +anc_score.
+
+## Maintainability Detectors (agents/adversarial.py)
+8 _MAINTAINABILITY_PATTERNS: MAGIC_NUMBER · HARDCODED_CONFIG · GOD_FUNCTION
+DEEP_INHERITANCE · BARE_EXCEPT · STRING_CONCAT_LOOP · MUTABLE_DEFAULT
+Score +1 each (warning), cap 3/file. Total: 53 adversarial patterns.
 
 ## Lighthouse — 100/100/100/91+
 GZipMiddleware(capital Z) · meta description · /robots.txt · heading hierarchy · contrast 4.5:1+

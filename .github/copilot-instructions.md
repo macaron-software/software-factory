@@ -118,11 +118,11 @@ Params: `file` (not `file_path`), absolute paths required.
 
 ## Traceability (live PG → session SQLite)
 ### UUID Scheme
-Features: `feat-{id}` (676) · Stories: `us-{id}` (248) · ACs: `ac-{id}` (193)
-Trace links: `tl-{type}-{id}` (590) · Personas: `p-{role}` (16)
+Features: `feat-{id}` (685) · Stories: `us-{id}` (262) · ACs: `ac-{id}` (221)
+Trace links: `tl-{type}-{id}` (615) · Personas: `p-{role}` (16)
 
 ### E2E Chain (8 layers)
-Persona(16) → Feature(676) → Story(248) → AC(193,Gherkin)
+Persona(16) → Feature(685) → Story(262) → AC(221,Gherkin)
 → IHM(43 feat-linked) → Code(45) → UnitTest(17) → E2E(14)
 + CRUD(655 handlers) + RBAC(49/49 route files)
 
@@ -130,9 +130,38 @@ Persona(16) → Feature(676) → Story(248) → AC(193,Gherkin)
 7 features · 21 stories · 39 ACs · 24 trace links · 42/42 tests pass
 Files: cognitive.py prompt_builder.py store.py pua.py git_tools.py migrations.py
 
-### Integrity Tests (28+42 pass)
+### SWE-CI / RC Fixes Traceability (100% complete)
+9 features · 14 stories · 28 ACs · 25 trace links · 38+40 tests pass
+Files: pm_checkpoint.py adversarial.py engine.py human_in_the_loop.py
+
+### Integrity Tests (28+42+38 pass)
 UUID format · referential integrity · bidirectional links · coverage 0-100%
 gap detection · Gherkin completeness · Feature→Story→AC chain join
+
+## ANC Metric — SWE-CI CI-Loop (pm_checkpoint.py)
+Tracks test pass count evolution across sprint iterations.
+NC = (p_i - p_0)/(p_* - p_0) improve · (p_i - p_0)/p_0 regress.
+ANC = mean(NC) across all iterations. Positive=improving, 1.0=target.
+
+### Dataclasses
+`TestResult`: total/passed/failed/skipped/command (parsed from runner output)
+`ANCScore`: baseline_passed/current_passed/target_passed/nc/history/anc
+
+### Functions
+`run_test_gate(workspace)` — auto-detect pytest/Jest/cargo/Go, execute, parse
+`compute_anc(baseline, current, target, prior_ncs)` — compute NC+ANC
+`generate_test_gap_requirements(test_result, build_result, anc, phase)` — CI-loop bridge
+
+### PM Checkpoint Integration
+pm_checkpoint() gains: baseline_tests_passed, target_tests_passed, prior_anc_history params.
+Regression guard: NC < -0.2 → force retry. ANC in evidence_summary.
+PMDecision gains: test_result, anc_score fields.
+
+## Maintainability Detectors (adversarial.py)
+8 patterns in _MAINTAINABILITY_PATTERNS (SWE-CI "maintainable > correct"):
+MAGIC_NUMBER · HARDCODED_CONFIG(url/timeout) · GOD_FUNCTION · DEEP_INHERITANCE
+BARE_EXCEPT · STRING_CONCAT_LOOP · MUTABLE_DEFAULT
+Score +1 each (warning), capped 3/file. Total adversarial: 53 patterns.
 
 ## UI / Frontend
 - HTMX partial swaps: `hx-get="/partial/X" hx-trigger="load"` · returns HTML not JSON
