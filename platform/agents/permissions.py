@@ -57,9 +57,9 @@ _GIT_WRITE_TOOLS = {"git_commit"}
 _GIT_READ_TOOLS = {"git_status", "git_log", "git_diff"}
 _ALL_WRITE_TOOLS = _FILE_WRITE_TOOLS | _GIT_WRITE_TOOLS
 
-# Rate limit defaults
-MAX_TOOL_CALLS_PER_SESSION = 200
-MAX_WRITES_PER_SESSION = 300
+# Rate limit defaults (configurable via env)
+MAX_TOOL_CALLS_PER_SESSION = int(os.environ.get("MAX_TOOL_CALLS_PER_SESSION", "500"))
+MAX_WRITES_PER_SESSION = int(os.environ.get("MAX_WRITES_PER_SESSION", "500"))
 
 # Default denied path patterns (always blocked regardless of config)
 _ALWAYS_DENIED_BASENAMES = {".env", "id_rsa", "id_ed25519"}
