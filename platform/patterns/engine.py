@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1024,8 +1025,6 @@ async def _execute_node(
             # Auto-create design system scaffold if it doesn't exist
             if ctx.project_path:
                 try:
-                    import os
-
                     styles_dir = os.path.join(ctx.project_path, "src", "styles")
                     tokens_path = os.path.join(styles_dir, "tokens.css")
                     if not os.path.exists(tokens_path):
