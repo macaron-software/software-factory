@@ -942,6 +942,27 @@ def check_l0(
     # trigger false positives for "hallucination" (claiming actions without tool calls)
     if any(k in role_lower for k in ("qa", "test", "validation", "e2e")):
         threshold = 8
+
+    # LLM-aware threshold scaling: weaker models (MiniMax M2.5) produce more
+    # false positives on SLOP/HALLUCINATION detectors — raise threshold to reduce
+    # unrecoverable rejection loops (91.5% rejection rate observed with MiniMax)
+    try:
+        from ..config import get_config
+        _llm_cfg = get_config().llm
+        _primary = getattr(_llm_cfg, "default_provider", "") or ""
+        _model = getattr(_llm_cfg, "default_model", "") or ""
+        # Tier 1 (strong): gpt-5*, claude-*, gemini-* → default threshold
+        # Tier 2 (medium): minimax, mistral, llama → +2 threshold
+        # Tier 3 (weak): local-mlx, ollama → +3 threshold
+        _weaker_providers = {"minimax", "nvidia", "mistral"}
+        _weakest_providers = {"local-mlx", "ollama"}
+        if _primary in _weakest_providers:
+            threshold += 3
+        elif _primary in _weaker_providers:
+            threshold += 2
+    except Exception:
+        pass  # config unavailable — keep default threshold
+
     return GuardResult(
         passed=score < threshold,
         score=score,
@@ -1088,8 +1109,20 @@ Respond ONLY with JSON:
             l1_score = max(l1_score, 7)  # floor at 7 = force retry
             verdict = "REJECT"
 
+        # Scale L1 threshold for weaker LLM providers (mirrors L0 scaling)
+        _l1_threshold = 6
+        try:
+            from ..config import get_config
+            _l1_prov = getattr(get_config().llm, "default_provider", "") or ""
+            if _l1_prov in ("local-mlx", "ollama"):
+                _l1_threshold += 3
+            elif _l1_prov in ("minimax", "nvidia", "mistral"):
+                _l1_threshold += 2
+        except Exception:
+            pass
+
         return GuardResult(
-            passed=verdict == "APPROVE" and l1_score < 6,
+            passed=verdict == "APPROVE" and l1_score < _l1_threshold,
             score=l1_score,
             issues=[f"L1: {i}" for i in l1_issues],
             level="L1",

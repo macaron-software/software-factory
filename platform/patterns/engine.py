@@ -1299,6 +1299,14 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # Coordinators and discussion patterns skip L1 (expensive LLM check)
     # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
     MAX_ADVERSARIAL_RETRIES = 1  # 1 retry = 2 attempts total for execution patterns
+    # Weaker LLMs get an extra retry — they struggle more to recover from rejections
+    try:
+        from ..config import get_config as _get_cfg
+        _adv_prov = getattr(_get_cfg().llm, "default_provider", "") or ""
+        if _adv_prov in ("minimax", "nvidia", "mistral", "local-mlx", "ollama"):
+            MAX_ADVERSARIAL_RETRIES = 2  # 2 retries = 3 attempts total
+    except Exception:
+        pass
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
     is_discussion = run.pattern.type in _discussion_patterns

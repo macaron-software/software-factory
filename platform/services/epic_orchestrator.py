@@ -1404,7 +1404,9 @@ class EpicOrchestrator:
                     await asyncio.sleep(0.8)
 
             # Human-in-the-loop checkpoint
-            if pattern_type == "human-in-the-loop":
+            # Skip HITL validation if the pattern itself crashed — nothing to validate
+            _pattern_crashed = bool(phase_error) and not phase_success and result is None
+            if pattern_type == "human-in-the-loop" and not _pattern_crashed:
                 phase.status = PhaseStatus.WAITING_VALIDATION
                 run_store.update(mission)
                 await self._push_sse(
