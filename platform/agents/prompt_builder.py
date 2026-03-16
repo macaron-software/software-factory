@@ -182,28 +182,20 @@ Do NOT repeat the same approach. Change your behavior fundamentally.""")
 
     if ctx.tools_enabled:
         parts.append("""
-You have access to tools via function calling. When you need to take action, call the tools directly — do NOT write tool calls as text (no [TOOL_CALL], no JSON in your response). The system handles tool execution automatically when you use function calling.
-CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE your tools immediately. Do not just describe what you would do — actually do it.
+You have access to tools via function calling. Call tools directly — do NOT write tool calls as text.
+CRITICAL: When asked to CREATE or IMPLEMENT something, call code_write WITHIN YOUR FIRST 3 ROUNDS.
+Do not spend all rounds exploring — explore quickly (1 list_files), then WRITE code.
 
-## Memory (MANDATORY)
-1. ALWAYS call memory_search(query="<topic>") at the START of your work to see what was already decided/built.
-2. ALWAYS call memory_store() at the END to record your key decisions, findings, or deliverables.
-   - key: short identifier (e.g. "auth-strategy", "db-schema", "api-design")
-   - value: concrete decision/finding (1-3 sentences, factual, no filler)
-   - category: architecture | development | quality | security | infrastructure | product | design | convention
-   Example: memory_store(key="auth-strategy", value="JWT with refresh tokens, bcrypt for passwords, 15min access token TTL", category="architecture")
-3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
-4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
+## Memory (recommended, not blocking)
+- Call memory_search(query="<topic>") to check prior decisions — skip if the task is clear.
+- Call memory_store() at the END to record key decisions.""")
 
-        # RLM instruction — mandatory for agents with deep_search access
+        # RLM instruction — optional, not mandatory
         if ctx.allowed_tools is None or "deep_search" in (ctx.allowed_tools or []):
             parts.append("""
-## Deep Search / RLM (MANDATORY after memory)
-After calling memory_search, if the question involves codebase exploration, technical analysis, specs understanding, or architectural decisions:
-3. ALWAYS call deep_search(query="<your question>") BEFORE synthesizing your answer.
-   deep_search triggers the RLM (Recursive Language Model) engine: it runs iterative parallel sub-agent exploration (grep, file read, structure analysis) and is 10× more thorough than memory_search alone.
-   Use it for: "how does X work?", "where is Y implemented?", "what are the specs for Z?", "analyse l'architecture de...", "que faut-il pour coder..."
-   Skip it only for: simple factual lookups, greetings, or when you already called it this turn.""")
+## Deep Search / RLM (optional — use only when exploring unfamiliar code)
+Call deep_search(query="<question>") for complex codebase exploration.
+Skip it when you already know what to build — go straight to code_write.""")
 
         # Role-specific tool instructions
         role_cat = _classify_agent_role(agent)
@@ -306,9 +298,9 @@ RULES:
             parts.append("""
 ## Tool Usage (MANDATORY — zero tolerance)
 You are an EXECUTION agent. Every response MUST include tool calls.
-1. READ first: code_read / list_files to understand the workspace
-2. WRITE code: code_write / code_edit to create or modify files
-3. VERIFY: build / test to confirm your changes work
+1. WRITE code FIRST: code_write / code_edit — this is your PRIMARY action
+2. Read only if needed: code_read / list_files to check existing code (max 2 calls)
+3. VERIFY after writing: build / test to confirm your changes work
 NEVER describe what you would do — DO IT with tool calls.
 Text-only responses WITHOUT tool calls = automatic REJECTION.
 If a tool fails, try a different approach — do NOT give up and describe instead.""")

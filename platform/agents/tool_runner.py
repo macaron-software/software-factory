@@ -610,7 +610,8 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
     """RLM: Deep recursive search (MIT CSAIL arXiv:2512.24601)."""
     from .rlm import get_project_rlm
 
-    query = args.get("query", "")
+    # Accept 'q' as alias for 'query' (MiniMax M2.5 sometimes abbreviates param names)
+    query = args.get("query", "") or args.get("q", "")
     if not query:
         return "Error: query is required"
     if not ctx.project_id and not ctx.project_path:
