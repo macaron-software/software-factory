@@ -30,6 +30,7 @@ from .patterns import router as patterns_router
 from .agent_bench import router as agent_bench_router
 from .team_bench import router as team_bench_router
 from .partials import router as partials_router
+from .pulse import router as pulse_router
 
 router = APIRouter()
 
@@ -59,3 +60,4 @@ router.include_router(patterns_router)
 router.include_router(agent_bench_router)
 router.include_router(team_bench_router)
 router.include_router(partials_router)
+router.include_router(pulse_router)

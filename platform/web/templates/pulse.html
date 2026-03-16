@@ -1,0 +1,178 @@
+<!-- Ref: feat-lean-ux -->
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+/* ── Pulse — Apple-style "only useful now" dashboard ─────── */
+.pulse { padding: 1.5rem 2rem; max-width: 960px; margin: 0 auto; }
+.pulse-header { margin-bottom: 1.5rem; }
+.pulse-title { font-size: var(--text-2xl); font-weight: 700; color: var(--text-primary); margin: 0; }
+.pulse-subtitle { font-size: var(--text-base); color: var(--text-secondary); margin-top: 0.25rem; }
+
+/* KPI strip — 3 cards, no more */
+.pulse-kpis { display: flex; gap: 1rem; margin-bottom: 2rem; }
+.pulse-kpi { flex: 1; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem 1rem; text-align: center; transition: border-color 0.15s; }
+.pulse-kpi:hover { border-color: var(--purple); }
+.pulse-kpi-value { font-size: var(--text-3xl); font-weight: 800; font-variant-numeric: tabular-nums; }
+.pulse-kpi-label { font-size: var(--text-sm); color: var(--text-secondary); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.pulse-kpi--blocked .pulse-kpi-value { color: var(--yellow); }
+.pulse-kpi--running .pulse-kpi-value { color: var(--purple); }
+.pulse-kpi--done .pulse-kpi-value { color: var(--green); }
+
+/* Section headings */
+.pulse-section { margin-bottom: 1.5rem; }
+.pulse-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.pulse-section-title { font-size: var(--text-md); font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+.pulse-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; font-size: 0.6rem; font-weight: 700; padding: 0 5px; }
+.pulse-badge--warn { background: var(--yellow); color: #000; }
+.pulse-badge--info { background: var(--purple-deep); color: #fff; }
+
+/* Mission cards */
+.pulse-missions { display: flex; flex-direction: column; gap: 0.5rem; }
+.pulse-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: border-color 0.15s; }
+.pulse-card:hover { border-color: var(--purple); }
+.pulse-card--blocked { border-left: 3px solid var(--yellow); }
+.pulse-card--running { border-left: 3px solid var(--purple); }
+.pulse-card--failed { border-left: 3px solid var(--red); }
+
+/* Blocked card — expanded */
+.pulse-card-main { display: flex; align-items: center; padding: 0.75rem 1rem; gap: 1rem; cursor: pointer; }
+.pulse-card-info { flex: 1; min-width: 0; }
+.pulse-card-name { font-size: var(--text-md); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pulse-card-meta { font-size: var(--text-sm); color: var(--text-secondary); margin-top: 0.15rem; display: flex; gap: 0.75rem; align-items: center; }
+.pulse-card-phase { color: var(--purple-light); }
+.pulse-card-agent { opacity: 0.8; }
+.pulse-card-time { opacity: 0.6; }
+
+/* Progress bar (inline, thin) */
+.pulse-bar { flex: 0 0 120px; height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; }
+.pulse-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.pulse-bar-fill--purple { background: var(--purple); }
+.pulse-bar-fill--green { background: var(--green); }
+.pulse-bar-fill--yellow { background: var(--yellow); }
+.pulse-pct { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); min-width: 32px; text-align: right; }
+
+/* Action buttons */
+.pulse-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.pulse-btn { padding: 0.35rem 0.75rem; border-radius: 6px; font-size: var(--text-sm); font-weight: 600; border: none; cursor: pointer; transition: opacity 0.15s; }
+.pulse-btn:hover { opacity: 0.85; }
+.pulse-btn--go { background: var(--green); color: #000; }
+.pulse-btn--nogo { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); }
+.pulse-btn--view { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border); }
+
+/* Expanded detail (blocked cards) */
+.pulse-card-detail { padding: 0 1rem 0.75rem; border-top: 1px solid var(--border); }
+.pulse-card-detail-inner { padding-top: 0.6rem; font-size: var(--text-sm); color: var(--text-secondary); }
+.pulse-card-detail .pulse-quality { display: flex; gap: 1.5rem; margin-top: 0.4rem; }
+.pulse-quality-item { display: flex; align-items: center; gap: 0.3rem; }
+.pulse-quality-label { opacity: 0.7; }
+.pulse-quality-val { font-weight: 600; color: var(--text-primary); }
+
+/* ANC sparkline (tiny inline) */
+.pulse-anc { display: inline-flex; align-items: center; gap: 0.3rem; }
+.pulse-anc-arrow { font-size: 0.7rem; }
+.pulse-anc-arrow--up { color: var(--green); }
+.pulse-anc-arrow--down { color: var(--red); }
+.pulse-anc-arrow--flat { color: var(--text-secondary); }
+
+/* New mission button */
+.pulse-new { margin-top: 1rem; }
+.pulse-new-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; background: var(--purple-deep); color: #fff; border: none; border-radius: 8px; font-size: var(--text-md); font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.pulse-new-btn:hover { background: var(--purple); }
+.pulse-new-btn svg { width: 14px; height: 14px; }
+
+/* Empty state */
+.pulse-empty { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); }
+.pulse-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.pulse-empty-text { font-size: var(--text-md); }
+
+/* Completed today strip */
+.pulse-done-strip { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 1.5rem; }
+.pulse-done-label { font-size: var(--text-sm); color: var(--text-secondary); }
+.pulse-done-count { font-size: var(--text-lg); font-weight: 700; color: var(--green); }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .pulse { padding: 1rem; }
+  .pulse-kpis { flex-direction: column; }
+  .pulse-bar { flex: 0 0 60px; }
+  .pulse-card-meta { flex-wrap: wrap; }
+}
+
+/* ── Mission detail (inline expand) ── */
+.pulse-mission-detail { padding: 1rem 1.25rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 0.5rem; }
+.pulse-mission-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.pulse-mission-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; }
+.pulse-mission-progress { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.pulse-progress-mini { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.pulse-progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.3s; }
+.pulse-progress-text { font-size: var(--text-xs); color: var(--text-secondary); white-space: nowrap; }
+
+/* Phase timeline dots */
+.phase-timeline { display: flex; align-items: flex-start; gap: 0; padding: 0.5rem 0; overflow-x: auto; }
+.phase-dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 48px; position: relative; }
+.phase-dot-wrap:not(:last-child)::after { content: ""; position: absolute; top: 8px; left: calc(50% + 10px); right: calc(-50% + 10px); height: 2px; background: var(--border); }
+.phase-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg-primary); position: relative; z-index: 1; }
+.dot-done { background: var(--green); border-color: var(--green); }
+.dot-active { background: var(--accent); border-color: var(--accent); animation: dot-pulse 1.5s ease-in-out infinite; }
+.dot-fail { background: var(--red, #e53e3e); border-color: var(--red, #e53e3e); }
+.dot-pending { background: var(--bg-primary); border-color: var(--border); }
+@keyframes dot-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); } 50% { box-shadow: 0 0 0 6px rgba(99,102,241,0); } }
+.phase-dot-label { font-size: 0.6rem; color: var(--text-secondary); text-align: center; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Current phase expanded */
+.phase-expanded { padding: 0.75rem 1rem; background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: var(--radius); margin-top: 0.5rem; }
+.phase-expanded-name { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); margin-bottom: 4px; }
+.phase-expanded-meta { display: flex; gap: 1rem; font-size: var(--text-xs); color: var(--text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pulse">
+  <div class="pulse-header">
+    <h1 class="pulse-title">Pulse</h1>
+    <p class="pulse-subtitle">What needs your attention right now</p>
+  </div>
+
+  <!-- KPI strip — loaded via HTMX, refreshes every 30s -->
+  <div class="pulse-kpis"
+       hx-get="/api/pulse/kpis"
+       hx-trigger="load, every 30s"
+       hx-swap="innerHTML">
+    <div class="pulse-kpi pulse-kpi--running"><div class="pulse-kpi-value">-</div><div class="pulse-kpi-label">Running</div></div>
+    <div class="pulse-kpi pulse-kpi--blocked"><div class="pulse-kpi-value">-</div><div class="pulse-kpi-label">Blocked</div></div>
+    <div class="pulse-kpi pulse-kpi--done"><div class="pulse-kpi-value">-</div><div class="pulse-kpi-label">Done today</div></div>
+  </div>
+
+  <!-- Blocked / Needs Attention — expanded cards -->
+  <div class="pulse-section" id="pulse-blocked"
+       hx-get="/api/pulse/blocked"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML">
+    <!-- HTMX loads blocked missions here -->
+  </div>
+
+  <!-- Running — collapsed progress bars -->
+  <div class="pulse-section" id="pulse-running"
+       hx-get="/api/pulse/running"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML">
+    <!-- HTMX loads running missions here -->
+  </div>
+
+  <!-- Completed today strip -->
+  <div class="pulse-section" id="pulse-done"
+       hx-get="/api/pulse/done"
+       hx-trigger="load, every 60s"
+       hx-swap="innerHTML">
+  </div>
+
+  <!-- New mission CTA -->
+  <div class="pulse-new">
+    <button class="pulse-new-btn" onclick="document.getElementById('cmdPalette').showModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Mission
+    </button>
+  </div>
+</div>
+{% endblock %}

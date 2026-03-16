@@ -104,6 +104,9 @@
                     <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>
+                    <li><a href="/pulse" data-tooltip="Pulse" class="{% if page_title == 'Pulse' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-zap"/></svg>
+                    </a></li>
                     <li><a href="/projects" data-tooltip="Projects" class="{% if page_title in ('Projects', 'Project') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-folder"/></svg>
                     </a></li>
@@ -123,6 +126,9 @@
                     {% endif %}
                 {% else %}
                     {# ── Full UI ── #}
+                    <li><a href="/pulse" data-tooltip="Pulse" class="{% if page_title == 'Pulse' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-zap"/></svg>
+                    </a></li>
                     <li><a href="/cockpit" data-tooltip="Cockpit" class="{% if page_title == 'Cockpit' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
@@ -1318,5 +1324,6 @@ body.sf-wireframe #sfWireframeBtn {
   });
 })();
 </script>
+{% include "partials/cmd_palette.html" %}
 </body>
 </html>

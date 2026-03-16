@@ -112,6 +112,15 @@ async def home_page(request: Request):
     )
 
 
+@router.get("/pulse", response_class=HTMLResponse)
+async def pulse_page(request: Request):
+    """Pulse — Lean UX dashboard: only useful-now data."""
+    return _templates(request).TemplateResponse(
+        "pulse.html",
+        {"request": request, "page_title": "Pulse"},
+    )
+
+
 @router.get("/cockpit", response_class=HTMLResponse)
 async def cockpit_page(request: Request):
     """Cockpit — vue synthétique de toute la Software Factory."""
