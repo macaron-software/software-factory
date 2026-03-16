@@ -48,6 +48,7 @@ phases:
   config:
     disable_thinking: true
     feedback: tools
+    max_iterations: 2
     agents:
     - strat-dirprog
     - product_manager

@@ -1283,9 +1283,21 @@ async def run_guard(
         "scrum",
         "rh",
         "programme",
+        # English equivalents (agent roles can be in English)
+        "program",
+        "director",
+        "manager",
+        "master",
+        "officer",
+        "chef",
+        "coordinat",
     }
     role_lower = (agent_role or "").lower()
-    is_dev_role = not any(nr in role_lower for nr in _non_dev_roles)
+    agent_name_lower = (agent_name or "").lower()
+    is_dev_role = not any(
+        nr in role_lower or nr in agent_name_lower
+        for nr in _non_dev_roles
+    )
     if enable_l1 and pattern_type in execution_patterns and is_dev_role:
         l1 = await check_l1(
             content, task, agent_role, agent_name, tool_calls, pattern_type

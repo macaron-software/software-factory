@@ -73,9 +73,24 @@ async def run_human_in_the_loop(engine, run, task: str):
             if next_ns and next_ns.agent_id:
                 to_agent = next_ns.agent_id
 
-        output = await engine._execute_node(
-            run, nid, task, context_from=prev_output, to_agent_id=to_agent,
-        )
+        try:
+            output = await engine._execute_node(
+                run, nid, task, context_from=prev_output, to_agent_id=to_agent,
+            )
+        except WorkflowPaused:
+            raise  # legitimate pause — propagate
+        except Exception as exc:
+            # Crash recovery: don't leave phase stuck in waiting_validation
+            import logging
+            logging.getLogger(__name__).error(
+                "HITL node %s crashed: %s — marking done_with_issues", nid, exc
+            )
+            output = f"[Node {nid} crashed: {exc}]"
+            if ns:
+                from ..engine import NodeStatus
+                ns.status = NodeStatus.COMPLETED
+                ns.output = output
+
         prev_output = output
 
         # Insert checkpoint after this node if it has a checkpoint edge

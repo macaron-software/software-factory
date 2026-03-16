@@ -1397,8 +1397,31 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
 
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
+                # Build detector-specific recovery hints
+                _detector_hints: list[str] = []
+                for _issue in guard_result.issues[:5]:
+                    _iu = _issue.upper()
+                    if "HALLUCINATION" in _iu:
+                        _detector_hints.append("HALLUCINATION fix: only claim actions you performed via tools. Check tool_calls history.")
+                    elif "SLOP" in _iu:
+                        _detector_hints.append("SLOP fix: remove placeholder/generic text. Write specific, concrete content.")
+                    elif "MOCK" in _iu:
+                        _detector_hints.append("MOCK fix: replace TODO/NotImplementedError/pass with real implementation logic.")
+                    elif "TEST_CHEAT" in _iu:
+                        _detector_hints.append("TEST_CHEAT fix: remove @skip/@xtest/assert True. Write real test assertions.")
+                    elif "FAKE_BUILD" in _iu:
+                        _detector_hints.append("FAKE_BUILD fix: don't echo success. Run the actual build command.")
+                    elif "STACK_MISMATCH" in _iu:
+                        _detector_hints.append("STACK_MISMATCH fix: use the project's declared tech stack, not a different language.")
+                    elif "NO_CODE_WRITE" in _iu:
+                        _detector_hints.append("NO_CODE_WRITE fix: use code_write/code_edit tools to actually create files.")
+                    elif "LOC_REGRESSION" in _iu:
+                        _detector_hints.append("LOC_REGRESSION fix: don't delete working code. Add to it or refactor in-place.")
+
                 # Re-run agent with PUA pressure escalation (source: tanweai/pua MIT)
                 feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
+                if _detector_hints:
+                    feedback += "\n\nRecovery hints:\n" + "\n".join(f"  * {h}" for h in dict.fromkeys(_detector_hints))
 
                 # Collect phase-level failure context for cross-agent pressure
                 _phase_failures: dict[str, int] = {}
@@ -1535,6 +1558,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # All retries exhausted — check if critical flags warrant failure
                 has_critical = any(
                     "NO_CODE_WRITE" in i or "HALLUCINATION" in i or "FAKE_BUILD" in i
+                    or "NO_DELIVERABLE" in i or "TOOLS_USED_BUT_WASTED" in i
                     for i in guard_result.issues
                 )
                 if has_critical:

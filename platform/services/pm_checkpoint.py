@@ -104,16 +104,18 @@ async def run_build_gate(workspace: str, timeout: int = 300) -> BuildResult:
     # Combine stdout + stderr — some compilers (Swift) output errors to stdout
     raw = ((stderr or b"") + b"\n" + (stdout or b"")).decode("utf-8", errors="replace")
     # Extract unique errors (dedup by message content)
+    # Patterns: "error:" (gcc/clang/python) · "error[" (rust) · "error TS" (typescript)
+    # · ": error " (go) · "ERROR:" (maven/gradle) · "Error:" (dotnet/swift)
     error_lines = [
         ln.strip()
         for ln in raw.splitlines()
-        if "error:" in ln.lower() or "error[" in ln.lower()
+        if re.search(r"error[:\[\s]|:\s*error\b|^ERROR:", ln, re.IGNORECASE)
     ]
     seen_msgs = set()
     unique_errors = []
     for ln in error_lines:
-        # Extract just the error message part (after "error:")
-        match = re.search(r"error[:\[](.+)", ln, re.IGNORECASE)
+        # Extract just the error message part (after error marker)
+        match = re.search(r"error[:\[\s](.+)", ln, re.IGNORECASE)
         msg = match.group(1).strip() if match else ln
         if msg not in seen_msgs:
             seen_msgs.add(msg)
@@ -314,8 +316,17 @@ async def pm_checkpoint(
     """
     from ..llm.client import LLMMessage, get_llm_client
 
-    # Step 1: Build gate (deterministic)
-    build_result = await run_build_gate(workspace)
+    # Step 1: Build gate (deterministic) — only for code-producing phases
+    # Non-code phases (qa, ux-review, traceability, architecture) can't fix build errors
+    _BUILD_PHASE_KEYWORDS = ("dev", "sprint", "impl", "code", "fix", "tdd", "build", "cicd", "deploy")
+    is_code_phase = any(
+        k in (phase_id or "").lower()
+        for k in _BUILD_PHASE_KEYWORDS
+    )
+    if is_code_phase:
+        build_result = await run_build_gate(workspace)
+    else:
+        build_result = BuildResult(success=True, command="(skipped — non-code phase)")
 
     logger.warning(
         "PM_GATE build=%s errors=%d phase=%s sprint=%d/%d",
@@ -357,10 +368,6 @@ async def pm_checkpoint(
     )
 
     # Hard rules (deterministic, no LLM needed):
-    is_code_phase = any(
-        k in (phase_id or "").lower()
-        for k in ("dev", "sprint", "impl", "code", "fix", "tdd")
-    )
 
     if is_code_phase and not build_result.success:
         if sprint_num < max_sprints:
