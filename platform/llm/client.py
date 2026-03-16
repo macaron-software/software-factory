@@ -722,23 +722,8 @@ class LLMClient:
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
-            # MiniMax stops the tool-calling loop when it sees role=tool results.
-            # Convert tool results and assistant+tool_calls to user/assistant text
-            # so MiniMax continues acting instead of summarizing.
-            if provider == "minimax":
-                if role == "tool":
-                    _tname = name or "tool"
-                    d = {"role": "user", "content": f"[Tool result ({_tname})]: {content}"}
-                    msgs.append(d)
-                    continue
-                if role == "assistant" and tool_calls:
-                    _tc_summary = ", ".join(
-                        tc.get("function", {}).get("name", "?") if isinstance(tc, dict) else getattr(getattr(tc, "function", None), "name", "?")
-                        for tc in tool_calls
-                    )
-                    d = {"role": "assistant", "content": f"I called: {_tc_summary}"}
-                    msgs.append(d)
-                    continue
+            # MiniMax M2.5 supports native role=tool messages (OpenAI-compatible).
+            # _sanitize_tool_pairs() in executor.py handles orphaned tool_call_ids.
             if name:
                 d["name"] = name
             if tool_call_id:
@@ -1093,27 +1078,13 @@ class LLMClient:
                         d["content"] = f"[System instruction]: {d['content']}"
                         msgs.append(d)
                     continue
-                # MiniMax stops multi-turn tool loop when it sees role=tool.
-                # Convert to user/assistant text so it continues acting.
-                if d["role"] == "tool":
-                    _tname = m.name or "tool"
-                    d = {"role": "user", "content": f"[Tool result ({_tname})]: {d['content']}"}
-                    msgs.append(d)
-                    continue
-                if d["role"] == "assistant" and getattr(m, "tool_calls", None):
-                    _tc_names = ", ".join(
-                        tc.get("function", {}).get("name", "?") if isinstance(tc, dict) else getattr(getattr(tc, "function", None), "name", "?")
-                        for tc in m.tool_calls
-                    )
-                    d = {"role": "assistant", "content": f"I called: {_tc_names}"}
-                    msgs.append(d)
-                    continue
-            else:
-                if m.tool_call_id:
-                    d["tool_call_id"] = m.tool_call_id
-                if m.tool_calls:
-                    d["tool_calls"] = m.tool_calls
-                    d.pop("content", None)
+                # MiniMax M2.5 supports native role=tool — no conversion needed.
+                # _sanitize_tool_pairs() in executor.py handles orphaned tool_call_ids.
+            if m.tool_call_id:
+                d["tool_call_id"] = m.tool_call_id
+            if m.tool_calls:
+                d["tool_calls"] = m.tool_calls
+                d.pop("content", None)
             msgs.append(d)
         # Inject system prompt
         # local-mlx (mlx_lm.server) requires system message strictly at position 0 —
