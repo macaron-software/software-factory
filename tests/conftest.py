@@ -130,6 +130,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "regression: Regression tests"
     )
+    config.addinivalue_line(
+        "markers", "prompt_ci: Prompt CI tests (real LLM calls)"
+    )
+    config.addinivalue_line(
+        "markers", "slow: Slow tests (>10s, LLM round-trips)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
