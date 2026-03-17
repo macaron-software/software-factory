@@ -850,6 +850,29 @@ class EpicOrchestrator:
                     wf_phase.config.get("max_iterations"),
                 )
 
+            # ── Feature-Queue Model ──────────────────────────────────
+            # For dev phases: iterate through backlog features in batches
+            # Each sprint scopes to pending features and marks them done
+            _feature_queue: list = []
+            _features_done_this_phase: list[str] = []
+            if is_dev_phase and mission.id:
+                try:
+                    from ..epics.product import get_product_backlog
+                    _fq_pb = get_product_backlog()
+                    _all_feats = _fq_pb.list_features(epic_id=mission.id)
+                    _feature_queue = [f for f in _all_feats if f.status in ("backlog", "ready")]
+                    if _feature_queue:
+                        # Ensure max_sprints covers the feature queue
+                        _needed = len(_feature_queue) + 1  # +1 for cleanup sprint
+                        if max_sprints < _needed:
+                            max_sprints = min(_needed, 10)  # cap at 10
+                        logger.warning(
+                            "ORCH FEATURE_QUEUE phase=%s pending_features=%d max_sprints=%d",
+                            phase.phase_id, len(_feature_queue), max_sprints,
+                        )
+                except Exception as _fq_err:
+                    logger.warning("Feature queue init failed: %s", _fq_err)
+
             phase_success = False
             phase_error = ""
             current_sprint_id = None
@@ -906,12 +929,49 @@ class EpicOrchestrator:
                         f"\n\n--- {sprint_label} ---\n"
                         f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
                     )
-                    if sprint_num == 1:
-                        phase_task += "Focus: mise en place structure projet, première feature MVP.\n"
-                    elif sprint_num < max_sprints:
-                        phase_task += "Focus: itérez sur les features suivantes du backlog, utilisez le code existant.\n"
+                    # ── Feature-Queue: scope sprint to pending features ──
+                    if _feature_queue:
+                        # Refresh feature statuses
+                        try:
+                            from ..epics.product import get_product_backlog as _fq_pb2
+                            _fq = _fq_pb2()
+                            _all_f = _fq.list_features(epic_id=mission.id)
+                            _pending = [f for f in _all_f if f.status in ("backlog", "ready", "in_progress") and f.id not in _features_done_this_phase]
+                            _done_f = [f for f in _all_f if f.status == "done" or f.id in _features_done_this_phase]
+                        except Exception:
+                            _pending = _feature_queue
+                            _done_f = []
+
+                        if not _pending:
+                            phase_task += "\nAll features implemented. Focus: cleanup, tests, finalization.\n"
+                        else:
+                            # Scope this sprint to top 2 pending features
+                            _sprint_features = _pending[:2]
+                            _remaining = len(_pending) - len(_sprint_features)
+                            phase_task += (
+                                f"\n\nSPRINT {sprint_num} SCOPE — implement THESE features:\n"
+                            )
+                            for _sf_i, _sf in enumerate(_sprint_features):
+                                phase_task += f"  {_sf_i + 1}. [{_sf.story_points}SP] {_sf.name}: {_sf.description[:150]}\n"
+                                # Mark as in_progress
+                                try:
+                                    _fq.update_feature_status(_sf.id, "in_progress")
+                                except Exception:
+                                    pass
+                            if _remaining > 0:
+                                phase_task += f"\n({_remaining} more features in backlog for next sprints)\n"
+                            if _done_f:
+                                phase_task += "\nAlready implemented (DO NOT redo):\n"
+                                for _df in _done_f[:5]:
+                                    phase_task += f"  - [DONE] {_df.name}\n"
+                            phase_task += "\nIMPORTANT: Build on existing code. Do NOT recreate files that already exist.\n"
                     else:
-                        phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
+                        if sprint_num == 1:
+                            phase_task += "Focus: mise en place structure projet, première feature MVP.\n"
+                        elif sprint_num < max_sprints:
+                            phase_task += "Focus: itérez sur les features suivantes du backlog, utilisez le code existant.\n"
+                        else:
+                            phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
 
                     # Inject backlog from earlier phases
                     if mission.id:
@@ -934,8 +994,8 @@ class EpicOrchestrator:
                         except Exception:
                             pass
 
-                    # SAFe B1: Feature Pull
-                    if is_dev_phase:
+                    # SAFe B1: Feature Pull (full backlog view for context)
+                    if is_dev_phase and not _feature_queue:
                         try:
                             from ..epics.product import get_product_backlog
 
@@ -1391,10 +1451,64 @@ class EpicOrchestrator:
                     )
                     break
 
-                # Sprint succeeded but evidence gate was not applicable (no criteria).
-                # Break immediately — do NOT run sprint N+1 just because max_sprints > 1.
+                # Sprint succeeded — check if feature queue has more work
                 if phase_success:
-                    break
+                    # ── Feature-Queue: mark sprint features as done, continue if more ──
+                    if _feature_queue:
+                        try:
+                            from ..epics.product import get_product_backlog as _fq_pb3
+                            _fq3 = _fq_pb3()
+                            _all_f3 = _fq3.list_features(epic_id=mission.id)
+                            _still_pending = [
+                                f for f in _all_f3
+                                if f.status in ("backlog", "ready", "in_progress")
+                                and f.id not in _features_done_this_phase
+                            ]
+                            # Mark in_progress features as done (agents wrote code for them)
+                            for _f3 in _all_f3:
+                                if _f3.status == "in_progress" and _f3.id not in _features_done_this_phase:
+                                    _fq3.update_feature_status(_f3.id, "done")
+                                    _features_done_this_phase.append(_f3.id)
+                            # Recheck pending
+                            _still_pending = [
+                                f for f in _fq3.list_features(epic_id=mission.id)
+                                if f.status in ("backlog", "ready")
+                            ]
+                            if _still_pending and sprint_num < max_sprints:
+                                await self._sse_orch_msg(
+                                    f"Sprint {sprint_num} done ({len(_features_done_this_phase)} features). "
+                                    f"{len(_still_pending)} features remaining — next sprint…",
+                                    phase.phase_id,
+                                )
+                                logger.warning(
+                                    "ORCH FEATURE_QUEUE sprint=%d done, features_done=%d remaining=%d — continuing",
+                                    sprint_num, len(_features_done_this_phase), len(_still_pending),
+                                )
+                                # Inject done summary for next sprint context
+                                prev_context += (
+                                    f"\n\nSprint {sprint_num} completed successfully. "
+                                    f"Features done: {len(_features_done_this_phase)}. "
+                                    f"Remaining: {len(_still_pending)}. Continue with next features."
+                                )
+                                phase_success = False  # Reset to allow loop to continue
+                                await asyncio.sleep(0.8)
+                                continue  # Next sprint with next features
+                            else:
+                                logger.warning(
+                                    "ORCH FEATURE_QUEUE all features done (%d total) — exiting sprint loop",
+                                    len(_features_done_this_phase),
+                                )
+                                await self._sse_orch_msg(
+                                    f"All {len(_features_done_this_phase)} features implemented — sprint loop complete.",
+                                    phase.phase_id,
+                                )
+                                phase_success = True
+                                break
+                        except Exception as _fq3_err:
+                            logger.warning("Feature queue check failed: %s", _fq3_err)
+                            break
+                    else:
+                        break  # No feature queue — original behavior
 
                 if max_sprints > 1 and sprint_num < max_sprints:
                     await self._sse_orch_msg(

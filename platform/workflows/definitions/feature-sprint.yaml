@@ -148,7 +148,7 @@ phases:
   gate: no_veto
   config:
     agents: []
-    max_iterations: 3
+    max_iterations: 10
     dynamic_team: true
 - id: adversarial-review
   pattern_id: sequential

@@ -99,7 +99,7 @@ phases:
     - dev_backend
     - test_automation
     leader: lead_dev
-    max_iterations: 3
+    max_iterations: 10
 - id: traceability-check
   pattern_id: sequential
   name: Vérification Traçabilité E2E
