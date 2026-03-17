@@ -160,7 +160,11 @@ async def demo_login(request: Request):
     demo_email = os.environ.get("SF_DEMO_EMAIL", "admin@demo.local")
     demo_pass = os.environ.get("SF_DEMO_PASSWORD", "")
     if not demo_pass:
-        return JSONResponse({"error": "Demo login not configured"}, status_code=503)
+        # Local dev: use a default password so Skip (Demo) works without config
+        if os.environ.get("SF_LOCAL"):
+            demo_pass = "local-dev-skip"
+        else:
+            return JSONResponse({"error": "Demo login not configured"}, status_code=503)
     demo_name = "Demo Admin"
 
     loop = asyncio.get_event_loop()

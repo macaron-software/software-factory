@@ -194,9 +194,12 @@ DEMO_MISSIONS = [
 
 
 def is_demo_mode() -> bool:
-    """True when SF_DEMO_PASSWORD is set (demo env) OR provider is 'demo'.
+    """True when SF_DEMO_PASSWORD is set (demo env) OR provider is 'demo'
+    OR running locally (SF_LOCAL=1).
     Controls UI elements like the Skip (Demo) button on login page."""
     if os.environ.get("SF_DEMO_PASSWORD"):
+        return True
+    if os.environ.get("SF_LOCAL"):
         return True
     return os.environ.get("PLATFORM_LLM_PROVIDER", "").lower() == "demo"
 
