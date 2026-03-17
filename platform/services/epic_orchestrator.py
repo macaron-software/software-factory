@@ -1420,7 +1420,41 @@ class EpicOrchestrator:
                             passed_count,
                             total_count,
                         )
-                        break  # All criteria met, exit sprint loop
+                        # ── Feature-Queue: mark sprint features done, continue if more ──
+                        if _feature_queue:
+                            try:
+                                from ..epics.product import get_product_backlog as _fq_pb_eg
+                                _fq_eg = _fq_pb_eg()
+                                _all_f_eg = _fq_eg.list_features(epic_id=mission.id)
+                                for _f_eg in _all_f_eg:
+                                    if _f_eg.status == "in_progress" and _f_eg.id not in _features_done_this_phase:
+                                        _fq_eg.update_feature_status(_f_eg.id, "done")
+                                        _features_done_this_phase.append(_f_eg.id)
+                                _still_pending_eg = [
+                                    f for f in _fq_eg.list_features(epic_id=mission.id)
+                                    if f.status in ("backlog", "ready")
+                                ]
+                                if _still_pending_eg and sprint_num < max_sprints:
+                                    await self._sse_orch_msg(
+                                        f"Sprint {sprint_num} done ({len(_features_done_this_phase)} features). "
+                                        f"{len(_still_pending_eg)} features remaining — next sprint…",
+                                        phase.phase_id,
+                                    )
+                                    logger.warning(
+                                        "ORCH FEATURE_QUEUE (evidence-gate) sprint=%d done, features_done=%d remaining=%d — continuing",
+                                        sprint_num, len(_features_done_this_phase), len(_still_pending_eg),
+                                    )
+                                    prev_context += (
+                                        f"\n\nSprint {sprint_num} completed (evidence gate passed). "
+                                        f"Features done: {len(_features_done_this_phase)}. "
+                                        f"Remaining: {len(_still_pending_eg)}. Continue with next features."
+                                    )
+                                    phase_success = False  # Allow loop to continue
+                                    await asyncio.sleep(0.8)
+                                    continue  # Next sprint
+                            except Exception as _fq_eg_err:
+                                logger.warning("Feature queue check (evidence-gate) failed: %s", _fq_eg_err)
+                        break  # All criteria met (or no feature queue), exit sprint loop
                     if sprint_num < max_sprints:
                         await self._sse_orch_msg(
                             f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",
