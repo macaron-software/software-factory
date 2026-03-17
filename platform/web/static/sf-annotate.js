@@ -281,6 +281,13 @@
     if (!active && hoveredEl) { hoveredEl.classList.remove('sf-ann-highlight', `sf-ann-highlight-${annotType}`); hoveredEl = null; }
     const banner = document.getElementById('sf-ann-mode-banner');
     if (banner) banner.style.display = active ? 'flex' : 'none';
+    // Show wireframe button only when annotation is active
+    const wfBtn = document.getElementById('sfWireframeBtn');
+    if (wfBtn) wfBtn.style.display = active ? '' : 'none';
+    // Turn off wireframe when annotation is deactivated
+    if (!active && document.body.classList.contains('sf-wireframe') && window.toggleWireframeMode) {
+      window.toggleWireframeMode();
+    }
   }
 
   // ── Capture-phase click interceptor — blocks ALL navigation when active ──
