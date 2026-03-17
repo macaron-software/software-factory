@@ -842,6 +842,18 @@ class EpicOrchestrator:
                 if is_dev_phase
                 else 1
             )
+            # YOLO mode: ignore sprint cap on evidence-gated phases — run until gate passes
+            if is_evidence_gated and is_dev_phase:
+                try:
+                    from ..config import get_config as _gc
+                    if _gc().orchestrator.yolo_mode:
+                        max_sprints = 999
+                        logger.warning(
+                            "ORCH YOLO mode: max_sprints cap lifted for %s (unlimited until evidence gate passes)",
+                            phase.phase_id,
+                        )
+                except Exception:
+                    pass
             if is_dev_phase:
                 logger.warning(
                     "ORCH phase=%s max_sprints=%d (from config=%s)",
