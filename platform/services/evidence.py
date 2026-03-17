@@ -449,6 +449,9 @@ def run_evidence_checks(
                 else:
                     fakes = []
                     for f in found:
+                        # __init__.py is legitimately small in Python packages — skip size check
+                        if os.path.basename(f) == "__init__.py":
+                            continue
                         if os.path.getsize(f) < min_size:
                             fakes.append(f)
                         else:
