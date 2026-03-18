@@ -585,7 +585,14 @@ def _glob_recursive(workspace: str, pattern: str) -> list[str]:
                 )
             # Deduplicate
             return list(
-                set(f for f in results if not f.endswith("/.git") and "/.git/" not in f)
+                set(
+                    f for f in results
+                    if not f.endswith("/.git")
+                    and "/.git/" not in f
+                    and "/node_modules/" not in f
+                    and "/dist/" not in f
+                    and "/__pycache__/" not in f
+                )
             )
 
     found = glob.glob(os.path.join(workspace, pattern), recursive=True)
