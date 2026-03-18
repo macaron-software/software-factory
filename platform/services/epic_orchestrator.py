@@ -919,6 +919,18 @@ class EpicOrchestrator:
                             sprint_num,
                             mission.id,
                         )
+                        # Heartbeat: keep updated_at fresh so watchdog doesn't kill long runs
+                        try:
+                            from ..db.migrations import get_db as _hb_db
+                            _hbdb = _hb_db()
+                            _hbdb.execute(
+                                "UPDATE epic_runs SET updated_at=? WHERE id=?",
+                                (datetime.utcnow().isoformat(), mission.id),
+                            )
+                            _hbdb.commit()
+                            _hbdb.close()
+                        except Exception:
+                            pass
                     except Exception as e:
                         logger.warning("Sprint creation failed: %s", e)
 
