@@ -93,7 +93,7 @@ def create_legacy_item(
             """INSERT INTO legacy_items
             (id, project_id, item_type, name, parent_id, description,
              metadata_json, source_file, source_line, status, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'identified',%s)""",
+            VALUES (?,?,?,?,?,?,?,?,?,'identified',?)""",
             (item_id, project_id, item_type, name, parent_id, description,
              meta_json, source_file, source_line,
              datetime.now(timezone.utc).isoformat()),
@@ -111,16 +111,16 @@ def list_legacy_items(
     status: str | None = None,
 ) -> list[LegacyItem]:
     """List legacy items with optional filters."""
-    clauses = ["project_id = %s"]
+    clauses = ["project_id = ?"]
     params: list = [project_id]
     if item_type:
-        clauses.append("item_type = %s")
+        clauses.append("item_type = ?")
         params.append(item_type)
     if parent_id is not None:
-        clauses.append("parent_id = %s")
+        clauses.append("parent_id = ?")
         params.append(parent_id)
     if status:
-        clauses.append("status = %s")
+        clauses.append("status = ?")
         params.append(status)
     where = " AND ".join(clauses)
     db = get_db()
@@ -139,7 +139,7 @@ def get_legacy_item(item_id: str) -> LegacyItem | None:
     db = get_db()
     try:
         row = db.execute(
-            "SELECT * FROM legacy_items WHERE id = %s", (item_id,)
+            "SELECT * FROM legacy_items WHERE id = ?", (item_id,)
         ).fetchone()
     finally:
         db.close()
@@ -151,7 +151,7 @@ def update_legacy_item_status(item_id: str, status: str) -> None:
     db = get_db()
     try:
         db.execute(
-            "UPDATE legacy_items SET status = %s WHERE id = %s",
+            "UPDATE legacy_items SET status = ? WHERE id = ?",
             (status, item_id),
         )
         db.commit()
@@ -165,7 +165,7 @@ def count_legacy_items(project_id: str) -> dict[str, int]:
     try:
         rows = db.execute(
             "SELECT item_type, COUNT(*) as cnt FROM legacy_items "
-            "WHERE project_id = %s GROUP BY item_type ORDER BY cnt DESC",
+            "WHERE project_id = ? GROUP BY item_type ORDER BY cnt DESC",
             (project_id,),
         ).fetchall()
     finally:
@@ -191,7 +191,7 @@ def create_link(
             """INSERT INTO traceability_links
             (source_id, source_type, target_id, target_type, link_type,
              coverage_pct, notes, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (?,?,?,?,?,?,?,?)
             ON CONFLICT (source_id, target_id, link_type) DO UPDATE
             SET coverage_pct = EXCLUDED.coverage_pct, notes = EXCLUDED.notes""",
             (source_id, source_type, target_id, target_type, link_type,
@@ -217,18 +217,18 @@ def get_links(
         results = []
         params: list = []
         if direction in ("outgoing", "both"):
-            q = "SELECT * FROM traceability_links WHERE source_id = %s"
+            q = "SELECT * FROM traceability_links WHERE source_id = ?"
             p = [item_id]
             if link_type:
-                q += " AND link_type = %s"
+                q += " AND link_type = ?"
                 p.append(link_type)
             results.extend(db.execute(q, p).fetchall())
 
         if direction in ("incoming", "both"):
-            q = "SELECT * FROM traceability_links WHERE target_id = %s"
+            q = "SELECT * FROM traceability_links WHERE target_id = ?"
             p = [item_id]
             if link_type:
-                q += " AND link_type = %s"
+                q += " AND link_type = ?"
                 p.append(link_type)
             results.extend(db.execute(q, p).fetchall())
     finally:
@@ -249,7 +249,7 @@ def coverage_report(project_id: str) -> dict:
         # Total items per type
         totals = db.execute(
             "SELECT item_type, COUNT(*) as cnt FROM legacy_items "
-            "WHERE project_id = %s GROUP BY item_type",
+            "WHERE project_id = ? GROUP BY item_type",
             (project_id,),
         ).fetchall()
 
@@ -258,7 +258,7 @@ def coverage_report(project_id: str) -> dict:
             "SELECT li.item_type, COUNT(DISTINCT li.id) as cnt "
             "FROM legacy_items li "
             "JOIN traceability_links tl ON tl.source_id = li.id "
-            "WHERE li.project_id = %s "
+            "WHERE li.project_id = ? "
             "GROUP BY li.item_type",
             (project_id,),
         ).fetchall()
@@ -299,7 +299,7 @@ def orphan_report(project_id: str) -> dict:
         # Legacy items with no outgoing link
         legacy_orphans = db.execute(
             "SELECT li.id, li.item_type, li.name FROM legacy_items li "
-            "WHERE li.project_id = %s "
+            "WHERE li.project_id = ? "
             "AND NOT EXISTS ("
             "  SELECT 1 FROM traceability_links tl "
             "  WHERE tl.source_id = li.id"
@@ -311,7 +311,7 @@ def orphan_report(project_id: str) -> dict:
         stories_no_test = db.execute(
             "SELECT us.id, us.title FROM user_stories us "
             "JOIN features f ON us.feature_id = f.id "
-            "WHERE f.epic_id IN (SELECT id FROM epics WHERE project_id = %s) "
+            "WHERE f.epic_id IN (SELECT id FROM epics WHERE project_id = ?) "
             "AND NOT EXISTS ("
             "  SELECT 1 FROM traceability_links tl "
             "  WHERE tl.source_id = us.id AND tl.link_type = 'tests'"
@@ -323,7 +323,7 @@ def orphan_report(project_id: str) -> dict:
         stories_no_code = db.execute(
             "SELECT us.id, us.title FROM user_stories us "
             "JOIN features f ON us.feature_id = f.id "
-            "WHERE f.epic_id IN (SELECT id FROM epics WHERE project_id = %s) "
+            "WHERE f.epic_id IN (SELECT id FROM epics WHERE project_id = ?) "
             "AND NOT EXISTS ("
             "  SELECT 1 FROM traceability_links tl "
             "  WHERE tl.source_id = us.id AND tl.link_type = 'implements'"
@@ -353,7 +353,7 @@ def traceability_matrix(project_id: str) -> list[dict]:
     try:
         items = db.execute(
             "SELECT id, item_type, name, status FROM legacy_items "
-            "WHERE project_id = %s ORDER BY item_type, name",
+            "WHERE project_id = ? ORDER BY item_type, name",
             (project_id,),
         ).fetchall()
 
@@ -364,7 +364,7 @@ def traceability_matrix(project_id: str) -> list[dict]:
             story_links = db.execute(
                 "SELECT tl.target_id, tl.link_type, tl.coverage_pct "
                 "FROM traceability_links tl "
-                "WHERE tl.source_id = %s AND tl.target_type IN ('story', 'feature')",
+                "WHERE tl.source_id = ? AND tl.target_type IN ('story', 'feature')",
                 (item_id,),
             ).fetchall()
 
@@ -372,7 +372,7 @@ def traceability_matrix(project_id: str) -> list[dict]:
             code_links = db.execute(
                 "SELECT tl.target_id, tl.link_type "
                 "FROM traceability_links tl "
-                "WHERE tl.source_id = %s AND tl.target_type = 'code'",
+                "WHERE tl.source_id = ? AND tl.target_type = 'code'",
                 (item_id,),
             ).fetchall()
 
@@ -380,7 +380,7 @@ def traceability_matrix(project_id: str) -> list[dict]:
             test_links = db.execute(
                 "SELECT tl.target_id, tl.link_type "
                 "FROM traceability_links tl "
-                "WHERE tl.source_id = %s AND tl.target_type = 'test'",
+                "WHERE tl.source_id = ? AND tl.target_type = 'test'",
                 (item_id,),
             ).fetchall()
 

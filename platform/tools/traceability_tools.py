@@ -510,9 +510,12 @@ class TraceabilityRecordTool(BaseTool):
         if not feature_id or not layer:
             return "Error: feature_id and layer are required"
 
+        # Accept short aliases: tu→test_tu, e2e→test_e2e
+        _aliases = {"tu": "test_tu", "e2e": "test_e2e"}
+        layer = _aliases.get(layer, layer)
         valid_layers = {"code", "ihm", "test_tu", "test_e2e", "crud", "rbac", "screen", "nft", "persona"}
         if layer not in valid_layers:
-            return f"Error: layer must be one of {sorted(valid_layers)}"
+            return f"Error: layer must be one of {sorted(valid_layers | set(_aliases))}"
 
         result_id = artifact_id or f"{layer}-{feature_id[:8]}"
 

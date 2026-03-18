@@ -2230,8 +2230,8 @@ def _platform_schemas() -> list[dict]:
                         "epic_id":       {"type": "string", "description": "Epic/run ID"},
                         "layer":         {
                             "type": "string",
-                            "enum": ["code", "ihm", "test_tu", "test_e2e", "crud", "rbac", "screen", "nft", "persona"],
-                            "description": "Which traceability layer this artifact covers",
+                            "enum": ["code", "ihm", "test_tu", "tu", "test_e2e", "e2e", "crud", "rbac", "screen", "nft", "persona"],
+                            "description": "Which traceability layer this artifact covers (tu=alias for test_tu, e2e=alias for test_e2e)",
                         },
                         "artifact_id":   {"type": "string", "description": "File path, test name, endpoint, or role name"},
                         "artifact_name": {"type": "string", "description": "Human-readable label"},
