@@ -1022,6 +1022,19 @@ async def _tool_traceability(name: str, args: dict, ctx: ExecutionContext) -> st
                 lines.append(f"\n... and {len(matrix) - 20} more items")
             return "\n".join(lines)
 
+        # ── New chain tools ──────────────────────────────────────────
+        if name == "traceability_record":
+            from ..tools.traceability_tools import TraceabilityRecordTool
+            return await TraceabilityRecordTool().execute(args)
+
+        if name == "traceability_chain_report":
+            from ..tools.traceability_tools import TraceabilityChainReportTool
+            return await TraceabilityChainReportTool().execute(args)
+
+        if name == "traceability_check_e2e":
+            from ..tools.traceability_tools import TraceabilityCheckE2ETool
+            return await TraceabilityCheckE2ETool().execute(args)
+
     except Exception as e:
         logger.exception("Traceability tool error: %s", e)
         return f"Error in {name}: {e}"
@@ -2287,7 +2300,8 @@ async def _execute_tool(
         return await run_tla_list(args)
 
     # ── Traceability tools ──
-    if name in ("legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate"):
+    if name in ("legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate",
+                "traceability_record", "traceability_chain_report", "traceability_check_e2e"):
         return await _tool_traceability(name, args, ctx)
     if name == "fractal_code":
         return await _tool_fractal_code(args, ctx, registry, llm)

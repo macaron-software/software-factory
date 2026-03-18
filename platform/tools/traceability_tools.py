@@ -479,9 +479,166 @@ def _extract_http_method(content: str, mapping_pos: int) -> str:
     return "GET"
 
 
+class TraceabilityRecordTool(BaseTool):
+    name = "traceability_record"
+    description = (
+        "Record a traceability artifact and link it to a feature/story. "
+        "Use this after writing code, tests, screens, CRUD endpoints, RBAC rules, NFTs. "
+        "Args: epic_id, feature_id, layer (code|ihm|test_tu|test_e2e|crud|rbac|screen|nft|persona), "
+        "artifact_id (file path, test name, screen name, endpoint, role, etc.), "
+        "artifact_name (human label), notes (optional). "
+        "For layer=persona: also set persona_name, persona_role. "
+        "For layer=nft: also set nft_type (perf|security|a11y|i18n|load|compliance), criterion."
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import (
+            get_persona_store, get_nft_store, update_feature_coverage,
+            Persona, NFTTest,
+        )
+        from ..traceability.migration_store import create_link
+
+        epic_id    = params.get("epic_id", "")
+        feature_id = params.get("feature_id", "")
+        layer      = params.get("layer", "")
+        artifact_id   = params.get("artifact_id", "")
+        artifact_name = params.get("artifact_name", artifact_id)
+        notes      = params.get("notes", "")
+        project_id = params.get("project_id", epic_id)
+
+        if not feature_id or not layer:
+            return "Error: feature_id and layer are required"
+
+        valid_layers = {"code", "ihm", "test_tu", "test_e2e", "crud", "rbac", "screen", "nft", "persona"}
+        if layer not in valid_layers:
+            return f"Error: layer must be one of {sorted(valid_layers)}"
+
+        result_id = artifact_id or f"{layer}-{feature_id[:8]}"
+
+        if layer == "persona":
+            p = Persona(
+                project_id=project_id, epic_id=epic_id,
+                name=params.get("persona_name", artifact_name),
+                role=params.get("persona_role", ""),
+                description=notes,
+            )
+            p = get_persona_store().create(p)
+            result_id = p.id
+            create_link(
+                source_id=p.id, source_type="persona",
+                target_id=feature_id, target_type="feature",
+                link_type="persona", notes=notes,
+            )
+
+        elif layer == "nft":
+            t = NFTTest(
+                project_id=project_id, epic_id=epic_id, feature_id=feature_id,
+                nft_type=params.get("nft_type", "perf"),
+                name=artifact_name,
+                criterion=params.get("criterion", notes),
+                threshold=params.get("threshold", ""),
+            )
+            t = get_nft_store().create(t)
+            result_id = t.id
+            create_link(
+                source_id=feature_id, source_type="feature",
+                target_id=t.id, target_type="nft_test",
+                link_type="nft", notes=notes,
+            )
+
+        elif layer == "screen":
+            # Insert into project_screens if not existing
+            from ..db.migrations import get_db as _gdb
+            _db = _gdb()
+            try:
+                from ..traceability.artifacts import make_id as _mk
+                screen_id = artifact_id or _mk("scr")
+                _db.execute(
+                    """INSERT INTO project_screens (id, project_id, name, feature_id, mission_id)
+                       VALUES (?,?,?,?,?)
+                       ON CONFLICT (id) DO NOTHING""",
+                    (screen_id, project_id, artifact_name, feature_id, epic_id),
+                )
+                _db.commit()
+                result_id = screen_id
+            except Exception as e:
+                logger.warning("traceability_record screen insert: %s", e)
+            finally:
+                _db.close()
+            create_link(
+                source_id=feature_id, source_type="feature",
+                target_id=result_id, target_type="screen",
+                link_type="screen", notes=notes,
+            )
+
+        else:
+            create_link(
+                source_id=feature_id, source_type="feature",
+                target_id=result_id, target_type=layer,
+                link_type=layer, notes=notes,
+            )
+
+        cov = update_feature_coverage(feature_id)
+
+        return json.dumps({
+            "recorded": True,
+            "layer": layer,
+            "artifact_id": result_id,
+            "feature_id": feature_id,
+            "coverage_pct": cov["coverage_pct"],
+            "flags": cov["flags"],
+            "message": f"Layer '{layer}' recorded for feature {feature_id}. Coverage: {cov['coverage_pct']}%",
+        }, ensure_ascii=False)
+
+
+class TraceabilityChainReportTool(BaseTool):
+    name = "traceability_chain_report"
+    description = (
+        "Get the full 13-layer traceability chain report for an epic. "
+        "Shows coverage per feature across: persona, ihm, code, tu, e2e, crud, rbac, screens, nft. "
+        "Args: epic_id"
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import get_chain_report
+
+        epic_id = params.get("epic_id", "")
+        if not epic_id:
+            return "Error: epic_id required"
+
+        report = get_chain_report(epic_id)
+        return json.dumps(report, ensure_ascii=False, default=str)
+
+
+class TraceabilityCheckE2ETool(BaseTool):
+    name = "traceability_check_e2e"
+    description = (
+        "Validate full E2E traceability chain for an epic. "
+        "Returns PASS/FAIL per layer and per feature with gap list. "
+        "Args: epic_id, threshold (int, default 80 — % of features that must be covered)"
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import validate_chain
+
+        epic_id   = params.get("epic_id", "")
+        threshold = int(params.get("threshold", 80))
+        if not epic_id:
+            return "Error: epic_id required"
+
+        result = validate_chain(epic_id, threshold=threshold)
+        return json.dumps(result, ensure_ascii=False, default=str)
+
+
 def register_traceability_tools(registry):
     """Register all traceability tools."""
     registry.register(LegacyScanTool())
     registry.register(TraceabilityLinkTool())
     registry.register(TraceabilityCoverageTool())
     registry.register(TraceabilityValidateTool())
+    registry.register(TraceabilityRecordTool())
+    registry.register(TraceabilityChainReportTool())
+    registry.register(TraceabilityCheckE2ETool())

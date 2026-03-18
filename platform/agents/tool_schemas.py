@@ -2213,6 +2213,78 @@ def _platform_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Traceability chain tools (13-layer E2E coverage) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "traceability_record",
+                "description": (
+                    "Record a traceability artifact for a feature across the 13-layer chain: "
+                    "persona, ihm, code, test_tu, test_e2e, crud, rbac, screen, nft. "
+                    "Call this after writing code, tests, screens, CRUD endpoints, RBAC rules, or NFTs."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "feature_id":    {"type": "string", "description": "Feature UUID (feat-XXXXXXXX)"},
+                        "epic_id":       {"type": "string", "description": "Epic/run ID"},
+                        "layer":         {
+                            "type": "string",
+                            "enum": ["code", "ihm", "test_tu", "test_e2e", "crud", "rbac", "screen", "nft", "persona"],
+                            "description": "Which traceability layer this artifact covers",
+                        },
+                        "artifact_id":   {"type": "string", "description": "File path, test name, endpoint, or role name"},
+                        "artifact_name": {"type": "string", "description": "Human-readable label"},
+                        "notes":         {"type": "string", "description": "Optional context"},
+                        "persona_name":  {"type": "string", "description": "Persona name (layer=persona only)"},
+                        "persona_role":  {"type": "string", "description": "Persona role (layer=persona only)"},
+                        "nft_type":      {
+                            "type": "string",
+                            "enum": ["perf", "security", "a11y", "i18n", "load", "compliance"],
+                            "description": "NFT category (layer=nft only)",
+                        },
+                        "criterion":     {"type": "string", "description": "NFT success criterion, e.g. 'p95 < 200ms'"},
+                    },
+                    "required": ["feature_id", "layer"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "traceability_chain_report",
+                "description": (
+                    "Get the full 13-layer traceability chain report for an epic. "
+                    "Shows per-feature coverage: persona, ihm, code, tu, e2e, crud, rbac, screens, nft."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "epic_id": {"type": "string", "description": "Epic/run ID"},
+                    },
+                    "required": ["epic_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "traceability_check_e2e",
+                "description": (
+                    "Validate the full E2E traceability chain for an epic. "
+                    "Returns PASS/FAIL with per-layer coverage % and gap list. "
+                    "Use at the end of a sprint or phase to confirm all layers are covered."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "epic_id":   {"type": "string", "description": "Epic/run ID"},
+                        "threshold": {"type": "integer", "description": "Min % of features that must be fully covered (default 80)"},
+                    },
+                    "required": ["epic_id"],
+                },
+            },
+        },
         # ── Composition tools (dynamic workflow/team/mission) ──
         {
             "type": "function",
