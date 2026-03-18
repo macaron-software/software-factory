@@ -284,7 +284,10 @@
     // Show wireframe button only when annotation is active
     const wfBtn = document.getElementById('sfWireframeBtn');
     if (wfBtn) wfBtn.style.display = active ? '' : 'none';
-    // Turn off wireframe when annotation is deactivated
+    // Auto-activate wireframe when annotation turns ON, deactivate when OFF
+    if (active && !document.body.classList.contains('sf-wireframe') && window.toggleWireframeMode) {
+      window.toggleWireframeMode();
+    }
     if (!active && document.body.classList.contains('sf-wireframe') && window.toggleWireframeMode) {
       window.toggleWireframeMode();
     }

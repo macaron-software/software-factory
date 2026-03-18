@@ -409,19 +409,19 @@ async def fix_all_annotations(project_id: str, request: Request):
         return JSONResponse({"error": "No open annotations to fix"}, status_code=400)
 
     try:
-        from ....epics.store import get_epic_store
+        from ....epics.store import MissionDef, get_epic_store
         from ....projects.manager import get_project_store
 
         proj = get_project_store().get(project_id)
         proj_name = proj.name if proj else project_id
 
         epic_store = get_epic_store()
-        mission = epic_store.create_mission(
+        mission = epic_store.create_mission(MissionDef(
             project_id=project_id,
-            title=f"Fix UI Annotations — {proj_name}",
+            name=f"Fix UI Annotations — {proj_name}",
             description=f"Fix all open UI annotations from the Annotation Studio:\n\n{markdown}",
             workflow_id="sf-pipeline",
-        )
+        ))
         return JSONResponse({"mission_id": mission.id, "ok": True})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
