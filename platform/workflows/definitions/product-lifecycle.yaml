@@ -102,10 +102,16 @@ phases:
     max_iterations: 10
 - id: traceability-check
   pattern_id: sequential
-  name: Vérification Traçabilité E2E
-  description: 'Le trace-auditor scanne tous les fichiers pour les headers # Ref: manquants et les orphelins.
-    Le trace-writer ajoute les headers manquants, crée les features/stories dans le backlog, et met à jour
-    SPECS.md avec les AC UUID. Le trace-lead valide la couverture >= 80% et VETO si insuffisante.'
+  name: Vérification Traçabilité E2E — Chaîne 13 couches
+  description: >
+    Pipeline de traçabilité en 3 étapes:
+    (1) trace-auditor appelle traceability_chain_report(epic_id) pour auditer les 13 couches
+    (epic→persona→feature→story→ac→ihm→code→tu→e2e→crud→rbac→screens→nft) et produit un rapport
+    des features avec coverage_pct < 80%.
+    (2) trace-writer appelle traceability_record pour enregistrer les artefacts manquants détectés
+    (couches code/tu/e2e/ihm/crud/rbac/screen) et ajoute les headers # Ref: manquants dans les fichiers.
+    (3) trace-lead appelle traceability_check_e2e(epic_id, threshold=80): si PASS -> APPROVE;
+    si FAIL -> VETO avec liste des features insuffisantes. Coverage >= 80% obligatoire.
   gate: no_veto
   skip_on_failure: true
   config:

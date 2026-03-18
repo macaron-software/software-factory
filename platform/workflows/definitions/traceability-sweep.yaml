@@ -1,14 +1,18 @@
 id: traceability-sweep
 name: Traceability Sweep
-description: 'Scheduled traceability maintenance: audit legacy items, fix orphans, update SPECS.md, validate coverage. Runs via traceability_scheduler every 6h on projects below 80% coverage.'
+description: 'Maintenance traçabilité 13 couches: audit chaîne epic→persona→feature→story→ac→ihm→code→tu→e2e→crud→rbac→screens→nft, enregistrement artefacts manquants via traceability_record, validation E2E via traceability_check_e2e. Lance toutes les 6h sur les projets sous 80% de couverture.'
 icon: link
 is_builtin: true
 phases:
 - id: ts-audit
   pattern_id: parallel
-  name: Traceability Audit
-  description: 'Scan codebase for legacy items, check # Ref: headers, assess coverage. Produce gap report.'
-  gate: Gap report produced with coverage metrics
+  name: Traceability Audit — Chaîne 13 couches
+  description: >
+    trace-auditor appelle traceability_chain_report(epic_id) pour auditer toutes les couches
+    (epic→persona→feature→story→ac→ihm→code→tu→e2e→crud→rbac→screens→nft).
+    trace-monitor appelle traceability_check_e2e(epic_id) et produit un rapport avec:
+    features sous 80%, couches manquantes par feature, score global.
+  gate: Gap report with per-layer coverage produced
   config:
     agents:
     - trace-auditor
@@ -16,17 +20,26 @@ phases:
 
 - id: ts-fix
   pattern_id: sequential
-  name: Traceability Fix
-  description: 'Add missing # Ref: headers, create traceability_links for orphans, update SPECS.md AC items with UUIDs.'
-  gate: All orphaned items linked, headers added
+  name: Traceability Fix — Enregistrement couches
+  description: >
+    trace-writer appelle traceability_record pour chaque artefact identifié dans l'audit:
+    layer=code pour les fichiers source trouvés, layer=tu pour les tests unitaires,
+    layer=e2e pour les tests Playwright, layer=ihm pour les routes/vues,
+    layer=crud/rbac/screen selon les patterns détectés.
+    Ajoute aussi les headers # Ref: manquants et met à jour SPECS.md avec les AC UUID.
+  gate: All missing layers recorded, coverage_pct recomputed
   config:
     agents:
     - trace-writer
 
 - id: ts-validate
   pattern_id: voting
-  name: Traceability Validation
-  description: 'Validate end-to-end traceability: legacy→story→code→test. All voters must approve ≥80% coverage.'
+  name: Traceability Validation E2E — 13 couches
+  description: >
+    trace-lead appelle traceability_check_e2e(epic_id, threshold=80): PASS → vote APPROVE,
+    FAIL → vote REJECT avec liste features insuffisantes. trace-monitor et trace-auditor
+    confirment avec traceability_chain_report pour les détails par couche.
+    Tous les votants doivent approuver pour valider (gate=all_approved).
   gate: all_approved
   config:
     agents:
