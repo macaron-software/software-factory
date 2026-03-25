@@ -464,7 +464,7 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
 def _auto_persist_backlog(result: str, ctx, mission_id: str):
     """Auto-parse PM output to persist features/stories in the product backlog.
 
-    MiniMax M2.5 won't call create_feature tool reliably, so we parse
+    MiniMax-M2.7 won't call create_feature tool reliably, so we parse
     structured tables from PM output (Epic/Story markdown tables).
     """
     import re
@@ -725,6 +725,36 @@ def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) ->
     return "\n".join(parts)
 
 
+def _resolve_max_iterations(pattern: PatternDef, phase_config: dict | None) -> int:
+    """Resolve max_iterations for a pattern, boosting for design/UI phases.
+
+    Design/UI phases benefit from 10-15 iterations (vs default 5) based on
+    Anthropic harness findings: evaluator-driven refinement loops produce
+    dramatically better visual output with more cycles.
+    Ref: https://anthropic.com/engineering/harness-design-long-running-apps
+
+    Priority: phase_config.max_iterations > pattern.config.max_iterations > auto-detect.
+    """
+    # Explicit override in phase YAML config takes precedence
+    cfg = phase_config or {}
+    if "max_iterations" in cfg:
+        return int(cfg["max_iterations"])
+
+    # Pattern-level default
+    pattern_default = pattern.config.get("max_iterations", 5)
+
+    # Auto-boost for design/UI phases (detected by phase_id or pattern agents)
+    _ui_markers = {"ui", "design", "ux", "frontend", "ihm", "screen", "layout", "css", "solaris"}
+    phase_id = cfg.get("id", "") or ""
+    phase_name = cfg.get("name", "") or ""
+    phase_text = f"{phase_id} {phase_name}".lower()
+
+    if any(m in phase_text for m in _ui_markers):
+        return max(pattern_default, 12)  # boost to 12 for design phases
+
+    return pattern_default
+
+
 async def run_pattern(
     pattern: PatternDef,
     session_id: str,
@@ -743,7 +773,9 @@ async def run_pattern(
         project_path=project_path,
         phase_id=phase_id,
         phase_config=phase_config or {},
-        max_iterations=pattern.config.get("max_iterations", 5),
+        # Design/UI phases benefit from more iterations (5-15 cycles per Anthropic
+        # harness findings: https://anthropic.com/engineering/harness-design-long-running-apps)
+        max_iterations=_resolve_max_iterations(pattern, phase_config),
     )
     # Lineage context: prepend to initial_task so agents know their place in the workflow
     if lineage:
@@ -1510,7 +1542,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     # Accumulate tool_calls from retry
                     cumulative_tool_calls.extend(retry_result.tool_calls or [])
                     # If retry produced empty output, try ONE more call with a nudge
-                    # (MiniMax M2.5 intermittently returns empty — usually succeeds on 2nd try)
+                    # (MiniMax-M2.7 intermittently returns empty — usually succeeds on 2nd try)
                     if not content or len(content.strip()) < 10:
                         logger.warning(
                             "ADVERSARIAL RETRY [%s] empty output — nudging once more (MiniMax quirk)",
@@ -2007,15 +2039,29 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         if getattr(m, "message_type", "") != "phase_summary"  # skip — loaded separately
     ]
 
-    # ── Compact phase memory: prepend prior phase summaries ───────
-    # Gives every agent a telegraphic view of all completed phases
-    # without replaying full conversation history (~100-200 tok/phase).
+    # ── Context strategy: clean_context_per_phase vs compact phase memory ──
+    # WHY: Anthropic found that context resets (completely clearing history between
+    # phases) outperform context compaction (summarizing) for long-running missions.
+    # Models exhibit "context anxiety" — premature completion as perceived token
+    # limits approach — when carrying compressed history forward.
+    # Ref: https://anthropic.com/engineering/harness-design-long-running-apps
+    # "Rather than context compaction, the team found that context resets prevented
+    # models from exhibiting context anxiety."
+    # Default: False (legacy behavior — carry over compressed history).
+    # Enable per-phase: `context_reset: true` in workflow YAML phase config.
+    _context_reset = (run.phase_config or {}).get("context_reset", False)
+
+    if _context_reset:
+        # Clean context mode: drop all conversation history, keep only phase digests
+        history_dicts = []
+        logger.info("CONTEXT_RESET: phase=%s — clean context (no history carry-over)", run.phase_id)
+
+    # Compact phase memory: prepend prior phase summaries as telegraphic digest
     try:
         from ..llm.phase_memory import load_phase_summaries, build_compact_context
         _phase_summaries = load_phase_summaries(run.session_id)
         if _phase_summaries:
             _compact_ctx = build_compact_context(_phase_summaries)
-            # Inject as first history entry so it appears before recent messages
             history_dicts.insert(0, {
                 "from_agent": "phase_memory",
                 "content": _compact_ctx,

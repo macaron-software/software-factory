@@ -754,3 +754,74 @@ def load_results() -> list[dict]:
         except Exception:
             pass
     return results
+
+
+async def compare_models(
+    model_a: str, provider_a: str,
+    model_b: str, provider_b: str,
+    tool_choice: str = "auto",
+) -> dict:
+    """Run ToolCall-15 on two models and produce a head-to-head comparison.
+
+    Designed for model upgrade validation: run BEFORE and AFTER switching providers
+    to quantify regression or improvement per category.
+
+    Ref: Anthropic harness design — "stress-test your assumptions about what models
+    cannot do — improvements can render scaffolding obsolete."
+    https://anthropic.com/engineering/harness-design-long-running-apps
+
+    Returns:
+        {
+            "model_a": {...result}, "model_b": {...result},
+            "delta": {final_score, per_category, regressions[], improvements[]},
+            "recommendation": "upgrade" | "rollback" | "neutral"
+        }
+    """
+    import dataclasses
+
+    result_a = await run_toolcall_bench(model_a, provider_a, tool_choice=tool_choice)
+    result_b = await run_toolcall_bench(model_b, provider_b, tool_choice=tool_choice)
+
+    # Per-category delta
+    cat_a = {cs.category: cs.percent for cs in result_a.category_scores}
+    cat_b = {cs.category: cs.percent for cs in result_b.category_scores}
+
+    regressions = []
+    improvements = []
+    for cat in CATEGORY_LABELS:
+        delta = cat_b.get(cat, 0) - cat_a.get(cat, 0)
+        if delta < -10:
+            regressions.append({"category": cat, "label": CATEGORY_LABELS[cat], "delta": delta})
+        elif delta > 10:
+            improvements.append({"category": cat, "label": CATEGORY_LABELS[cat], "delta": delta})
+
+    score_delta = result_b.final_score - result_a.final_score
+
+    # Recommendation logic
+    if regressions and not improvements:
+        recommendation = "rollback"
+    elif score_delta >= 10:
+        recommendation = "upgrade"
+    elif score_delta <= -10:
+        recommendation = "rollback"
+    else:
+        recommendation = "neutral"
+
+    logger.warning(
+        "ToolCall-15 COMPARE: %s/%s=%d%% vs %s/%s=%d%% → delta=%+d%% → %s",
+        provider_a, model_a, result_a.final_score,
+        provider_b, model_b, result_b.final_score,
+        score_delta, recommendation,
+    )
+
+    return {
+        "model_a": dataclasses.asdict(result_a),
+        "model_b": dataclasses.asdict(result_b),
+        "delta": {
+            "final_score": score_delta,
+            "per_category": {cat: cat_b.get(cat, 0) - cat_a.get(cat, 0) for cat in CATEGORY_LABELS},
+            "regressions": regressions,
+            "improvements": improvements,
+        },
+        "recommendation": recommendation,
+    }

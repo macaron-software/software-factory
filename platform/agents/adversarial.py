@@ -45,6 +45,7 @@ import json
 import logging
 import os
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -983,7 +984,7 @@ def check_l0(
     if any(k in role_lower for k in ("qa", "test", "validation", "e2e")):
         threshold = 8
 
-    # LLM-aware threshold scaling: weaker models (MiniMax M2.5) produce more
+    # LLM-aware threshold scaling: weaker models (MiniMax-M2.7) produce more
     # false positives on SLOP/HALLUCINATION detectors — raise threshold to reduce
     # unrecoverable rejection loops (91.5% rejection rate observed with MiniMax)
     try:
@@ -1094,8 +1095,15 @@ Check for:
 5. ECHO: Just rephrasing the task without doing real work
 6. STACK_MISMATCH: Code written in wrong language for declared stack (e.g. TypeScript backend when task says Rust/axum)
 
-Respond ONLY with JSON:
-{{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
+Respond ONLY with XML:
+<adversarial_review>
+  <score>0-10</score>
+  <issues>
+    <issue>issue1</issue>
+    <issue>issue2</issue>
+  </issues>
+  <verdict>APPROVE|REJECT</verdict>
+</adversarial_review>"""
 
         client = get_llm_client()
         resp = await client.chat(
@@ -1105,18 +1113,27 @@ Respond ONLY with JSON:
             max_tokens=300,
         )
 
-        import json
-
         raw = resp.content.strip()
-        if "```json" in raw:
-            raw = raw.split("```json", 1)[1].split("```", 1)[0].strip()
+        if "```xml" in raw:
+            raw = raw.split("```xml", 1)[1].split("```", 1)[0].strip()
         elif "```" in raw:
             raw = raw.split("```", 1)[1].split("```", 1)[0].strip()
 
-        data = json.loads(raw)
-        l1_score = int(data.get("score", 0))
-        l1_issues = data.get("issues", [])
-        verdict = data.get("verdict", "APPROVE")
+        xml = raw
+        m = re.search(r"<adversarial_review>.*?</adversarial_review>", xml, re.DOTALL)
+        if m:
+            xml = m.group(0)
+        root = ET.fromstring(xml)
+        if root.tag != "adversarial_review":
+            raise ValueError(f"Invalid adversarial XML root tag: {root.tag}")
+        score_text = (root.findtext("score") or "0").strip()
+        l1_score = int(score_text)
+        l1_issues = [
+            (n.text or "").strip()
+            for n in root.findall("./issues/issue")
+            if (n.text or "").strip()
+        ]
+        verdict = (root.findtext("verdict") or "APPROVE").strip()
 
         # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS:
         # - agent used code_write/code_edit (wrote real code)
@@ -1382,10 +1399,59 @@ async def run_guard(
             l1.score = max(l0.score, l1.score)
             return l1
 
+    # ── L2: Visual screenshot eval for UI phases ──
+    # WHY: Anthropic harness used Playwright MCP to screenshot and evaluate live
+    # interfaces, creating a feedback loop driving 5-15 iterations per design.
+    # "The evaluator used Playwright MCP to interact with live interfaces directly,
+    # screenshotting and evaluating implementations before providing critique."
+    # Ref: https://anthropic.com/engineering/harness-design-long-running-apps
+    # If the phase involves UI work AND a project URL is available, take a screenshot
+    # and evaluate visual quality via LLM. Non-blocking: failures log but don't reject.
+    _ui_phase_markers = {"ui", "frontend", "design", "ux", "ihm", "screen", "layout", "css"}
+    _phase_is_ui = bool(
+        _ui_phase_markers & {(task or "").lower()[:20]}
+    ) or any(m in (task or "").lower() for m in _ui_phase_markers)
+    _project_url = os.environ.get("PLATFORM_PROJECT_URL", "")
+
+    if _phase_is_ui and _project_url and enable_l1:
+        try:
+            from ..tools.test_tools import playwright_screenshot
+            _screenshot_path = await playwright_screenshot(_project_url)
+            if _screenshot_path:
+                from ..llm.client import get_llm_client, LLMMessage
+                _vis_client = get_llm_client()
+                _vis_resp = await _vis_client.chat(
+                    messages=[
+                        LLMMessage(role="system", content=(
+                            "You are a UI design critic. Evaluate this screenshot for: "
+                            "1) Visual coherence (mood, colors, spacing) "
+                            "2) Craft quality (typography, alignment, contrast) "
+                            "3) Functionality (are elements usable, readable?) "
+                            "4) Originality (does it look custom or template-default?) "
+                            "Score 0-100. If score < 40, output REJECT. Otherwise PASS. "
+                            "Be concise: one line per criterion, then verdict."
+                        )),
+                        LLMMessage(role="user", content=f"Screenshot: {_screenshot_path}\nTask: {task[:500]}"),
+                    ],
+                    temperature=0,
+                )
+                _vis_score = 50  # default
+                if "REJECT" in _vis_resp.content.upper():
+                    _vis_score = 30
+                    l0.issues.append(f"L2-VISUAL: UI quality rejected — {_vis_resp.content[:200]}")
+                    l0.score += 3
+                    logger.warning("GUARD L2-VISUAL REJECT [%s]: %s", agent_name, _vis_resp.content[:100])
+                else:
+                    logger.info("GUARD L2-VISUAL PASS [%s]: %s", agent_name, _vis_resp.content[:100])
+        except Exception as _vis_err:
+            logger.debug("L2-VISUAL skip: %s", _vis_err)
+
     # Both passed
     return GuardResult(
         passed=True,
         score=l0.score,
         issues=l0.issues,  # L0 warnings (below threshold) still reported
-        level="L0+L1" if enable_l1 and pattern_type in execution_patterns else "L0",
+        level="L0+L1+L2" if _phase_is_ui and _project_url else (
+            "L0+L1" if enable_l1 and pattern_type in execution_patterns else "L0"
+        ),
     )

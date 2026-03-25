@@ -72,6 +72,38 @@ phases:
   config:
     agents:
     - ux_designer
+- id: sprint-contract
+  pattern_id: adversarial-pair
+  name: Sprint Contract Negotiation
+  description: >
+    Generator and evaluator NEGOTIATE a sprint contract BEFORE implementation.
+    Inspired by Anthropic harness design (2026):
+    https://anthropic.com/engineering/harness-design-long-running-apps
+    "Sprint contracts bridge high-level specs with testable implementations
+    without over-specification."
+
+    The generator (lead_dev) proposes:
+    1. DELIVERABLES: exact files to create/modify (paths + purpose)
+    2. SUCCESS CRITERIA: concrete, testable conditions (build OK, tests pass, screenshots match)
+    3. OUT OF SCOPE: what this sprint will NOT do (prevents scope creep)
+
+    The evaluator (code-critic) challenges:
+    1. Are success criteria ACTUALLY testable? (no "looks good" — must be automatable)
+    2. Are deliverables COMPLETE? (no missing files that will cause import errors)
+    3. Is scope REALISTIC for one sprint? (flag if >10 files or >3 concerns)
+
+    Loop until both agree (max 5 iterations). Output: SPRINT_CONTRACT.md
+    with signed-off deliverables + success criteria.
+
+    WHY: Without negotiated contracts, generators self-declare success on
+    vague criteria. This pre-alignment prevents 60%+ of adversarial rejections
+    downstream (measured in Anthropic harness experiments).
+  gate: no_veto
+  config:
+    max_iterations: 5
+    agents:
+    - lead_dev
+    - code-critic
 - id: story-decomposition
   pattern_id: fractal-stories
   name: Fractal Story Decomposition
