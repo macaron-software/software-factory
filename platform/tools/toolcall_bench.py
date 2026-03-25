@@ -590,16 +590,16 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str) -> Scenar
                 state.final_answer = content
                 break
 
-            # Process tool calls
+            # Process tool calls (LLMToolCall dataclass: .id, .function_name, .arguments)
             for tc in resp.tool_calls:
-                tc_id = tc.get("id", f"call_{turn}_{tc.get('function', {}).get('name', '')}")
-                fn = tc.get("function", {})
-                name = fn.get("name", "")
-                raw_args = fn.get("arguments", "{}")
-                try:
-                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                except (json.JSONDecodeError, TypeError):
-                    args = {}
+                tc_id = tc.id if hasattr(tc, "id") else tc.get("id", f"call_{turn}")
+                name = tc.function_name if hasattr(tc, "function_name") else tc.get("function", {}).get("name", "")
+                args = tc.arguments if hasattr(tc, "arguments") else {}
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
 
                 record = ToolCall(id=tc_id, name=name, arguments=args, raw_arguments=str(raw_args), turn=turn)
                 state.tool_calls.append(record)
