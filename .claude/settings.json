@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/detect-gaps.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
