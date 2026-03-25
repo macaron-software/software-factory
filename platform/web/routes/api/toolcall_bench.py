@@ -58,6 +58,7 @@ async def toolcall_bench_run(
     background_tasks: BackgroundTasks,
     model: str = Query(..., description="Model name (e.g. MiniMax-M2.7)"),
     provider: str = Query(..., description="Provider id (e.g. minimax)"),
+    tool_choice: str = Query(default="auto", description="Tool choice: auto or required"),
 ) -> dict[str, Any]:
     """Launch ToolCall-15 benchmark in background. Returns job_id to poll."""
     import uuid
@@ -69,7 +70,7 @@ async def toolcall_bench_run(
         try:
             from ....tools.toolcall_bench import run_toolcall_bench
             import dataclasses
-            result = await run_toolcall_bench(model, provider)
+            result = await run_toolcall_bench(model, provider, tool_choice=tool_choice)
             _RUNNING[job_id] = {
                 "status": "done",
                 "model": model,

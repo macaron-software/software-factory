@@ -367,8 +367,54 @@ def scan_escalated_ac_runs() -> list[dict]:
         return []
 
 
+async def toolcall_bench_check():
+    """Run ToolCall-15 bench if no recent result exists (max once/day).
+
+    Triggered by watchdog loop. Results stored in data/toolcall_bench/.
+    Compares current provider against last known score — logs regression warnings.
+    """
+    try:
+        from ..tools.toolcall_bench import RESULTS_DIR, run_toolcall_bench
+        from ..agents.store import DEFAULT_PROVIDER, DEFAULT_MODEL
+
+        key = f"{DEFAULT_PROVIDER}_{DEFAULT_MODEL}".replace("/", "_").replace(" ", "_")
+        result_path = RESULTS_DIR / f"{key}.json"
+
+        # Skip if result is less than 24h old
+        if result_path.exists():
+            import json as _json
+
+            age_h = (
+                datetime.now(timezone.utc)
+                - datetime.fromisoformat(_json.loads(result_path.read_text()).get("ran_at", "2000-01-01T00:00:00"))
+            ).total_seconds() / 3600
+            if age_h < 24:
+                return
+
+        logger.info("watchdog: ToolCall-15 bench triggered for %s/%s", DEFAULT_PROVIDER, DEFAULT_MODEL)
+        result = await run_toolcall_bench(DEFAULT_MODEL, DEFAULT_PROVIDER, tool_choice="auto")
+
+        # Also run with tool_choice=required for comparison
+        result_req = await run_toolcall_bench(DEFAULT_MODEL, DEFAULT_PROVIDER, tool_choice="required")
+
+        logger.warning(
+            "watchdog: ToolCall-15 %s/%s — auto=%d%% (%s), required=%d%% (%s)",
+            DEFAULT_PROVIDER, DEFAULT_MODEL,
+            result.final_score, result.rating,
+            result_req.final_score, result_req.rating,
+        )
+    except Exception as e:
+        logger.warning("watchdog: ToolCall-15 bench failed: %s", e)
+
+
 async def watchdog_cycle():
     """One watchdog cycle: scan → detect → trigger quality-improvement if needed."""
+    # ToolCall-15 bench (max once/day, non-blocking)
+    try:
+        await toolcall_bench_check()
+    except Exception as e:
+        logger.warning("watchdog: toolcall_bench_check error: %s", e)
+
     db = _get_db()
     false_positives = (
         scan_false_completions() + scan_ac_issues() + scan_escalated_ac_runs()

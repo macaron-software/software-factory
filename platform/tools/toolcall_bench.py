@@ -552,7 +552,7 @@ SCENARIOS: list[Scenario] = [TC01(), TC02(), TC03(), TC04(), TC05(), TC06(), TC0
 
 # ── Orchestrator ─────────────────────────────────────────────────────────────
 
-async def _run_scenario(scenario: Scenario, model: str, provider: str) -> ScenarioResult:
+async def _run_scenario(scenario: Scenario, model: str, provider: str, tool_choice: str = "auto") -> ScenarioResult:
     """Run one scenario against the LLM with multi-turn tool loop."""
     from ..llm.client import get_llm_client, LLMMessage
 
@@ -568,12 +568,15 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str) -> Scenar
     t0 = time.monotonic()
     try:
         for turn in range(1, MAX_TURNS + 1):
+            # Restraint scenarios (D) should always use "auto" to test if model avoids tools
+            effective_choice = "auto" if scenario.category == "D" else tool_choice
             resp = await client.chat(
                 messages=messages,
                 model=model,
                 provider=provider,
                 temperature=0,
                 tools=UNIVERSAL_TOOLS,
+                tool_choice=effective_choice,
             )
 
             content = resp.content or ""
@@ -660,8 +663,13 @@ async def run_toolcall_bench(
     model: str,
     provider: str,
     scenario_ids: list[str] | None = None,
+    tool_choice: str = "auto",
 ) -> ToolCallBenchResult:
-    """Run ToolCall-15 benchmark against a specific model/provider."""
+    """Run ToolCall-15 benchmark against a specific model/provider.
+
+    tool_choice: "auto" (default, strict ToolCall-15 spec) or "required" (force tool use).
+    Category D (Restraint) always uses "auto" regardless of this setting.
+    """
     import datetime
 
     scenarios = SCENARIOS
@@ -673,8 +681,8 @@ async def run_toolcall_bench(
     results: list[ScenarioResult] = []
 
     for scenario in scenarios:
-        logger.info("ToolCall-15: running %s (%s) on %s/%s", scenario.id, scenario.title, provider, model)
-        r = await _run_scenario(scenario, model, provider)
+        logger.info("ToolCall-15: running %s (%s) on %s/%s (tool_choice=%s)", scenario.id, scenario.title, provider, model, tool_choice)
+        r = await _run_scenario(scenario, model, provider, tool_choice=tool_choice)
         results.append(r)
         logger.info("  → %s (%d pts): %s", r.status, r.points, r.summary)
 

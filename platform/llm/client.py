@@ -388,6 +388,7 @@ class LLMClient:
         system_prompt: str = "",
         tools: list[dict] | None = None,
         disable_thinking: bool | None = None,
+        tool_choice: str | None = None,
     ) -> LLMResponse:
         """Send a chat completion request. Falls back to next provider on failure."""
         # ── Cache lookup (deterministic dedup) ──
@@ -768,7 +769,7 @@ class LLMClient:
 
         if tools:
             body["tools"] = tools
-            body["tool_choice"] = "auto"
+            body["tool_choice"] = tool_choice or "auto"
 
         t0 = time.monotonic()
 
