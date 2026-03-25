@@ -531,6 +531,7 @@ async def ideation_create_epic(request: Request):
         project_path = str(FACTORY_ROOT.parent / project_id)
         proj_dir = Path(project_path)
         vision_content = ""
+        stack = proj_data.get("stack", [])
 
         try:
             proj_dir.mkdir(parents=True, exist_ok=True)
