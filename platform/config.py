@@ -66,8 +66,8 @@ class LLMConfig:
                 name="MiniMax",
                 base_url="https://api.minimaxi.chat/v1",
                 api_key_env="MINIMAX_API_KEY",
-                models=["MiniMax-M2.5", "MiniMax-M2.1"],
-                default_model="MiniMax-M2.5",
+                models=["MiniMax-M2.7", "MiniMax-M2.7"],
+                default_model="MiniMax-M2.7",
             ),
             "glm": LLMProviderConfig(
                 id="glm",

@@ -3,7 +3,7 @@
 All providers use OpenAI-compatible chat/completions API:
 - Azure AI Foundry GPT-5.2 (swedencentral) — leaders, control, architecture
 - NVIDIA/Kimi K2 (integrate.api.nvidia.com) — fast production workers
-- MiniMax M2.5 (api.minimaxi.chat) — fallback, thinking model
+- MiniMax-M2.7 (api.minimaxi.chat) — fallback, thinking model
 - Claude CLI / Copilot CLI — offline headless (slow, 10-12s)
 
 Streaming supported via SSE (text/event-stream).
@@ -83,8 +83,8 @@ _PROVIDERS = {
         "name": "MiniMax",
         "base_url": "https://api.minimaxi.chat/v1",
         "key_env": "MINIMAX_API_KEY",
-        "models": ["MiniMax-M2.5", "MiniMax-M2.1"],
-        "default": "MiniMax-M2.5",
+        "models": ["MiniMax-M2.7", "MiniMax-M2.7"],
+        "default": "MiniMax-M2.7",
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },
@@ -540,7 +540,7 @@ class LLMClient:
                         tools,
                         disable_thinking=disable_thinking,
                     )
-                    # Auto-retry on empty response (MiniMax M2.5 quirk):
+                    # Auto-retry on empty response (MiniMax-M2.7 quirk):
                     # - tokens_out==0: classic empty response
                     # - tokens_out>0 but content empty: <think> tokens counted, body stripped to ""
                     # - finish_reason==content_filter: content blocked, content will be ""
@@ -722,7 +722,7 @@ class LLMClient:
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
-            # MiniMax M2.5 supports native role=tool messages (OpenAI-compatible).
+            # MiniMax-M2.7 supports native role=tool messages (OpenAI-compatible).
             # _sanitize_tool_pairs() in executor.py handles orphaned tool_call_ids.
             if name:
                 d["name"] = name
@@ -1078,7 +1078,7 @@ class LLMClient:
                         d["content"] = f"[System instruction]: {d['content']}"
                         msgs.append(d)
                     continue
-                # MiniMax M2.5 supports native role=tool — no conversion needed.
+                # MiniMax-M2.7 supports native role=tool — no conversion needed.
                 # _sanitize_tool_pairs() in executor.py handles orphaned tool_call_ids.
             if m.tool_call_id:
                 d["tool_call_id"] = m.tool_call_id
