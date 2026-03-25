@@ -568,7 +568,7 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str) -> Scenar
     t0 = time.monotonic()
     try:
         for turn in range(1, MAX_TURNS + 1):
-            resp = await client.complete(
+            resp = await client.chat(
                 messages=messages,
                 model=model,
                 provider=provider,
