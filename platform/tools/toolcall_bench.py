@@ -570,11 +570,13 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str, tool_choi
         for turn in range(1, MAX_TURNS + 1):
             # Restraint scenarios (D) should always use "auto" to test if model avoids tools
             effective_choice = "auto" if scenario.category == "D" else tool_choice
+            # Use temperature=0.01 (not 0) to bust LLM cache which doesn't key on tool_choice
+            bench_temp = 0.01 if tool_choice != "auto" else 0
             resp = await client.chat(
                 messages=messages,
                 model=model,
                 provider=provider,
-                temperature=0,
+                temperature=bench_temp,
                 tools=UNIVERSAL_TOOLS,
                 tool_choice=effective_choice,
             )
