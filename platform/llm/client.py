@@ -317,7 +317,9 @@ class LLMClient:
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
             self._http = httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0),
+                # Timeouts increased for heavy tool-calling payloads (60+ tool schemas).
+                # MiniMax M2.7 needs >60s to start streaming when body is large.
+                timeout=httpx.Timeout(connect=30.0, read=300.0, write=60.0, pool=15.0),
                 limits=httpx.Limits(
                     max_connections=30,
                     max_keepalive_connections=5,
@@ -1137,10 +1139,10 @@ class LLMClient:
 
         # Use a separate client for streaming to avoid blocking the shared client
         stream_http = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
+            timeout=httpx.Timeout(connect=30.0, read=300.0, write=60.0, pool=15.0)
         )
         try:
-            _STREAM_HARD_DEADLINE = 300  # 5min absolute max for any streaming call
+            _STREAM_HARD_DEADLINE = 600  # 10min absolute max (was 5min — too short for heavy tool payloads)
             async with asyncio.timeout(_STREAM_HARD_DEADLINE):
               async with stream_http.stream(
                 "POST", url, json=body, headers=headers
@@ -1151,7 +1153,7 @@ class LLMClient:
                 logger.warning("LLM stream %s/%s connected", provider, model)
                 _stream_usage: dict = {}
                 import time as _time
-                _idle_deadline = _time.monotonic() + 60  # 60s to get first data: line
+                _idle_deadline = _time.monotonic() + 120  # 120s for first data (was 60s — MiniMax slow on large tool schemas)
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         # Keepalive/empty line — check idle timeout
@@ -1161,7 +1163,7 @@ class LLMClient:
                                 f"within deadline"
                             )
                         continue
-                    _idle_deadline = _time.monotonic() + 90  # 90s between data: lines
+                    _idle_deadline = _time.monotonic() + 120  # 120s between data: lines (was 90s)
                     payload = line[6:]
                     if payload.strip() == "[DONE]":
                         yield LLMStreamChunk(
