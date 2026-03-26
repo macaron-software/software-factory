@@ -585,10 +585,14 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str, tool_choi
             state.assistant_messages.append(content)
             trace_lines.append(f"turn_{turn}: {content[:200] or '[tool_calls]'}")
 
-            # Build assistant message for history
+            # Build assistant message for history — convert LLMToolCall to dicts for JSON serialization
             assistant_msg = LLMMessage(role="assistant", content=content)
             if resp.tool_calls:
-                assistant_msg.tool_calls = resp.tool_calls
+                assistant_msg.tool_calls = [
+                    {"id": tc.id, "type": "function", "function": {"name": tc.function_name, "arguments": json.dumps(tc.arguments, ensure_ascii=False)}}
+                    if hasattr(tc, "function_name") else tc
+                    for tc in resp.tool_calls
+                ]
             messages.append(assistant_msg)
 
             if not resp.tool_calls:
@@ -606,7 +610,7 @@ async def _run_scenario(scenario: Scenario, model: str, provider: str, tool_choi
                     except (json.JSONDecodeError, TypeError):
                         args = {}
 
-                record = ToolCall(id=tc_id, name=name, arguments=args, raw_arguments=str(raw_args), turn=turn)
+                record = ToolCall(id=tc_id, name=name, arguments=args, raw_arguments=str(args), turn=turn)
                 state.tool_calls.append(record)
                 trace_lines.append(f"  tool: {name}({json.dumps(args, ensure_ascii=False)[:200]})")
 

@@ -26,7 +26,8 @@ def _resolve_default_model() -> str:
         return explicit
     # Infer from provider
     _provider_models = {
-        "minimax": "MiniMax-M2.5",
+        "minimax": "MiniMax-M2.7",
+        "mistral": "devstral-latest",
         "azure-openai": "gpt-5-mini",
         "azure-ai": "gpt-5.2",
         "anthropic": "claude-sonnet-4-20250514",
@@ -1681,7 +1682,10 @@ class AgentStore:
                 skills=["traceability-management", "pua-debugging"],
                 tools=[
                     "legacy_scan", "traceability_link", "traceability_coverage",
-                    "traceability_validate", "code_read", "code_search", "list_files",
+                    "traceability_validate", "traceability_chain_report",
+                    "traceability_check_e2e", "project_traceability_report",
+                    "project_traceability_check_e2e", "project_traceability_export_sqlite",
+                    "code_read", "code_search", "list_files",
                     "deep_search", "memory_search", "memory_store", "get_project_context",
                     "create_feature", "create_story",
                 ],
@@ -1691,8 +1695,8 @@ class AgentStore:
                     "You are Nadia Ferreira, Traceability Lead for the Software Factory.\n"
                     "Your mission: ensure every code file, every feature, every story has a traceable link.\n\n"
                     "RESPONSIBILITIES:\n"
-                    "1. Run traceability_coverage() on the workspace — get % covered, list orphans\n"
-                    "2. Run traceability_validate() to get a pass/fail verdict + gap list\n"
+                    "1. Run project_traceability_report() for the 13-layer project view\n"
+                    "2. Run project_traceability_check_e2e() to get PASS/FAIL + per-layer gaps\n"
                     "3. Delegate gap fixes to trace-auditor (code scan) and trace-writer (SPECS.md updates)\n"
                     "4. VETO any delivery with traceability_score < 80%\n"
                     "5. Report weekly coverage trend to PM\n\n"
@@ -1723,6 +1727,8 @@ class AgentStore:
                 skills=["traceability-management"],
                 tools=[
                     "legacy_scan", "traceability_coverage", "traceability_validate",
+                    "traceability_chain_report", "traceability_check_e2e",
+                    "project_traceability_report", "project_traceability_check_e2e",
                     "code_read", "code_search", "list_files", "deep_search",
                     "memory_search", "get_project_context",
                 ],
@@ -1734,7 +1740,7 @@ class AgentStore:
                     "1. list_files(path='.') — enumerate all source files\n"
                     "2. For each .py / .ts / .js / .go file: code_read() → check for '# Ref:' or '// Ref:' header\n"
                     "3. legacy_scan(path='.') — get structured inventory of classes/endpoints/tables\n"
-                    "4. traceability_coverage() — get quantitative coverage report\n"
+                    "4. project_traceability_report() — get 13-layer project coverage report\n"
                     "5. Produce gap report: list of files missing headers, with suggested Ref IDs\n\n"
                     "OUTPUT FORMAT:\n"
                     "## Traceability Gap Report\n"
@@ -1764,6 +1770,8 @@ class AgentStore:
                 skills=["traceability-management"],
                 tools=[
                     "traceability_link", "traceability_coverage",
+                    "traceability_record", "project_traceability_report",
+                    "project_traceability_check_e2e", "project_traceability_export_sqlite",
                     "code_read", "code_write", "code_edit", "code_search", "list_files",
                     "memory_search", "memory_store", "get_project_context",
                     "create_feature", "create_story", "git_commit",
@@ -1809,6 +1817,9 @@ class AgentStore:
                 skills=["traceability-management"],
                 tools=[
                     "traceability_coverage", "traceability_validate",
+                    "traceability_chain_report", "traceability_check_e2e",
+                    "project_traceability_report", "project_traceability_check_e2e",
+                    "project_traceability_export_sqlite",
                     "legacy_scan", "code_read", "code_search", "list_files",
                     "deep_search", "memory_search", "memory_store",
                     "get_project_context", "get_project_health",
@@ -1819,7 +1830,7 @@ class AgentStore:
                     "You are Lucas Moreno, Traceability Coverage Monitor.\n"
                     "Your mission: track traceability coverage across sprints and block delivery if it regresses.\n\n"
                     "WORKFLOW (run after each sprint):\n"
-                    "1. traceability_coverage(project_id, include_orphans=true) — get current state\n"
+                    "1. project_traceability_report(project_id) — get current 13-layer state\n"
                     "2. Compare with previous coverage (from memory_search)\n"
                     "3. If coverage dropped: VETO with regression details\n"
                     "4. If new orphans appeared: list them and assign to trace-writer\n"
@@ -2563,6 +2574,8 @@ class AgentStore:
                         perm_dict["can_approve"] = True
                     if perms.get("can_delegate"):
                         perm_dict["can_delegate"] = True
+                    if perms.get("scope"):
+                        perm_dict["scope"] = perms["scope"]
 
                     # Extract persona from dict or string
                     persona_obj = raw.get("persona", {})

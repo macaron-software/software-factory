@@ -102,6 +102,15 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,  # skip auth header entirely
     },
+    "mistral": {
+        "name": "Mistral AI",
+        "base_url": "https://api.mistral.ai/v1",
+        "key_env": "MISTRAL_API_KEY",
+        "models": ["devstral-latest", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest", "codestral-latest"],
+        "default": "devstral-latest",
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+    },
     "ollama": {
         "name": "Ollama (local)",
         "base_url": os.environ.get("OLLAMA_URL", "http://localhost:11434/v1"),
@@ -144,6 +153,7 @@ _FALLBACK_CHAIN = [_primary] + [
         (["local-mlx"] if _local_mlx_enabled else [])
         + (["ollama"] if _ollama_enabled else [])
         + (["opencode"] if _opencode_enabled else [])
+        + (["mistral"] if os.environ.get("MISTRAL_API_KEY") else [])
         + (
             ["minimax"]
             + (["azure-openai"] if os.environ.get("AZURE_OPENAI_API_KEY") else [])
@@ -161,6 +171,19 @@ _disable_thinking = bool(os.environ.get("LLM_DISABLE_THINKING", ""))
 _THINKING_PROVIDERS = frozenset({"ollama", "minimax"})  # providers that respect /no_think
 
 _rtk_cache: dict = {}  # RTK prompt compression state cache
+
+
+def _sanitize_tool_call_id(tc_id: str, provider: str) -> str:
+    """Sanitize tool_call_id for provider compatibility.
+
+    Mistral requires: a-z, A-Z, 0-9 only, length exactly 9.
+    MiniMax generates: call_function_xxxx_N (underscores + variable length).
+    """
+    if provider != "mistral" or not tc_id:
+        return tc_id
+    import hashlib
+    # Deterministic 9-char alphanumeric hash (preserves pairing between assistant + tool msgs)
+    return hashlib.md5(tc_id.encode()).hexdigest()[:9]
 
 
 class _RateLimiter:
@@ -542,6 +565,7 @@ class LLMClient:
                         _send_system,
                         tools,
                         disable_thinking=disable_thinking,
+                        tool_choice=tool_choice,
                     )
                     # Auto-retry on empty response (MiniMax-M2.7 quirk):
                     # - tokens_out==0: classic empty response
@@ -690,6 +714,7 @@ class LLMClient:
         system_prompt: str,
         tools: list[dict] | None = None,
         disable_thinking: bool | None = None,
+        tool_choice: str | None = None,
     ) -> LLMResponse:
         http = await self._get_http()
         url = self._build_url(pcfg, model)
@@ -730,8 +755,15 @@ class LLMClient:
             if name:
                 d["name"] = name
             if tool_call_id:
-                d["tool_call_id"] = tool_call_id
+                d["tool_call_id"] = _sanitize_tool_call_id(tool_call_id, provider)
             if tool_calls:
+                # Sanitize tool_call IDs inside tool_calls list for Mistral compatibility
+                if provider == "mistral":
+                    tool_calls = [
+                        {**tc, "id": _sanitize_tool_call_id(tc.get("id", ""), provider)}
+                        if isinstance(tc, dict) else tc
+                        for tc in tool_calls
+                    ]
                 d["tool_calls"] = tool_calls
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
@@ -1084,9 +1116,16 @@ class LLMClient:
                 # MiniMax-M2.7 supports native role=tool — no conversion needed.
                 # _sanitize_tool_pairs() in executor.py handles orphaned tool_call_ids.
             if m.tool_call_id:
-                d["tool_call_id"] = m.tool_call_id
+                d["tool_call_id"] = _sanitize_tool_call_id(m.tool_call_id, provider)
             if m.tool_calls:
-                d["tool_calls"] = m.tool_calls
+                tc_list = m.tool_calls
+                if provider == "mistral":
+                    tc_list = [
+                        {**tc, "id": _sanitize_tool_call_id(tc.get("id", ""), provider)}
+                        if isinstance(tc, dict) else tc
+                        for tc in tc_list
+                    ]
+                d["tool_calls"] = tc_list
                 d.pop("content", None)
             msgs.append(d)
         # Inject system prompt

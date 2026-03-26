@@ -69,6 +69,14 @@ class LLMConfig:
                 models=["MiniMax-M2.7", "MiniMax-M2.7"],
                 default_model="MiniMax-M2.7",
             ),
+            "mistral": LLMProviderConfig(
+                id="mistral",
+                name="Mistral AI",
+                base_url="https://api.mistral.ai/v1",
+                api_key_env="MISTRAL_API_KEY",
+                models=["devstral-latest", "mistral-small-latest", "mistral-medium-latest"],
+                default_model="devstral-latest",
+            ),
             "glm": LLMProviderConfig(
                 id="glm",
                 name="Zhipu AI (GLM)",
