@@ -724,7 +724,14 @@ class LLMClient:
         # Disable thinking when LLM_DISABLE_THINKING=1 or per-project override
         # (arXiv:2603.05488 — saves tokens on routine tasks where extended CoT is
         # "performative" / reasoning theater).
-        _should_disable = disable_thinking if disable_thinking is not None else _disable_thinking
+        #
+        # AUTO no_think: when input context > 10K tokens (~40K chars), MiniMax spends
+        # entire budget on <think> and returns empty. Force /no_think above threshold.
+        _estimated_chars = sum(len(m.content or "") for m in messages) + len(system_prompt or "")
+        _auto_no_think = _estimated_chars > 40000 and provider in _THINKING_PROVIDERS
+        if _auto_no_think:
+            logger.info("AUTO_NO_THINK: context ~%d chars > 40K, forcing /no_think for %s", _estimated_chars, provider)
+        _should_disable = disable_thinking if disable_thinking is not None else (_disable_thinking or _auto_no_think)
         _no_think = _should_disable and provider in _THINKING_PROVIDERS
         if system_prompt:
             sp = f"/no_think\n{system_prompt}" if _no_think else system_prompt
