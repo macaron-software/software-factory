@@ -83,3 +83,5 @@ platform.bak
 # AI config personal overrides
 CLAUDE.local.md
 .claude/settings.local.json
+_FINARY/
+dashboard/.claude/settings.local.json
