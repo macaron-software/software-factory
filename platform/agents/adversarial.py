@@ -1448,22 +1448,26 @@ async def run_guard(
                 _vis_resp = await _vis_client.chat(
                     messages=[
                         LLMMessage(role="system", content=(
-                            "You are a UI design critic. Evaluate this screenshot for: "
-                            "1) Visual coherence (mood, colors, spacing) "
-                            "2) Craft quality (typography, alignment, contrast) "
-                            "3) Functionality (are elements usable, readable?) "
-                            "4) Originality (does it look custom or template-default?) "
-                            "Score 0-100. If score < 40, output REJECT. Otherwise PASS. "
-                            "Be concise: one line per criterion, then verdict."
+                            "You are a strict UI quality gate. Binary verdict only.\n\n"
+                            "Look at this screenshot and answer these YES/NO questions:\n"
+                            "1. Is there visible, rendered content? (not blank/white/error page)\n"
+                            "2. Is the layout functional? (elements visible, not overlapping garbage)\n"
+                            "3. Does it match the task description?\n\n"
+                            "If ALL three are YES → output exactly: PASS\n"
+                            "If ANY is NO → output exactly: VETO\n"
+                            "Then one sentence explaining why.\n"
+                            "No scores. No percentages. Binary: PASS or VETO."
                         )),
                         LLMMessage(role="user", content=f"Screenshot: {_screenshot_path}\nTask: {task[:500]}"),
                     ],
                     temperature=0,
                 )
-                if "REJECT" in _vis_resp.content.upper():
-                    l0.issues.append(f"L2-VISUAL: UI quality rejected — {_vis_resp.content[:200]}")
-                    l0.score += 3
-                    logger.warning("GUARD L2-VISUAL REJECT [%s]: %s", agent_name, _vis_resp.content[:100])
+                if "VETO" in _vis_resp.content.upper():
+                    # Binary VETO — force recode, no partial credit
+                    l0.issues.append(f"L2-VISUAL VETO: {_vis_resp.content[:200]}")
+                    l0.score += 10  # guaranteed rejection (threshold is 5)
+                    l0.passed = False
+                    logger.warning("GUARD L2-VISUAL VETO [%s]: %s", agent_name, _vis_resp.content[:100])
                 else:
                     logger.info("GUARD L2-VISUAL PASS [%s]: %s", agent_name, _vis_resp.content[:100])
         except Exception as _vis_err:
