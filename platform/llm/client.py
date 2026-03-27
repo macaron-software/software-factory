@@ -1097,7 +1097,13 @@ class LLMClient:
         logger.warning("LLM stream trying %s/%s ...", provider, model)
 
         msgs = []
-        _should_disable = disable_thinking if disable_thinking is not None else _disable_thinking
+        # AUTO no_think for streaming: same logic as _do_chat — prevent MiniMax
+        # from spending entire budget on <think> with empty visible output.
+        _estimated_chars = sum(len(m.content or "") for m in messages) + len(system_prompt or "")
+        _auto_no_think = _estimated_chars > 20000 and provider in _THINKING_PROVIDERS
+        if _auto_no_think:
+            logger.info("AUTO_NO_THINK (stream): context ~%d chars > 20K, forcing /no_think for %s", _estimated_chars, provider)
+        _should_disable = disable_thinking if disable_thinking is not None else (_disable_thinking or _auto_no_think)
         _no_think = _should_disable and provider in _THINKING_PROVIDERS
         sys_content = ("/no_think\n" + system_prompt if _no_think and system_prompt
                        else "/no_think" if _no_think and not system_prompt
