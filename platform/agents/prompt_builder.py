@@ -366,6 +366,16 @@ If you don't have a feature ID, use the task name (e.g., # Ref: task-auth — Lo
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")
 
+    # Inject constraints — adversarial L1 reviewer enforces these
+    parts.append("""
+## CONSTRAINTS (adversarial reviewer will VETO violations)
+- No emoji in code. Use text or SVG icons only.
+- If brief says "single file": ALL code in ONE file. Inline CSS+JS. No external src/href.
+- Never concatenate two implementations. Clean before rewriting.
+- Write files ONLY inside the project workspace path shown above.
+- Output must match the brief: requested stack, theme, features, architecture.
+""")
+
     perms = agent.permissions or {}
     if perms.get("can_delegate"):
         parts.append("""

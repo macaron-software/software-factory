@@ -978,6 +978,22 @@ def check_l0(
                 )
                 score += 7  # hard reject — broken build cannot be approved
 
+    # ── L0 deterministic: only things regex CAN reliably catch ─────────
+    # Brief compliance, code quality, design coherence → L1 LLM reviewer.
+    # L0 only catches structural/syntactic issues that are 100% deterministic.
+
+    # CHECK: Duplicate HTML documents concatenated (agent wrote over without cleaning)
+    for tc in tool_calls:
+        if tc.get("name") != "code_write":
+            continue
+        fc = str(tc.get("args", {}).get("content", ""))
+        fp = str(tc.get("args", {}).get("path", "") or "")
+        if fp.endswith((".html", ".htm")):
+            doctype_count = fc.lower().count("<!doctype")
+            if doctype_count > 1:
+                issues.append(f"DUPLICATE_CODE: {doctype_count} <!DOCTYPE> in {fp} — concatenated")
+                score += 5
+
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)
@@ -1093,7 +1109,15 @@ Check for:
 3. MOCK: Fake implementations (TODO, pass, NotImplementedError, dummy data)
 4. LIES: Invented file paths, URLs, results not in tool output
 5. ECHO: Just rephrasing the task without doing real work
-6. STACK_MISMATCH: Code written in wrong language for declared stack (e.g. TypeScript backend when task says Rust/axum)
+6. STACK_MISMATCH: Code written in wrong language for declared stack
+7. BRIEF_VIOLATION: Output does not match what was asked. Examples:
+   - Task says "single file" but multiple code files were written
+   - Task says "dark theme" but output is light theme
+   - Task says "Canvas" but output uses DOM elements
+   - HTML references external files (src="...", href="...") when single-file was requested
+8. EMOJI_IN_CODE: Emoji characters in user-facing HTML/CSS/JS. Use text or SVG icons.
+9. DUPLICATE_CODE: Two implementations concatenated in one file (e.g. two <!DOCTYPE>)
+10. DEAD_CODE: CSS/JS that is defined but never used (e.g. theme toggle without CSS variants)
 
 Respond ONLY with XML:
 <adversarial_review>
