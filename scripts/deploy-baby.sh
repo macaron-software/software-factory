@@ -20,10 +20,10 @@ case "${1:-deploy}" in
     # 1. Create .env.baby if missing
     if [ ! -f .env.baby ]; then
       cat > .env.baby <<'EOF'
-# SF-Baby — MiniMax M2.5
+# SF-Baby — MiniMax-M2.7
 MINIMAX_API_KEY=REPLACE_WITH_YOUR_KEY
 PG_USER=macaron
-PG_PASSWORD=macaron_pg_ovh_2024
+PG_PASSWORD=${PG_PASSWORD}
 MACARON_API_KEY=baby-sf-key
 SF_DEMO_EMAIL=admin@demo.local
 SF_DEMO_PASSWORD=demo123
@@ -118,7 +118,7 @@ NGINX
     echo "  UI port: 8093"
     echo "  Factory: 8094"
     echo "  DB:      macaron_baby"
-    echo "  LLM:     MiniMax M2.5"
+    echo "  LLM:     MiniMax-M2.7"
     echo ""
     ;;
 

@@ -7,7 +7,7 @@
 # Architecture: same as main SF but isolated DB + workspace + Redis DB
 #   - Shares: postgres service, redis service
 #   - Isolates: database (macaron_baby), redis db 2, workspace volume, data volume
-#   - LLM: MiniMax M2.5 (same provider, different API key in .env.baby)
+#   - LLM: MiniMax-M2.7 (same provider, different API key in .env.baby)
 #   - Ports: 8093 (baby-ui), 8094 (baby-factory)
 
 services:
@@ -23,8 +23,8 @@ services:
     environment:
       - PLATFORM_MODE=ui
       - PLATFORM_LLM_PROVIDER=minimax
-      - PLATFORM_LLM_MODEL=MiniMax-M2.5
-      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg_ovh_2024}@postgres:5432/macaron_baby
+      - PLATFORM_LLM_MODEL=MiniMax-M2.7
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-${PG_PASSWORD:-changeme}}@postgres:5432/macaron_baby
       - REDIS_URL=redis://redis:6379/2
       - PLATFORM_AUTO_RESUME_ENABLED=0
       - PLATFORM_UI_SIMPLE=1
@@ -61,8 +61,8 @@ services:
     environment:
       - PLATFORM_MODE=factory
       - PLATFORM_LLM_PROVIDER=minimax
-      - PLATFORM_LLM_MODEL=MiniMax-M2.5
-      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg_ovh_2024}@postgres:5432/macaron_baby
+      - PLATFORM_LLM_MODEL=MiniMax-M2.7
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-${PG_PASSWORD:-changeme}}@postgres:5432/macaron_baby
       - REDIS_URL=redis://redis:6379/2
       - PLATFORM_AUTO_RESUME_ENABLED=0
       - SANDBOX_ENABLED=true

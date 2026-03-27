@@ -3,11 +3,11 @@
 # Déclenché à chaque `git push origin` (ne bloque pas le push GitHub)
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-SYNC_SCRIPT="$REPO_ROOT/sync-to-laposte.sh"
+SYNC_SCRIPT="$REPO_ROOT/sync-to-client-sync.sh"
 
 [ -x "$SYNC_SCRIPT" ] || exit 0
 
 echo "🔄 Sync La Poste en arrière-plan..."
-nohup bash "$SYNC_SCRIPT" > /tmp/sync-laposte.log 2>&1 &
+nohup bash "$SYNC_SCRIPT" > /tmp/sync-client-sync.log 2>&1 &
 
 exit 0

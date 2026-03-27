@@ -158,12 +158,12 @@ Thompson(Beta selection) Darwin(team tournament) Evolution(GA pop=40 nightly)
 RL(Q-learning state-action) Skills(det+LLM judge) AC(reward 14d convergence experiments)
 
 ## LLM — FROZEN
-local-mlx Qwen3.5-mlx . minimax M2.5 . azure-oai gpt-5-mini/5.2/5.2-codex
+local-mlx Qwen3.5-mlx . minimax M2.7 . azure-oai gpt-5-mini/5.2/5.2-codex
 azure-ai gpt-5.2 . nvidia Kimi-K2
 MiniMax: native tool_calls no temp `<think>` stripped NEVER empty. GPT-5.x: reasoning budget>=16K
 
 ## Infra
-OVH: 54.36.183.124 blue-green Docker. Azure: 3-node nginx lb n2→n1+n2 PG+Redis n3(10.0.1.6)
+OVH: $OVH_IP blue-green Docker. Azure: 3-node nginx lb n2→n1+n2 PG+Redis n3($AZURE_PG_IP)
 Deploy: rsync+docker-compose --force-recreate. CI: deploy-demo.yml
 
 ## Gotchas

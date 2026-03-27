@@ -25,7 +25,6 @@ SECRET_PATTERNS=(
     'sk-cp-[A-Za-z0-9]{20,}'                         # MiniMax specific
     'sk-ant-[A-Za-z0-9]{20,}'                        # Anthropic key
     'nvapi-[A-Za-z0-9]{20,}'                         # NVIDIA API key
-    'EayNuWg3[A-Za-z0-9]{20,}'                       # Mistral key pattern
     'Bearer [A-Za-z0-9._-]{40,}'                     # Long bearer tokens
     '-----BEGIN [A-Z ]*PRIVATE KEY-----'             # Private keys
     '-----BEGIN [A-Z ]*CERTIFICATE-----'             # Certificates
