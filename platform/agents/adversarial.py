@@ -1407,13 +1407,38 @@ async def run_guard(
     # Ref: https://anthropic.com/engineering/harness-design-long-running-apps
     # If the phase involves UI work AND a project URL is available, take a screenshot
     # and evaluate visual quality via LLM. Non-blocking: failures log but don't reject.
-    _ui_phase_markers = {"ui", "frontend", "design", "ux", "ihm", "screen", "layout", "css"}
-    _phase_is_ui = bool(
-        _ui_phase_markers & {(task or "").lower()[:20]}
-    ) or any(m in (task or "").lower() for m in _ui_phase_markers)
-    _project_url = os.environ.get("PLATFORM_PROJECT_URL", "")
+    # Detect UI phases from task content or agent role
+    _ui_phase_markers = {"ui", "frontend", "design", "ux", "ihm", "screen", "layout", "css", "html", "canvas"}
+    _task_lower = (task or "").lower()
+    _phase_is_ui = any(m in _task_lower for m in _ui_phase_markers)
+    # Also check if agent just wrote HTML/CSS files
+    _wrote_ui_files = any(
+        tc_name.endswith((".html", ".css", ".htm", ".svg"))
+        for tc_name in (tool_calls or [])
+        if isinstance(tc_name, str)
+    )
+    # Check for HTML content in the output itself
+    _has_html_output = "<!DOCTYPE" in content or "<html" in content or "<canvas" in content
 
-    if _phase_is_ui and _project_url and enable_l1:
+    # Resolve screenshot URL: project URL env var OR workspace index.html
+    _project_url = os.environ.get("PLATFORM_PROJECT_URL", "")
+    if not _project_url:
+        # Try to find index.html in the workspace via tool_calls context
+        _ws_index = None
+        for _tc in (tool_calls or []):
+            if isinstance(_tc, str) and "index.html" in _tc:
+                _ws_index = _tc
+                break
+        if not _ws_index:
+            # Scan common workspace paths
+            import glob as _glob
+            _ws_candidates = _glob.glob("/app/data/workspaces/*/index.html")
+            if _ws_candidates:
+                _ws_index = sorted(_ws_candidates, key=os.path.getmtime)[-1]  # most recent
+        if _ws_index:
+            _project_url = f"file://{_ws_index}"
+
+    if (_phase_is_ui or _wrote_ui_files or _has_html_output) and _project_url and enable_l1:
         try:
             from ..tools.test_tools import playwright_screenshot
             _screenshot_path = await playwright_screenshot(_project_url)
@@ -1435,9 +1460,7 @@ async def run_guard(
                     ],
                     temperature=0,
                 )
-                _vis_score = 50  # default
                 if "REJECT" in _vis_resp.content.upper():
-                    _vis_score = 30
                     l0.issues.append(f"L2-VISUAL: UI quality rejected — {_vis_resp.content[:200]}")
                     l0.score += 3
                     logger.warning("GUARD L2-VISUAL REJECT [%s]: %s", agent_name, _vis_resp.content[:100])

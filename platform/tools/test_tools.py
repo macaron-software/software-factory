@@ -21,6 +21,44 @@ def _workspace_screenshot_dir(cwd: str) -> Path:
     return d
 
 
+async def playwright_screenshot(url: str, width: int = 1280, height: int = 720) -> str | None:
+    """Take a screenshot of a URL (http:// or file://) via Playwright.
+
+    Used by adversarial L2 visual eval. Returns path to PNG or None on failure.
+    Ref: Anthropic harness — "evaluator used Playwright MCP to interact with live
+    interfaces directly, screenshotting and evaluating implementations."
+    """
+    import asyncio
+    out_dir = Path("/tmp/sf-screenshots")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"l2_visual_{int(time.time())}.png"
+
+    script = f"""
+const {{ chromium }} = require('playwright');
+(async () => {{
+    const browser = await chromium.launch();
+    const page = await browser.newPage({{ viewport: {{ width: {width}, height: {height} }} }});
+    await page.goto('{url}', {{ waitUntil: 'domcontentloaded', timeout: 15000 }});
+    await page.waitForTimeout(1000);
+    await page.screenshot({{ path: '{out_path}', fullPage: false }});
+    await browser.close();
+}})();
+"""
+    try:
+        proc = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["node", "-e", script],
+                capture_output=True, text=True, timeout=30,
+            ),
+        )
+        if proc.returncode == 0 and out_path.exists():
+            return str(out_path)
+    except Exception:
+        pass
+    return None
+
+
 class ScreenshotTool(BaseTool):
     name = "screenshot"
     description = (
