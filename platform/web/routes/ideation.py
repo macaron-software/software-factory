@@ -1,5 +1,4 @@
 """Web routes — Ideation workspace."""
-# Ref: feat-ideation, feat-mkt-ideation
 
 from __future__ import annotations
 
@@ -8,11 +7,10 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .helpers import _templates
-from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -133,7 +131,7 @@ async def ideation_page(request: Request):
     )
 
 
-@router.post("/api/ideation", dependencies=[Depends(require_auth())])
+@router.post("/api/ideation")
 async def ideation_submit(request: Request):
     """Launch a REAL multi-agent ideation via the pattern engine (network pattern).
 
@@ -374,7 +372,7 @@ Réponds UNIQUEMENT avec ce JSON (sans commentaires, JSON valide strict):
 Sois pragmatique et concret. Réponds UNIQUEMENT avec le JSON valide, rien d'autre."""
 
 
-@router.post("/api/ideation/create-epic", dependencies=[Depends(require_auth())])
+@router.post("/api/ideation/create-epic")
 async def ideation_create_epic(request: Request):
     """PO agent structures project + epic + features + stories from ideation."""
     import subprocess as _sp
@@ -385,10 +383,8 @@ async def ideation_create_epic(request: Request):
     from ...config import FACTORY_ROOT
 
     data = await request.json()
-    idea = data.get("goal", "") or data.get("name", "") or data.get("idea", "")
+    idea = data.get("goal", "") or data.get("name", "")
     findings = data.get("description", "")
-    user_tech_stack = data.get("tech_stack", "")
-    user_project_name = data.get("project_name", "")
 
     # If session_id provided, try to load idea + findings from session store / DB
     session_id_in = data.get("session_id", "").strip()
@@ -475,33 +471,19 @@ async def ideation_create_epic(request: Request):
         plan = json.loads(raw)
     except Exception as e:
         logger.error("PO epic structuring failed: %s", e)
-        # ── Create incident for TMA team ──
-        try:
-            from ...missions.feedback import create_platform_incident
-            create_platform_incident(
-                title=f"PO JSON parse fail: {str(e)[:80]}",
-                severity="P2",
-                source="ideation",
-                error_type="po_json_parse_error",
-                error_detail=f"idea={idea[:200]}\nraw_error={e}",
-            )
-        except Exception:
-            pass
-        # ── Fallback: use raw user input ──
-        slug = (user_project_name or idea[:30]).lower().replace(" ", "-").replace("'", "")
+        slug = idea[:30].lower().replace(" ", "-").replace("'", "")
         slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
-        stack_list = [s.strip() for s in user_tech_stack.split(",") if s.strip()] if user_tech_stack else []
         plan = {
             "project": {
                 "id": slug or "new-project",
-                "name": user_project_name or idea[:60] or "New Project",
+                "name": idea[:60] or "New Project",
                 "description": idea,
-                "stack": stack_list,
+                "stack": [],
                 "factory_type": "standalone",
             },
             "epic": {
-                "name": user_project_name or idea[:100],
-                "description": findings or idea,
+                "name": data.get("name", idea[:100]),
+                "description": findings,
                 "goal": idea,
             },
             "features": [],
@@ -518,6 +500,7 @@ async def ideation_create_epic(request: Request):
     # ── Step 2 & 3: Create project or use existing ──
     existing_project_id = data.get("project_id", "").strip()
     project_store = get_project_store()
+    stack = proj_data.get("stack", [])  # init early — used in both branches + after try/except
 
     if existing_project_id:
         # Use existing project
@@ -528,10 +511,12 @@ async def ideation_create_epic(request: Request):
     else:
         # Create new project directory + git init
         project_id = proj_data.get("id", "new-project")
-        project_path = str(FACTORY_ROOT.parent / project_id)
+        # Use DATA_DIR/workspaces/ for project paths (FACTORY_ROOT.parent = / in Docker)
+        from ...config import DATA_DIR
+        _ws_dir = DATA_DIR / "workspaces"
+        project_path = str(_ws_dir / project_id)
         proj_dir = Path(project_path)
         vision_content = ""
-        stack = proj_data.get("stack", [])
 
         try:
             proj_dir.mkdir(parents=True, exist_ok=True)
@@ -828,37 +813,13 @@ async def ideation_create_epic(request: Request):
     # ── Step 8: Auto-launch workflow (agents take over) ──
     session_id_live = None
     try:
-        import os
-        import subprocess
-        import uuid as _uuid
-
         from ...sessions.store import get_session_store, SessionDef, MessageDef
         from ...workflows.store import get_workflow_store
-        from ...models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
-        from ...epics.store import get_epic_run_store
         from .workflows import _run_workflow_background
 
         wf_store = get_workflow_store()
         wf = wf_store.get(workflow_id)
         if wf:
-            # ── Create sandboxed workspace (like auto_resume) ──
-            run_id = _uuid.uuid4().hex[:8]
-            ws_base = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-                "data", "workspaces", run_id,
-            )
-            os.makedirs(ws_base, exist_ok=True)
-            if not os.path.isdir(os.path.join(ws_base, ".git")):
-                subprocess.run(["git", "init"], cwd=ws_base, capture_output=True)
-                subprocess.run(
-                    ["git", "commit", "--allow-empty", "-m", "init workspace"],
-                    cwd=ws_base, capture_output=True,
-                    env={**os.environ, "GIT_AUTHOR_NAME": "agent",
-                         "GIT_AUTHOR_EMAIL": "agent@sf",
-                         "GIT_COMMITTER_NAME": "agent",
-                         "GIT_COMMITTER_EMAIL": "agent@sf"},
-                )
-
             session_store = get_session_store()
             session = SessionDef(
                 name=f"{mission.name}",
@@ -868,48 +829,12 @@ async def ideation_create_epic(request: Request):
                 config={"workflow_id": workflow_id, "mission_id": mission.id},
             )
             session = session_store.create(session)
-
-            # ── Create EpicRun with workspace_path ──
-            phases = [
-                PhaseRun(
-                    phase_id=wp.id,
-                    phase_name=wp.name,
-                    pattern_id=wp.pattern_id,
-                    status=PhaseStatus.PENDING,
-                )
-                for wp in wf.phases
-            ]
-            orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
-            epic_run = EpicRun(
-                id=run_id,
-                workflow_id=workflow_id,
-                workflow_name=wf.name,
-                brief=f"{mission.name}: {mission.goal or mission.description or ''}"[:500],
-                status=EpicStatus.PENDING,
-                phases=phases,
-                project_id=project_id,
-                workspace_path=ws_base,
-                cdp_agent_id=orchestrator_id,
-                session_id=session.id,
-            )
-            get_epic_run_store().create(epic_run)
-
-            # ── Store workspace_path in project memory ──
-            try:
-                from ...memory.manager import get_memory_manager
-                get_memory_manager().project_store(
-                    project_id, "workspace_path", ws_base,
-                    category="infrastructure", source="ideation", confidence=0.95,
-                )
-            except Exception:
-                pass
-
             session_store.add_message(
                 MessageDef(
                     session_id=session.id,
                     from_agent="system",
                     message_type="system",
-                    content=f"Workflow **{wf.name}** lancé pour l'epic **{mission.name}**.\nStack: {', '.join(stack)}\nGoal: {mission.goal or 'N/A'}\nWorkspace: {ws_base}",
+                    content=f"Workflow **{wf.name}** lancé pour l'epic **{mission.name}**.\nStack: {', '.join(stack)}\nGoal: {mission.goal or 'N/A'}",
                 )
             )
             task_desc = (
@@ -918,15 +843,17 @@ async def ideation_create_epic(request: Request):
                 f"Goal: {mission.goal or mission.description}\n"
                 f"Stack: {', '.join(stack)}\n"
                 f"Features: {', '.join(f.get('name', '') for f in features_data)}\n"
-                f"Workspace: {ws_base}"
+                f"Répertoire projet: {project_path}"
             )
             asyncio.create_task(
                 _run_workflow_background(wf, session.id, task_desc, project_id)
             )
             session_id_live = session.id
             logger.info(
-                "Auto-launched workflow %s for project %s (session %s, workspace %s)",
-                workflow_id, project_id, session.id, ws_base,
+                "Auto-launched workflow %s for project %s (session %s)",
+                workflow_id,
+                project_id,
+                session.id,
             )
     except Exception as e:
         logger.warning("Auto-launch workflow: %s", e)
