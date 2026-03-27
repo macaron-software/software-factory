@@ -481,14 +481,33 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
 
     mem = get_memory_manager()
     query = args.get("query", "")
+    kind = str(args.get("kind", "") or "").strip()
+    mandatory_only = bool(args.get("mandatory_only", False))
     try:
         results = []
+        mode = "memory-only"
         if ctx.project_id:
-            # FTS search first
-            results = mem.project_search(ctx.project_id, query, limit=8)
-            # If FTS yields nothing, fallback to recent entries from project
-            if not results:
-                results = mem.project_get(ctx.project_id, limit=8)
+            mode, adaptive = mem.project_retrieve_adaptive(ctx.project_id, query, limit=10)
+            results = list(adaptive)
+            if kind:
+                ko_rows = mem.ko_search(
+                    ctx.project_id,
+                    query=query,
+                    kind=kind,
+                    limit=8,
+                    mandatory_only=mandatory_only,
+                )
+                for r in ko_rows:
+                    results.append(
+                        {
+                            "source": "ko",
+                            "kind": r.get("kind", ""),
+                            "mandatory": bool(r.get("mandatory", 0)),
+                            "key": r.get("key", ""),
+                            "value": r.get("value", ""),
+                            "category": f"ko:{r.get('kind', '')}",
+                        }
+                    )
             # Always include relevant global memory (cross-project learnings)
             global_results = mem.global_search(query, limit=3) or []
             for r in global_results:
@@ -518,12 +537,99 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
                     )
         if not results:
             return "No memory entries found for this project yet."
-        return "\n".join(
+        out_lines = [f"[retrieval_mode] {mode}"] if ctx.project_id else []
+        out_lines.extend(
             f"[{r.get('category', r.get('key', ''))}] {r.get('key', '')}: {r.get('value', '')[:300]}"
             for r in results[:12]
         )
+        return "\n".join(out_lines)
     except Exception as e:
         return f"Memory search error: {e}"
+
+
+async def _tool_ko_store(args: dict, ctx: ExecutionContext) -> str:
+    """Store deterministic Knowledge Object (KO) at project scope."""
+    from ..memory.manager import get_memory_manager
+
+    if not ctx.project_id:
+        return "Error: no project context — KO requires project scope"
+    key = str(args.get("key", "") or "").strip()
+    value = str(args.get("value", "") or "").strip()
+    kind = str(args.get("kind", "constraint") or "constraint").strip()
+    mandatory = bool(args.get("mandatory", False))
+    confidence = float(args.get("confidence", 1.0) or 1.0)
+    if not key or not value:
+        return "Error: key and value required"
+    try:
+        mem = get_memory_manager()
+        ko_id = mem.ko_store(
+            ctx.project_id,
+            key,
+            value,
+            kind=kind,
+            mandatory=mandatory,
+            source=ctx.agent.id if ctx.agent else "system",
+            confidence=confidence,
+        )
+        return (
+            f"KO stored: id={ko_id} project={ctx.project_id} kind={kind} "
+            f"mandatory={'yes' if mandatory else 'no'} key={key}"
+        )
+    except Exception as e:
+        return f"KO store error: {e}"
+
+
+async def _tool_ko_get(args: dict, ctx: ExecutionContext) -> str:
+    """Get deterministic Knowledge Object by key (optionally kind)."""
+    from ..memory.manager import get_memory_manager
+
+    if not ctx.project_id:
+        return "Error: no project context"
+    key = str(args.get("key", "") or "").strip()
+    kind = str(args.get("kind", "") or "").strip()
+    if not key:
+        return "Error: key is required"
+    try:
+        mem = get_memory_manager()
+        ko = mem.ko_get(ctx.project_id, key=key, kind=kind)
+        if not ko:
+            return f"No KO found for key '{key}'"
+        return (
+            f"[ko:{ko.get('kind', '')}] {ko.get('key', '')}: {ko.get('value', '')}\n"
+            f"  mandatory={bool(ko.get('mandatory', 0))} "
+            f"confidence={ko.get('confidence', 1.0)} source={ko.get('source', '')}"
+        )
+    except Exception as e:
+        return f"KO get error: {e}"
+
+
+async def _tool_ko_search(args: dict, ctx: ExecutionContext) -> str:
+    """Search deterministic Knowledge Objects."""
+    from ..memory.manager import get_memory_manager
+
+    if not ctx.project_id:
+        return "Error: no project context"
+    query = str(args.get("query", "") or "").strip()
+    kind = str(args.get("kind", "") or "").strip()
+    mandatory_only = bool(args.get("mandatory_only", False))
+    limit = int(args.get("limit", 12) or 12)
+    try:
+        mem = get_memory_manager()
+        rows = mem.ko_search(
+            ctx.project_id,
+            query=query,
+            kind=kind,
+            limit=max(1, min(limit, 50)),
+            mandatory_only=mandatory_only,
+        )
+        if not rows:
+            return "No matching KOs."
+        return "\n".join(
+            f"[ko:{r.get('kind', '')}] {r.get('key', '')}: {str(r.get('value', ''))[:300]}"
+            for r in rows[:limit]
+        )
+    except Exception as e:
+        return f"KO search error: {e}"
 
 
 async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
@@ -610,7 +716,7 @@ async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
     """RLM: Deep recursive search (MIT CSAIL arXiv:2512.24601)."""
     from .rlm import get_project_rlm
 
-    # Accept 'q' as alias for 'query' (MiniMax M2.5 sometimes abbreviates param names)
+    # Accept 'q' as alias for 'query' (MiniMax-M2.7 sometimes abbreviates param names)
     query = args.get("query", "") or args.get("q", "")
     if not query:
         return "Error: query is required"
@@ -951,7 +1057,7 @@ async def _tool_traceability(name: str, args: dict, ctx: ExecutionContext) -> st
                     return "Error: target_id required for create"
                 link_id = create_link(
                     source_id, source_type, target_id, target_type,
-                    link_type, notes=notes,
+                    link_type, notes=notes, project_id=project_id,
                 )
                 return f"Link created (id={link_id}): {source_id} --[{link_type}]--> {target_id}"
 
@@ -1034,6 +1140,18 @@ async def _tool_traceability(name: str, args: dict, ctx: ExecutionContext) -> st
         if name == "traceability_check_e2e":
             from ..tools.traceability_tools import TraceabilityCheckE2ETool
             return await TraceabilityCheckE2ETool().execute(args)
+
+        if name == "project_traceability_report":
+            from ..tools.traceability_tools import ProjectTraceabilityReportTool
+            return await ProjectTraceabilityReportTool().execute(args)
+
+        if name == "project_traceability_check_e2e":
+            from ..tools.traceability_tools import ProjectTraceabilityCheckE2ETool
+            return await ProjectTraceabilityCheckE2ETool().execute(args)
+
+        if name == "project_traceability_export_sqlite":
+            from ..tools.traceability_tools import ProjectTraceabilityExportSQLiteTool
+            return await ProjectTraceabilityExportSQLiteTool().execute(args)
 
     except Exception as e:
         logger.exception("Traceability tool error: %s", e)
@@ -2238,7 +2356,10 @@ async def _execute_tool(
         if denied:
             return denied
     except Exception as e:
-        logger.debug("Permission check skipped: %s", e)
+        # FAIL-CLOSED: if permission check crashes, deny the tool call.
+        # Never allow a tool to bypass permissions due to a guard bug.
+        logger.error("Permission check FAILED (blocking tool): %s", e)
+        return f"Permission denied: internal guard error ({e})"
 
     # ── Guardrails: critical action interception ──
     try:
@@ -2266,6 +2387,12 @@ async def _execute_tool(
         return await _tool_memory_retrieve(args, ctx)
     if name == "memory_prune":
         return await _tool_memory_prune(args, ctx)
+    if name == "ko_store":
+        return await _tool_ko_store(args, ctx)
+    if name == "ko_get":
+        return await _tool_ko_get(args, ctx)
+    if name == "ko_search":
+        return await _tool_ko_search(args, ctx)
     if name in ("plan_create", "plan_update", "plan_get"):
         from ..tools.plan_tools import (
             _tool_plan_create,
@@ -2301,7 +2428,9 @@ async def _execute_tool(
 
     # ── Traceability tools ──
     if name in ("legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate",
-                "traceability_record", "traceability_chain_report", "traceability_check_e2e"):
+                "traceability_record", "traceability_chain_report", "traceability_check_e2e",
+                "project_traceability_report", "project_traceability_check_e2e",
+                "project_traceability_export_sqlite"):
         return await _tool_traceability(name, args, ctx)
     if name == "fractal_code":
         return await _tool_fractal_code(args, ctx, registry, llm)
