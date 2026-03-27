@@ -2,7 +2,8 @@
 
 Fills the traceability gaps: AC and Journeys were previously stored as plain text
 or JSON blobs without individual UUIDs. Now every artifact in the chain has a
-proper ID: pers-{uuid8}, feat-{uuid8}, us-{uuid8}, ac-{uuid8}, jour-{uuid8}.
+proper ID: pers-{uuid-v4}, feat-{uuid-v4}, us-{uuid-v4}, ac-{uuid-v4},
+jour-{uuid-v4}.
 
 Tables created on first use (no manual migration needed).
 """
@@ -23,8 +24,26 @@ logger = logging.getLogger(__name__)
 # ── UUID helper ──────────────────────────────────────────────────
 
 def make_id(prefix: str) -> str:
-    """Generate a standardized UUID: {prefix}-{8 hex chars}."""
-    return f"{prefix}-{uuid.uuid4().hex[:8]}"
+    """Generate a standardized identifier: {prefix}-{uuid-v4}."""
+    return f"{prefix}-{uuid.uuid4()}"
+
+
+def is_prefixed_uuid(value: str, prefix: str) -> bool:
+    """Return True when value matches {prefix}-{uuid-v4}."""
+    expected_prefix = f"{prefix}-"
+    if not value.startswith(expected_prefix):
+        return False
+    try:
+        uuid.UUID(value[len(expected_prefix) :])
+    except ValueError:
+        return False
+    return True
+
+
+def make_trace_uuid(artifact_type: str, project_id: str, source_id: str) -> str:
+    """Generate a stable canonical UUID for exported traceability entities."""
+    seed = f"traceability::{artifact_type}::{project_id}::{source_id}"
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
 
 
 # ── Acceptance Criteria ──────────────────────────────────────────
@@ -41,8 +60,8 @@ CREATE TABLE IF NOT EXISTS acceptance_criteria (
     and_text    TEXT DEFAULT '',
     status      TEXT DEFAULT 'pending',
     verified_by TEXT DEFAULT '',
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
+    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_ac_feature ON acceptance_criteria(feature_id);
 CREATE INDEX IF NOT EXISTS idx_ac_story   ON acceptance_criteria(story_id);
@@ -221,8 +240,8 @@ CREATE TABLE IF NOT EXISTS user_journeys (
     pain_points TEXT DEFAULT '',
     opportunities TEXT DEFAULT '',
     status      TEXT DEFAULT 'draft',
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
+    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_journey_project ON user_journeys(project_id);
 CREATE INDEX IF NOT EXISTS idx_journey_persona ON user_journeys(persona_id);
@@ -381,19 +400,9 @@ def _row_to_journey(row) -> UserJourney:
 
 # ── Singletons ───────────────────────────────────────────────────
 
-_ac_store: AcceptanceCriteriaStore | None = None
-_journey_store: JourneyStore | None = None
-
-
 def get_ac_store() -> AcceptanceCriteriaStore:
-    global _ac_store
-    if _ac_store is None:
-        _ac_store = AcceptanceCriteriaStore()
-    return _ac_store
+    return AcceptanceCriteriaStore()
 
 
 def get_journey_store() -> JourneyStore:
-    global _journey_store
-    if _journey_store is None:
-        _journey_store = JourneyStore()
-    return _journey_store
+    return JourneyStore()

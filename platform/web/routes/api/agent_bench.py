@@ -3,15 +3,13 @@
 Mirrors skill_eval.py pattern. Routes grafted onto existing /api router.
 Uses PG via get_db() — no separate DB, no SQLite fallback.
 """
-# Ref: feat-agents-list, feat-evals
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -62,8 +60,7 @@ async def agent_bench_result(agent_id: str) -> dict[str, Any]:
 
 
 @router.post(
-    "/api/agent-bench/run", summary="Trigger bench run for an agent (background)",
-    dependencies=[Depends(require_auth())],
+    "/api/agent-bench/run", summary="Trigger bench run for an agent (background)"
 )
 async def agent_bench_run(
     background_tasks: BackgroundTasks,

@@ -10,7 +10,6 @@ Endpoints:
   POST /api/rl/policy/recommend           — get RL recommendation for a state
   GET  /api/evolution/runs                — GA run history
 """
-# Ref: feat-agents-list, feat-agents-create
 
 from __future__ import annotations
 
@@ -19,8 +18,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from ...auth.middleware import require_auth
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 log = logging.getLogger(__name__)
@@ -67,13 +65,13 @@ async def list_proposals(status: str = "", limit: int = 50) -> JSONResponse:
         return JSONResponse({"proposals": [], "total": 0, "error": str(e)})
 
 
-@router.post("/api/evolution/proposals/{proposal_id}/approve", dependencies=[Depends(require_auth())])
+@router.post("/api/evolution/proposals/{proposal_id}/approve")
 async def approve_proposal(proposal_id: str) -> JSONResponse:
     """Approve an evolution proposal (mark for workflow template update)."""
     return _update_proposal_status(proposal_id, "approved")
 
 
-@router.post("/api/evolution/proposals/{proposal_id}/reject", dependencies=[Depends(require_auth())])
+@router.post("/api/evolution/proposals/{proposal_id}/reject")
 async def reject_proposal(proposal_id: str) -> JSONResponse:
     """Reject an evolution proposal."""
     return _update_proposal_status(proposal_id, "rejected")
@@ -108,7 +106,7 @@ def _update_proposal_status(proposal_id: str, status: str) -> JSONResponse:
 # ── Manual GA trigger ─────────────────────────────────────────────────────────
 
 
-@router.post("/api/evolution/run/{wf_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/evolution/run/{wf_id}")
 async def trigger_evolution(
     wf_id: str, background_tasks: BackgroundTasks
 ) -> JSONResponse:
@@ -194,7 +192,7 @@ async def rl_stats() -> JSONResponse:
         )
 
 
-@router.post("/api/rl/policy/recommend", dependencies=[Depends(require_auth())])
+@router.post("/api/rl/policy/recommend")
 async def rl_recommend(body: dict[str, Any]) -> JSONResponse:
     """
     Get RL recommendation for a phase context.
@@ -219,7 +217,7 @@ async def rl_recommend(body: dict[str, Any]) -> JSONResponse:
         )
 
 
-@router.post("/api/darwin/seed", dependencies=[Depends(require_auth())])
+@router.post("/api/darwin/seed")
 async def seed_darwin(background_tasks: BackgroundTasks) -> JSONResponse:
     """Seed team_fitness warmup data for Darwin Teams leaderboard."""
     background_tasks.add_task(_run_darwin_seed_bg)
@@ -231,7 +229,7 @@ async def seed_darwin(background_tasks: BackgroundTasks) -> JSONResponse:
 # Stage 1=LTM quality, 2=STM efficiency, 3=joint — call in order to progress.
 
 
-@router.post("/api/rl/memory/train", dependencies=[Depends(require_auth())])
+@router.post("/api/rl/memory/train")
 async def memory_rl_train(request: Request) -> JSONResponse:
     """Train one stage of the AgeMem memory RL policy.
 
@@ -352,7 +350,7 @@ async def _run_darwin_seed_bg():
 # ── Warmup ────────────────────────────────────────────────────────────────────
 
 
-@router.post("/api/warmup", dependencies=[Depends(require_auth())])
+@router.post("/api/warmup")
 async def trigger_warmup(
     body: dict[str, Any], background_tasks: BackgroundTasks
 ) -> JSONResponse:

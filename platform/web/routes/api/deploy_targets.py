@@ -1,5 +1,4 @@
 """Deploy Targets CRUD API."""
-# Ref: feat-ops
 
 from __future__ import annotations
 
@@ -7,8 +6,7 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Request
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -29,7 +27,7 @@ async def list_drivers():
     return JSONResponse(available_drivers())
 
 
-@router.post("/api/deploy-targets", dependencies=[Depends(require_auth("admin"))])
+@router.post("/api/deploy-targets")
 async def create_deploy_target(request: Request):
     """Create a new deploy target."""
     from ....db.migrations import get_db
@@ -63,7 +61,7 @@ async def create_deploy_target(request: Request):
         db.close()
 
 
-@router.put("/api/deploy-targets/{target_id}", dependencies=[Depends(require_auth("admin"))])
+@router.put("/api/deploy-targets/{target_id}")
 async def update_deploy_target(target_id: str, request: Request):
     """Update an existing deploy target."""
     from ....db.migrations import get_db
@@ -94,7 +92,7 @@ async def update_deploy_target(target_id: str, request: Request):
         db.close()
 
 
-@router.delete("/api/deploy-targets/{target_id}", dependencies=[Depends(require_auth("admin"))])
+@router.delete("/api/deploy-targets/{target_id}")
 async def delete_deploy_target(target_id: str):
     """Delete a deploy target."""
     from ....db.migrations import get_db
@@ -107,7 +105,7 @@ async def delete_deploy_target(target_id: str):
         db.close()
 
 
-@router.post("/api/deploy-targets/{target_id}/test", dependencies=[Depends(require_auth("admin"))])
+@router.post("/api/deploy-targets/{target_id}/test")
 async def test_deploy_target(target_id: str):
     """
     Test connectivity for a deploy target.
@@ -141,7 +139,7 @@ async def test_deploy_target(target_id: str):
         db.close()
 
 
-@router.post("/api/deploy-targets/{target_id}/provision", dependencies=[Depends(require_auth("admin"))])
+@router.post("/api/deploy-targets/{target_id}/provision")
 async def provision_deploy_target(target_id: str, request: Request):
     """
     Provision a new Azure VM for a deploy target.

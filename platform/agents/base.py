@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -313,38 +314,55 @@ class BaseAgent:
 
     async def _execute_tool_calls(self, llm_response: str) -> list[ToolResult]:
         """Parse and execute any tool calls from LLM response."""
-        # Simple JSON tool call detection
         results = []
-        if "```tool_call" in llm_response:
-            try:
-                start = llm_response.index("```tool_call") + len("```tool_call")
-                end = llm_response.index("```", start)
-                call_json = json.loads(llm_response[start:end].strip())
-                tool_name = call_json.get("tool")
-                params = call_json.get("params", {})
+        call_json: dict[str, Any] | None = None
 
-                if tool_name in self.tools:
-                    tool = self.tools[tool_name]
-                    t0 = time.monotonic()
-                    try:
-                        output = await tool.execute(params, self.instance)
-                        results.append(ToolResult(
-                            tool_name=tool_name,
-                            success=True,
-                            output=str(output),
-                            duration_ms=int((time.monotonic() - t0) * 1000),
-                            agent_id=self.id,
-                        ))
-                    except Exception as e:
-                        results.append(ToolResult(
-                            tool_name=tool_name,
-                            success=False,
-                            error=str(e),
-                            duration_ms=int((time.monotonic() - t0) * 1000),
-                            agent_id=self.id,
-                        ))
-            except (ValueError, json.JSONDecodeError):
-                pass
+        # XML-first tool call format:
+        # <tool_call name="tool"><param name="x">y</param></tool_call>
+        if "<tool_call" in llm_response:
+            try:
+                m = re.search(
+                    r'<tool_call\s+name="([^"]+)">(.*?)</tool_call>',
+                    llm_response,
+                    re.DOTALL,
+                )
+                if m:
+                    tool_name = m.group(1).strip()
+                    body = m.group(2)
+                    params: dict[str, str] = {}
+                    for pm in re.finditer(
+                        r'<(?:param|parameter)\s+name="([^"]+)">(.*?)</(?:param|parameter)>',
+                        body,
+                        re.DOTALL,
+                    ):
+                        params[pm.group(1).strip()] = pm.group(2).strip()
+                    call_json = {"tool": tool_name, "params": params}
+            except Exception:
+                call_json = None
+
+        if call_json:
+            tool_name = call_json.get("tool")
+            params = call_json.get("params", {})
+            if tool_name in self.tools:
+                tool = self.tools[tool_name]
+                t0 = time.monotonic()
+                try:
+                    output = await tool.execute(params, self.instance)
+                    results.append(ToolResult(
+                        tool_name=tool_name,
+                        success=True,
+                        output=str(output),
+                        duration_ms=int((time.monotonic() - t0) * 1000),
+                        agent_id=self.id,
+                    ))
+                except Exception as e:
+                    results.append(ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=str(e),
+                        duration_ms=int((time.monotonic() - t0) * 1000),
+                        agent_id=self.id,
+                    ))
 
         return results
 

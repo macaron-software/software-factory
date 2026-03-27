@@ -247,7 +247,7 @@ Then restart: `make run` (Docker) or `make dev` (local)
 
 | Provider | Env Variable | Models |
 |----------|-------------|--------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.7 |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
 | **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
@@ -897,7 +897,7 @@ Every project automatically gets 4 operational missions:
 
 ### LLMプロバイダー
 - **Multi-provider** with automatic fallback chain
-- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- MiniMax-M2.7, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
 - **Demo mode** for UI exploration without API keys
 
 ### プラットフォームの改善

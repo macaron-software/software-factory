@@ -38,7 +38,11 @@ tools:
   - code_edit
   - list_files
   - traceability_link
+  - traceability_record
   - traceability_coverage
+  - project_traceability_report
+  - project_traceability_check_e2e
+  - project_traceability_export_sqlite
   - memory_search
   - memory_store
 

@@ -1,5 +1,4 @@
 """API routes for traceability — why_log query endpoints."""
-# Ref: feat-annotate
 
 from __future__ import annotations
 

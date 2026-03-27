@@ -1,6 +1,5 @@
 """OpenAPI/Swagger schemas for Software Factory API."""
 from __future__ import annotations
-# Ref: feat-cockpit
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 

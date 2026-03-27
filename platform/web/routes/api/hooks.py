@@ -1,5 +1,4 @@
 """Hook registry API — list, register, toggle, delete hooks and view execution log."""
-# Ref: feat-monitoring
 
 from __future__ import annotations
 

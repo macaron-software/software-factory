@@ -1,5 +1,4 @@
 """HTML partial / HTMX fragment routes."""
-# Ref: feat-backlog
 
 from __future__ import annotations
 

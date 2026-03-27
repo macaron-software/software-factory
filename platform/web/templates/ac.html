@@ -1,6 +1,4 @@
-<!-- Ref: feat-quality -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_kpi_row, skeleton_table %}
 
 {% block topbar_actions %}
 <button onclick="runAllAC()" class="btn btn-sm btn-secondary" id="run-all-btn">
@@ -64,9 +62,7 @@
     <!-- Empty state -->
     <div id="ac-empty" style="text-align:center;padding:3rem;color:var(--text-secondary)">
         <svg class="icon" style="width:48px;height:48px;margin-bottom:1rem;opacity:0.3"><use href="#icon-check-circle"/></svg>
-        <div style="font-size:1rem;margin-bottom:1.5rem">Select a scope and click <strong>Run All</strong> to start the AC evaluation.</div>
-        {{ skeleton_kpi_row(4) }}
-        <div style="margin-top:1rem">{{ skeleton_table(5, 5) }}</div>
+        <div style="font-size:1rem">Select a scope and click <strong>Run All</strong> to start the AC evaluation.</div>
     </div>
 
 </div>

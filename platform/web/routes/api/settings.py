@@ -1,12 +1,10 @@
 """Platform settings — configurable rate limits, budget caps, and AC quality thresholds."""
-# Ref: feat-settings
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)
 
@@ -46,24 +44,14 @@ _AC_QUALITY_DEFAULTS: dict[str, tuple[str, str]] = {
 
 def _ensure_defaults(db) -> None:
     """Seed missing default settings into platform_settings."""
-    from ....db.adapter import is_postgresql
-
-    pg = is_postgresql()
     for key, (value, description) in {
         **_RATE_LIMIT_DEFAULTS,
         **_AC_QUALITY_DEFAULTS,
     }.items():
-        if pg:
-            db.execute(
-                "INSERT INTO platform_settings (key, value, description)"
-                " VALUES (?, ?, ?) ON CONFLICT (key) DO NOTHING",
-                (key, value, description),
-            )
-        else:
-            db.execute(
-                "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
-                (key, value, description),
-            )
+        db.execute(
+            "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
+            (key, value, description),
+        )
     db.commit()
 
 
@@ -95,7 +83,7 @@ async def get_rate_limits(request: Request):
         db.close()
 
 
-@router.put("/api/settings/rate-limits", dependencies=[Depends(require_auth("admin"))])
+@router.put("/api/settings/rate-limits")
 async def update_rate_limits(request: Request):
     from ....db.migrations import get_db
 
@@ -105,17 +93,13 @@ async def update_rate_limits(request: Request):
     if not updates:
         return {"ok": False, "error": "No valid keys provided"}
 
-    from ....db.adapter import is_postgresql
-
     db = get_db()
     try:
         _ensure_defaults(db)
-        pg = is_postgresql()
-        now_fn = "NOW()" if pg else "strftime('%Y-%m-%dT%H:%M:%SZ','now')"
         for key, value in updates.items():
             db.execute(
-                f"UPDATE platform_settings SET value=?,"
-                f" updated_at={now_fn} WHERE key=?",
+                "UPDATE platform_settings SET value=?,"
+                " updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE key=?",
                 (value, key),
             )
         db.commit()
@@ -138,7 +122,7 @@ async def get_quality_settings(request: Request):
         db.close()
 
 
-@router.put("/api/settings/quality", dependencies=[Depends(require_auth("admin"))])
+@router.put("/api/settings/quality")
 async def update_quality_settings(request: Request):
     """Update AC quality thresholds live — no restart needed."""
     from ....db.migrations import get_db
@@ -149,29 +133,17 @@ async def update_quality_settings(request: Request):
     if not updates:
         return {"ok": False, "error": "No valid keys provided"}
 
-    from ....db.adapter import is_postgresql
-
     db = get_db()
     try:
         _ensure_defaults(db)
-        pg = is_postgresql()
         for key, value in updates.items():
-            if pg:
-                db.execute(
-                    "INSERT INTO platform_settings (key, value, description)"
-                    " VALUES (?, ?, ?)"
-                    " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
-                    " updated_at=NOW()",
-                    (key, value, _AC_QUALITY_DEFAULTS[key][1]),
-                )
-            else:
-                db.execute(
-                    "INSERT INTO platform_settings (key, value, description)"
-                    " VALUES (?,?,?)"
-                    " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
-                    " updated_at=CURRENT_TIMESTAMP",
-                    (key, value, _AC_QUALITY_DEFAULTS[key][1]),
-                )
+            db.execute(
+                "INSERT INTO platform_settings (key, value, description)"
+                " VALUES (?,?,?)"
+                " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
+                " updated_at=CURRENT_TIMESTAMP",
+                (key, value, _AC_QUALITY_DEFAULTS[key][1]),
+            )
         db.commit()
         logger.info("AC quality settings updated: %s", updates)
         return {"ok": True, "updated": updates}

@@ -1,6 +1,6 @@
 // Ref: feat-settings
 /**
- * E2E Test: TMA / Migration Sharelook
+ * E2E Test: TMA / Migration CollabTool
  *
  * Load migration workflow → verify agent exchanges → verify code analysis
  */
@@ -8,15 +8,15 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Migration Flow", () => {
   test("migration workflow exists and loads", async ({ page }) => {
-    await page.goto("/dsi/workflow/migration-sharelook");
+    await page.goto("/dsi/workflow/migration-collabtool");
     await expect(page).toHaveTitle(/DSI|Migration/);
 
     // Should show workflow name
-    await expect(page.getByRole("heading", { name: /Migration Sharelook/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Migration CollabTool/ })).toBeVisible();
   });
 
   test("migration workflow has proper phases", async ({ page }) => {
-    await page.goto("/dsi/workflow/migration-sharelook");
+    await page.goto("/dsi/workflow/migration-collabtool");
 
     // At least 2 phases (deps + standalone at minimum)
     const phases = page.locator(".wf-phase");
@@ -25,7 +25,7 @@ test.describe("Migration Flow", () => {
   });
 
   test("migration workflow shows specialized agents", async ({ page }) => {
-    await page.goto("/dsi/workflow/migration-sharelook");
+    await page.goto("/dsi/workflow/migration-collabtool");
 
     // Agent panel
     const agents = page.locator('.wf-agent, [class*="agent-card"]');

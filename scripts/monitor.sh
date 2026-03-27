@@ -46,7 +46,7 @@ fi
 # 3. Cycle Workers Status
 log ""
 log "🔄 CYCLE WORKERS:"
-for project in ppz psy fervenza yolonow; do
+for project in saas psy fervenza yolonow; do
     PID_FILE="/tmp/factory/cycle-$project.pid"
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")

@@ -1,4 +1,3 @@
-<!-- Ref: feat-backlog, feat-portfolio -->
 {% extends "base.html" %}
 
 {% block topbar_actions %}
@@ -40,7 +39,7 @@
 /* Features list */
 .pm-features{border-top:1px solid var(--border);display:none}
 .pm-epic.open .pm-features{display:block}
-.pm-feat{display:grid;grid-template-columns:auto 1fr auto auto auto auto auto;align-items:center;gap:0.6rem;padding:0.55rem 1rem 0.55rem 2rem;border-bottom:1px solid rgba(255,255,255,.04);font-size:0.82rem}
+.pm-feat{display:grid;grid-template-columns:auto 1fr auto auto auto auto;align-items:center;gap:0.6rem;padding:0.55rem 1rem 0.55rem 2rem;border-bottom:1px solid rgba(255,255,255,.04);font-size:0.82rem}
 .pm-feat:last-child{border-bottom:none}
 .pm-feat:hover{background:rgba(255,255,255,.02)}
 .pm-feat-icon{width:14px;height:14px;color:var(--text-secondary)}
@@ -69,18 +68,6 @@
 .pm-story-dot.done{background:var(--green)}
 .pm-story-title{flex:1}
 .pm-story-sp{font-size:0.68rem;background:var(--bg-tertiary);padding:0.05rem 0.3rem;border-radius:3px}
-
-/* Feature detail panel (expandable) */
-.pm-feat-detail{display:none;padding:0.6rem 1rem 0.6rem 2rem;background:rgba(124,58,237,.03);border-bottom:1px solid var(--border);font-size:0.78rem;line-height:1.5;color:var(--text-secondary)}
-.pm-feat-detail.open{display:block}
-.pm-feat-detail-section{margin-bottom:0.5rem}
-.pm-feat-detail-section:last-child{margin-bottom:0}
-.pm-feat-detail-label{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);margin-bottom:0.15rem}
-.pm-feat-detail-text{white-space:pre-line;color:var(--text-primary);font-size:0.76rem}
-.pm-feat-persona{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.68rem;padding:0.1rem 0.45rem;border-radius:10px;background:rgba(124,58,237,.1);color:var(--purple);font-weight:600}
-.pm-feat-evidence{font-size:0.7rem;color:var(--text-secondary);font-style:italic;margin-top:0.2rem}
-.pm-feat-name{color:var(--text-primary);font-weight:500;cursor:pointer}
-.pm-feat-name:hover{text-decoration:underline;text-decoration-color:var(--purple)}
 
 /* Summary */
 .pm-summary{display:flex;gap:1.5rem;flex-wrap:wrap;padding:0.5rem 0;margin-bottom:0.5rem}
@@ -210,39 +197,16 @@
                     {% for f in e.features %}
                     <div class="pm-feat" data-feature-id="{{ f.id }}" data-priority="{{ loop.index }}">
                         <span class="pm-feat-drag" title="Drag to reorder">⋮⋮</span>
-                        <span class="pm-feat-name" onclick="toggleDetail('detail-{{ f.id }}')">{{ f.name }}</span>
+                        <span class="pm-feat-name">{{ f.name }}</span>
                         <span class="pm-feat-points editable-sp" data-type="feature" data-id="{{ f.id }}" title="Click to edit">{{ f.story_points }} pts</span>
                         {% if f.deps %}
                         <span class="pm-dep-badge has-deps" onclick="event.stopPropagation();showDeps('{{ f.id }}')" title="Has {{ f.deps|length }} dependency(ies)"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-git-merge"/></svg>{{ f.deps|length }}</span>
                         {% elif f.depended_by %}
                         <span class="pm-dep-badge depended" title="Required by {{ f.depended_by|length }} feature(s)"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-arrow-right"/></svg>{{ f.depended_by|length }}</span>
                         {% endif %}
-                        {% if f.persona_id %}<span class="pm-feat-persona" title="Persona">{{ f.persona_id }}</span>{% endif %}
                         <span class="pm-feat-status {{ f.status }}">{{ f.status }}</span>
                         <span style="font-size:0.65rem;color:var(--text-secondary);cursor:pointer" onclick="event.stopPropagation();openDepModal('{{ f.id }}','{{ f.name }}')" title="Manage dependencies"><svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-git-merge"/></svg></span>
                     </div>
-                    {% if f.user_story or f.acceptance_criteria or f.description %}
-                    <div class="pm-feat-detail" id="detail-{{ f.id }}">
-                        {% if f.user_story %}
-                        <div class="pm-feat-detail-section">
-                            <div class="pm-feat-detail-label">User Story</div>
-                            <div class="pm-feat-detail-text">{{ f.user_story }}</div>
-                        </div>
-                        {% endif %}
-                        {% if f.acceptance_criteria %}
-                        <div class="pm-feat-detail-section">
-                            <div class="pm-feat-detail-label">Acceptance Criteria</div>
-                            <div class="pm-feat-detail-text">{{ f.acceptance_criteria }}</div>
-                        </div>
-                        {% endif %}
-                        {% if f.description %}
-                        <div class="pm-feat-detail-section">
-                            <div class="pm-feat-detail-label">Description</div>
-                            <div class="pm-feat-detail-text">{{ f.description }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endif %}
                     {% if f.stories %}
                     <div class="pm-stories" data-feature-id="{{ f.id }}">
                         {% for s in f.stories %}
@@ -345,11 +309,6 @@
 <script>
 function toggleEpic(id) {
     document.getElementById('epic-' + id).classList.toggle('open');
-}
-
-function toggleDetail(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle('open');
 }
 
 function toggleForm(id) {

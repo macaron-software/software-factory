@@ -47,6 +47,8 @@ class ProjectInfo:
 
 
 _PERSONAL_IDS = {"fervenza", "psy", "yolonow"}
+_LOCAL_PROJECTS_DIR = Path.home() / ".config" / "factory" / "local-projects"
+_LOCAL_PROJECTS_ENV = "SF_LOCAL_PROJECTS_DIR"
 
 # Demo projects — realistic fictional projects for fresh/public installs
 _DEMO_PROJECTS: list[dict] = [
@@ -114,6 +116,19 @@ def _is_local_dev() -> bool:
     return bool(os.environ.get("SF_LOCAL", ""))
 
 
+def _iter_local_project_files() -> list[Path]:
+    """Return private local-only project YAMLs stored outside the git repo."""
+    raw_dir = os.environ.get(_LOCAL_PROJECTS_ENV, "").strip()
+    base_dir = Path(os.path.expanduser(raw_dir)) if raw_dir else _LOCAL_PROJECTS_DIR
+    if not base_dir.is_dir():
+        return []
+    return sorted(
+        p
+        for p in list(base_dir.glob("*.yaml")) + list(base_dir.glob("*.yml"))
+        if p.is_file() and not p.name.startswith("_")
+    )
+
+
 class ProjectRegistry:
     """Discovers and manages all known projects."""
 
@@ -148,6 +163,13 @@ class ProjectRegistry:
                         self._load_sf_yaml(f)
                     except Exception:
                         pass
+
+            # Private local-only projects (outside repo, never visible to git)
+            for f in _iter_local_project_files():
+                try:
+                    self._load_sf_yaml(f)
+                except Exception:
+                    pass
 
         # Migration Factory projects
         mf_base = Path(self._mf_root)

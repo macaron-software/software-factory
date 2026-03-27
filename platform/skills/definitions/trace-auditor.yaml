@@ -34,6 +34,10 @@ tools:
   - legacy_scan
   - traceability_coverage
   - traceability_validate
+  - traceability_chain_report
+  - traceability_check_e2e
+  - project_traceability_report
+  - project_traceability_check_e2e
   - code_read
   - list_files
   - deep_search

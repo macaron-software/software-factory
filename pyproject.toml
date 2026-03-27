@@ -52,4 +52,10 @@ markers = [
     "live: tests requiring a running platform server",
     "stress: concurrency/load stress tests (subset of live)",
     "prompt_eval: LLM prompt regression tests (requires API keys)",
+    "prompt_ci: prompt reliability tests against live LLM providers",
+    "chaos: destructive chaos engineering tests",
+    "endurance: long-running endurance tests",
+    "stability: remote stability smoke/load tests",
+    "legacy: tests for deprecated/legacy modules",
+    "slow: slow-running tests",
 ]

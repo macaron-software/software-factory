@@ -2264,6 +2264,7 @@ class EpicOrchestrator:
                         phase_id=phase.phase_id,
                         phase_output=_pm_phase_output,
                         workspace=_pm_ws,
+                        project_id=mission.project_id or "",
                         phase_success=phase_success,
                         adversarial_rejections=_pm_rej_count,
                         is_last_phase=_pm_is_last,

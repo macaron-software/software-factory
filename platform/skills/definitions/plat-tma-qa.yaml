@@ -62,7 +62,7 @@ tools:
   - git_diff
 
 llm:
-  model: MiniMax-M2.5
+  model: MiniMax-M2.7
   temperature: 0.3
   max_tokens: 4096
 

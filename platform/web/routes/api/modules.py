@@ -6,7 +6,6 @@ POST /api/modules/{id}/toggle → enable/disable a module
 POST /api/modules/{id}/install → run install command
 GET  /api/modules/categories → list categories
 """
-# Ref: feat-settings
 
 from __future__ import annotations
 
@@ -18,8 +17,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import yaml
-from fastapi import APIRouter, Depends
-from ....auth.middleware import require_auth
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 
@@ -147,7 +145,7 @@ async def list_categories():
     return JSONResponse(list(cats.values()))
 
 
-@router.post("/api/modules/{module_id}/toggle", dependencies=[Depends(require_auth())])
+@router.post("/api/modules/{module_id}/toggle")
 async def toggle_module(module_id: str):
     modules = _load_registry()
     ids = {m["id"] for m in modules}
@@ -182,7 +180,7 @@ async def toggle_module(module_id: str):
     return JSONResponse({"ok": True, "id": module_id, "enabled": now_enabled})
 
 
-@router.post("/api/modules/{module_id}/install", dependencies=[Depends(require_auth())])
+@router.post("/api/modules/{module_id}/install")
 async def install_module(module_id: str):
     modules = _load_registry()
     module = next((m for m in modules if m["id"] == module_id), None)

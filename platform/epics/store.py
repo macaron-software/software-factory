@@ -38,7 +38,7 @@ class MissionDef:
     goal: str = ""  # acceptance criteria
     status: str = "planning"  # planning|active|completed|failed|blocked
     type: str = "improvement"  # work category (NOT SAFe level): improvement|initiative|bug|debt|migration|security|architecture|program|review|tma
-    workflow_id: Optional[str] = None  # safe-veligo, safe-ppz...
+    workflow_id: Optional[str] = None  # safe-mobilityapp, safe-saas...
     parent_epic_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
     business_value: float = 0

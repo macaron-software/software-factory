@@ -12,7 +12,9 @@ Uses a temporary SQLite database — no PG, no real DB.
 # Ref: feat-quality
 from __future__ import annotations
 
+import json
 import sqlite3
+import uuid
 
 import pytest
 
@@ -22,7 +24,22 @@ from platform.traceability.artifacts import (
     AcceptanceCriterion,
     JourneyStore,
     UserJourney,
+    is_prefixed_uuid,
     make_id,
+    make_trace_uuid,
+)
+from platform.traceability.chain import (
+    NFTTest,
+    NFTStore,
+    Persona,
+    export_project_traceability_sqlite,
+    get_nft_store,
+    get_persona_store,
+    get_project_chain_report,
+    list_project_trace_artifacts,
+    record_trace_artifact,
+    update_feature_coverage,
+    validate_project_chain,
 )
 from platform.traceability import migration_store
 from platform.traceability.store import get_session_why, get_why, log_artifact
@@ -87,21 +104,68 @@ CREATE TABLE IF NOT EXISTS traceability_links (
     link_type     TEXT NOT NULL,
     coverage_pct  INTEGER DEFAULT 0,
     notes         TEXT DEFAULT '',
+    project_id    TEXT DEFAULT '',
     created_at    TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_id, target_id, link_type)
 );
+CREATE TABLE IF NOT EXISTS missions (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    name        TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    goal        TEXT DEFAULT '',
+    status      TEXT DEFAULT 'planning',
+    workflow_id TEXT DEFAULT '',
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS epics (
-    id         TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL,
+    name        TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    goal        TEXT DEFAULT '',
+    status      TEXT DEFAULT 'planning',
+    workflow_id TEXT DEFAULT '',
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS features (
-    id      TEXT PRIMARY KEY,
-    epic_id TEXT NOT NULL
+    id          TEXT PRIMARY KEY,
+    epic_id     TEXT NOT NULL,
+    name        TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    acceptance_criteria TEXT DEFAULT '',
+    priority    INTEGER DEFAULT 5,
+    status      TEXT DEFAULT 'backlog',
+    story_points INTEGER DEFAULT 0,
+    assigned_to TEXT DEFAULT '',
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS user_stories (
+    id          TEXT PRIMARY KEY,
+    title       TEXT DEFAULT '',
+    feature_id  TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    acceptance_criteria TEXT DEFAULT '',
+    story_points INTEGER DEFAULT 0,
+    priority    INTEGER DEFAULT 5,
+    status      TEXT DEFAULT 'backlog',
+    sprint_id   TEXT DEFAULT '',
+    assigned_to TEXT DEFAULT '',
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS project_screens (
     id         TEXT PRIMARY KEY,
-    title      TEXT DEFAULT '',
-    feature_id TEXT NOT NULL
+    project_id TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    page_url   TEXT DEFAULT '',
+    svg_path   TEXT DEFAULT '',
+    feature_id TEXT DEFAULT '',
+    mission_id TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -132,7 +196,14 @@ def _patch_get_db(db_path, monkeypatch):
 
     monkeypatch.setattr("platform.traceability.artifacts.get_db", _get_db)
     monkeypatch.setattr("platform.traceability.migration_store.get_db", _get_db)
+    monkeypatch.setattr("platform.traceability.chain.get_db", _get_db)
     monkeypatch.setattr("platform.traceability.store.get_db", _get_db)
+
+
+def _sqlite_conn(path: str):
+    conn = sqlite3.connect(path)
+    conn.row_factory = _dict_factory
+    return conn
 
 
 # ── make_id ───────────────────────────────────────────────────────────────────
@@ -142,14 +213,20 @@ class TestMakeId:
     @pytest.mark.parametrize("prefix", ["ac", "feat", "us", "jour", "li"])
     def test_generates_proper_prefix(self, prefix):
         result = make_id(prefix)
-        assert result.startswith(f"{prefix}-")
-        suffix = result[len(prefix) + 1 :]
-        assert len(suffix) == 8
-        int(suffix, 16)  # must be valid hex
+        assert is_prefixed_uuid(result, prefix)
+        uuid.UUID(result[len(prefix) + 1 :])
 
     def test_unique_ids(self):
         ids = {make_id("ac") for _ in range(50)}
         assert len(ids) == 50
+
+    def test_make_trace_uuid_is_stable(self):
+        left = make_trace_uuid("feature", "proj-alpha", "feat-1")
+        right = make_trace_uuid("feature", "proj-alpha", "feat-1")
+        other = make_trace_uuid("feature", "proj-alpha", "feat-2")
+        assert left == right
+        assert left != other
+        uuid.UUID(left)
 
 
 # ── AcceptanceCriteriaStore ───────────────────────────────────────────────────
@@ -516,3 +593,525 @@ class TestWhyLogStore:
     def test_empty_results(self):
         assert get_why("nonexistent_file_xyz.py") == []
         assert get_session_why("sess-nonexistent") == []
+
+
+class TestProjectTraceabilityChain:
+    def test_record_trace_artifact_reuses_uuid(self):
+        artifact = record_trace_artifact(
+            project_id="proj-trace",
+            epic_id="mission-1",
+            feature_id="feat-1",
+            layer="code",
+            artifact_key="src/auth.py",
+            artifact_name="Auth handler",
+            notes="initial",
+        )
+        updated = record_trace_artifact(
+            project_id="proj-trace",
+            epic_id="mission-1",
+            feature_id="feat-1",
+            layer="code",
+            artifact_key="src/auth.py",
+            artifact_name="Auth handler v2",
+            notes="updated",
+        )
+
+        assert artifact.id == updated.id
+        assert is_prefixed_uuid(artifact.id, "code")
+        items = list_project_trace_artifacts("proj-trace", "code")
+        assert len(items) == 1
+        assert items[0].artifact_name == "Auth handler v2"
+        assert items[0].notes == "updated"
+
+    def test_project_chain_report_and_validate(self, db_path):
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            "INSERT INTO missions (id, project_id, name, status) VALUES (?,?,?,?)",
+            ("mission-a", "proj-alpha", "Alpha epic", "in_progress"),
+        )
+        conn.execute(
+            "INSERT INTO missions (id, project_id, name, status) VALUES (?,?,?,?)",
+            ("mission-b", "proj-alpha", "Beta epic", "planning"),
+        )
+        conn.execute(
+            "INSERT INTO features (id, epic_id) VALUES (?,?)",
+            ("feat-a", "mission-a"),
+        )
+        conn.execute(
+            "INSERT INTO features (id, epic_id) VALUES (?,?)",
+            ("feat-b", "mission-b"),
+        )
+        conn.execute(
+            "INSERT INTO user_stories (id, title, feature_id) VALUES (?,?,?)",
+            ("us-a", "Story A", "feat-a"),
+        )
+        conn.execute(
+            "INSERT INTO user_stories (id, title, feature_id) VALUES (?,?,?)",
+            ("us-b", "Story B", "feat-b"),
+        )
+        conn.execute(
+            """INSERT INTO project_screens
+               (id, project_id, name, feature_id, mission_id)
+               VALUES (?,?,?,?,?)""",
+            ("scr-a", "proj-alpha", "Screen A", "feat-a", "mission-a"),
+        )
+        conn.commit()
+        conn.close()
+
+        ac_store = AcceptanceCriteriaStore()
+        ac_store.create(
+            AcceptanceCriterion(
+                feature_id="feat-a",
+                story_id="us-a",
+                title="AC A",
+                given_text="given",
+                when_text="when",
+                then_text="then",
+            )
+        )
+        ac_store.create(
+            AcceptanceCriterion(
+                feature_id="feat-b",
+                story_id="us-b",
+                title="AC B",
+                given_text="given",
+                when_text="when",
+                then_text="then",
+            )
+        )
+
+        persona = get_persona_store().create(
+            Persona(project_id="proj-alpha", epic_id="mission-a", name="Admin", role="admin")
+        )
+        nft = get_nft_store().create(
+            NFTTest(
+                project_id="proj-alpha",
+                epic_id="mission-a",
+                feature_id="feat-a",
+                nft_type="perf",
+                name="Perf A",
+                criterion="p95 < 200ms",
+                result="pass",
+            )
+        )
+        migration_store.create_link(
+            persona.id,
+            "persona",
+            "feat-a",
+            "feature",
+            "persona",
+            project_id="proj-alpha",
+        )
+        migration_store.create_link(
+            "feat-a",
+            "feature",
+            nft.id,
+            "nft_test",
+            "nft",
+            project_id="proj-alpha",
+        )
+
+        for layer, key, label in [
+            ("ihm", "routes:/alpha", "Alpha route"),
+            ("code", "src/alpha.py", "Alpha impl"),
+            ("test_tu", "tests/test_alpha.py", "Alpha TU"),
+            ("test_e2e", "playwright/alpha.spec.ts", "Alpha E2E"),
+            ("crud", "GET /api/alpha", "Alpha CRUD"),
+            ("rbac", "role:alpha-admin", "Alpha RBAC"),
+        ]:
+            art = record_trace_artifact(
+                project_id="proj-alpha",
+                epic_id="mission-a",
+                feature_id="feat-a",
+                layer=layer,
+                artifact_key=key,
+                artifact_name=label,
+            )
+            migration_store.create_link(
+                "feat-a",
+                "feature",
+                art.id,
+                layer,
+                layer,
+                project_id="proj-alpha",
+            )
+
+        art_b = record_trace_artifact(
+            project_id="proj-alpha",
+            epic_id="mission-b",
+            feature_id="feat-b",
+            layer="code",
+            artifact_key="src/beta.py",
+            artifact_name="Beta impl",
+        )
+        migration_store.create_link(
+            "feat-b",
+            "feature",
+            art_b.id,
+            "code",
+            "code",
+            project_id="proj-alpha",
+        )
+
+        update_feature_coverage("feat-a")
+        update_feature_coverage("feat-b")
+
+        report = get_project_chain_report("proj-alpha")
+        assert report["project_id"] == "proj-alpha"
+        assert report["epic_count"] == 2
+        assert report["feature_count"] == 2
+        assert report["persona_count"] == 1
+        assert report["artifact_count"] >= 7
+        assert report["gap_count"] == 1
+        assert report["layer_coverage"]["code"] == 100
+        assert report["layer_gap_counts"]["persona"] == 1
+
+        feat_a = next(f for f in report["features"] if f["id"] == "feat-a")
+        feat_b = next(f for f in report["features"] if f["id"] == "feat-b")
+        uuid.UUID(feat_a["trace_uuid"])
+        assert feat_a["coverage_pct"] == 100.0
+        assert feat_a["missing"] == []
+        assert feat_b["layers"]["code"] is True
+        assert "persona" in feat_b["missing"]
+
+        fail_check = validate_project_chain("proj-alpha", threshold=80)
+        assert fail_check["verdict"] == "FAIL"
+        assert fail_check["fully_covered_count"] == 1
+        assert fail_check["fully_covered_pct"] == 50
+        assert fail_check["gap_count"] == 1
+        assert fail_check["gaps_truncated"] is False
+        assert fail_check["layer_gap_counts"]["persona"] == 1
+
+        pass_check = validate_project_chain("proj-alpha", threshold=50)
+        assert pass_check["verdict"] == "PASS"
+        assert pass_check["gaps"][0]["trace_uuid"]
+
+    def test_validate_project_chain_counts_high_coverage_gap_as_gap(self, db_path):
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            "INSERT INTO missions (id, project_id, name, status) VALUES (?,?,?,?)",
+            ("mission-gap", "proj-gap", "Gap epic", "in_progress"),
+        )
+        conn.execute(
+            "INSERT INTO features (id, epic_id, name) VALUES (?,?,?)",
+            ("feat-gap", "mission-gap", "Gap feature"),
+        )
+        conn.execute(
+            "INSERT INTO user_stories (id, title, feature_id) VALUES (?,?,?)",
+            ("us-gap", "Gap story", "feat-gap"),
+        )
+        conn.execute(
+            """INSERT INTO project_screens
+               (id, project_id, name, feature_id, mission_id)
+               VALUES (?,?,?,?,?)""",
+            ("scr-gap", "proj-gap", "Gap screen", "feat-gap", "mission-gap"),
+        )
+        conn.commit()
+        conn.close()
+
+        AcceptanceCriteriaStore().create(
+            AcceptanceCriterion(
+                feature_id="feat-gap",
+                story_id="us-gap",
+                title="Gap AC",
+                given_text="given",
+                when_text="when",
+                then_text="then",
+            )
+        )
+        nft = NFTStore().create(
+            NFTTest(
+                project_id="proj-gap",
+                epic_id="mission-gap",
+                feature_id="feat-gap",
+                nft_type="perf",
+                name="Perf gap",
+                criterion="p95 < 200ms",
+                result="pass",
+            )
+        )
+        migration_store.create_link(
+            "feat-gap",
+            "feature",
+            nft.id,
+            "nft_test",
+            "nft",
+            project_id="proj-gap",
+        )
+        for layer, key, label in [
+            ("ihm", "routes:/gap", "Gap route"),
+            ("code", "src/gap.py", "Gap impl"),
+            ("test_tu", "tests/test_gap.py", "Gap TU"),
+            ("test_e2e", "playwright/gap.spec.ts", "Gap E2E"),
+            ("crud", "GET /api/gap", "Gap CRUD"),
+            ("rbac", "role:gap-admin", "Gap RBAC"),
+        ]:
+            art = record_trace_artifact(
+                project_id="proj-gap",
+                epic_id="mission-gap",
+                feature_id="feat-gap",
+                layer=layer,
+                artifact_key=key,
+                artifact_name=label,
+            )
+            migration_store.create_link(
+                "feat-gap",
+                "feature",
+                art.id,
+                layer,
+                layer,
+                project_id="proj-gap",
+            )
+
+        update_feature_coverage("feat-gap")
+
+        report = get_project_chain_report("proj-gap")
+        feature = report["features"][0]
+        assert feature["coverage_pct"] == 95.0
+        assert feature["missing"] == ["persona"]
+        assert report["gap_count"] == 1
+        assert report["layer_gap_counts"]["persona"] == 1
+
+        check = validate_project_chain("proj-gap", threshold=100)
+        assert check["verdict"] == "FAIL"
+        assert check["fully_covered_count"] == 0
+        assert check["fully_covered_pct"] == 0
+        assert check["gap_count"] == 1
+        assert check["layer_gap_counts"]["persona"] == 1
+        assert check["gaps"][0]["feature_id"] == "feat-gap"
+        assert check["gaps"][0]["missing"] == ["persona"]
+
+    def test_project_chain_report_uses_epics_table_on_pg(self, db_path, monkeypatch):
+        monkeypatch.setattr("platform.traceability.chain._epic_table_name", lambda: "epics")
+        AcceptanceCriteriaStore()
+
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            "INSERT INTO epics (id, project_id, name, status) VALUES (?,?,?,?)",
+            ("epic-pg", "proj-pg", "PG epic", "in_progress"),
+        )
+        conn.execute(
+            "INSERT INTO features (id, epic_id, name) VALUES (?,?,?)",
+            ("feat-pg", "epic-pg", "PG feature"),
+        )
+        conn.commit()
+        conn.close()
+
+        report = get_project_chain_report("proj-pg")
+
+        assert report["project_id"] == "proj-pg"
+        assert report["epic_count"] == 1
+        assert report["feature_count"] == 1
+        assert report["epics"][0]["id"] == "epic-pg"
+        assert report["features"][0]["id"] == "feat-pg"
+
+    def test_export_project_traceability_sqlite(self, db_path, tmp_path):
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            "INSERT INTO missions (id, project_id, name, status) VALUES (?,?,?,?)",
+            ("mission-export", "proj-export", "Export epic", "done"),
+        )
+        conn.execute(
+            "INSERT INTO features (id, epic_id) VALUES (?,?)",
+            ("feat-export", "mission-export"),
+        )
+        conn.execute(
+            "INSERT INTO user_stories (id, title, feature_id) VALUES (?,?,?)",
+            ("us-export", "Export story", "feat-export"),
+        )
+        conn.commit()
+        conn.close()
+
+        AcceptanceCriteriaStore().create(
+            AcceptanceCriterion(
+                feature_id="feat-export",
+                story_id="us-export",
+                title="Export AC",
+                given_text="given",
+                when_text="when",
+                then_text="then",
+            )
+        )
+        art = record_trace_artifact(
+            project_id="proj-export",
+            epic_id="mission-export",
+            feature_id="feat-export",
+            layer="code",
+            artifact_key="src/export.py",
+            artifact_name="Export impl",
+        )
+        migration_store.create_link(
+            "feat-export",
+            "feature",
+            art.id,
+            "code",
+            "code",
+            project_id="proj-export",
+        )
+        update_feature_coverage("feat-export")
+
+        out = tmp_path / "proj-export-trace.sqlite"
+        result = export_project_traceability_sqlite("proj-export", str(out))
+
+        assert result["path"] == str(out)
+        assert out.exists()
+        assert result["gap_count"] == 1
+
+        export_db = sqlite3.connect(out)
+        try:
+            meta = export_db.execute(
+                "SELECT project_id, feature_count, e2e_verdict, uuid_policy FROM export_meta"
+            ).fetchone()
+            assert meta[0] == "proj-export"
+            assert meta[1] == 1
+            assert meta[3] == "canonical-v5 + source-id"
+
+            feature_rows = export_db.execute(
+                "SELECT COUNT(*) FROM feature_traceability_status"
+            ).fetchone()[0]
+            artifact_rows = export_db.execute(
+                "SELECT COUNT(*) FROM traceability_artifacts"
+            ).fetchone()[0]
+            feature_uuid = export_db.execute(
+                "SELECT trace_uuid FROM features WHERE id='feat-export'"
+            ).fetchone()[0]
+            registry_rows = export_db.execute(
+                "SELECT COUNT(*) FROM uuid_registry"
+            ).fetchone()[0]
+            link_uuid = export_db.execute(
+                "SELECT source_trace_uuid, target_trace_uuid FROM traceability_links LIMIT 1"
+            ).fetchone()
+            missing_json = export_db.execute(
+                "SELECT missing_json FROM feature_traceability_status WHERE feature_id='feat-export'"
+            ).fetchone()[0]
+            assert feature_rows == 1
+            assert artifact_rows == 1
+            assert registry_rows >= 4
+            assert "persona" in json.loads(missing_json)
+            uuid.UUID(feature_uuid)
+            uuid.UUID(link_uuid[0])
+            uuid.UUID(link_uuid[1])
+        finally:
+            export_db.close()
+
+    def test_semantic_source_ids_are_preserved_in_report_and_export(self, db_path, tmp_path):
+        project_id = "software-factory"
+        epic_id = "sf-epic-platform"
+        feature_id = "sf-f-web-01"
+        story_id = "sf-us-web-01"
+
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            "INSERT INTO missions (id, project_id, name, status) VALUES (?,?,?,?)",
+            (epic_id, project_id, "Plateforme Web SF", "in_progress"),
+        )
+        conn.execute(
+            """INSERT INTO features
+               (id, epic_id, name, description, acceptance_criteria)
+               VALUES (?,?,?,?,?)""",
+            (
+                feature_id,
+                epic_id,
+                "Onboarding & configuration initiale",
+                "Premier démarrage du produit SF.",
+                "Le wizard fonctionne de bout en bout.",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO user_stories (id, title, feature_id) VALUES (?,?,?)",
+            (story_id, "Configurer la plateforme", feature_id),
+        )
+        conn.commit()
+        conn.close()
+
+        AcceptanceCriteriaStore().create(
+            AcceptanceCriterion(
+                feature_id=feature_id,
+                story_id=story_id,
+                title="Bootstrap SF",
+                given_text="un administrateur SF",
+                when_text="il lance le wizard",
+                then_text="la plateforme est configurée",
+            )
+        )
+        artifact = record_trace_artifact(
+            project_id=project_id,
+            epic_id=epic_id,
+            feature_id=feature_id,
+            layer="code",
+            artifact_key="platform/web/routes/projects.py",
+            artifact_name="Projects route",
+        )
+        migration_store.create_link(
+            feature_id,
+            "feature",
+            artifact.id,
+            "code",
+            "code",
+            project_id=project_id,
+        )
+
+        conn = _sqlite_conn(db_path)
+        conn.execute(
+            """UPDATE traceability_links
+               SET project_id = ''
+               WHERE source_id = ? AND target_id = ? AND link_type = 'code'""",
+            (feature_id, artifact.id),
+        )
+        conn.commit()
+        conn.close()
+
+        update_feature_coverage(feature_id)
+
+        report = get_project_chain_report(project_id)
+        feature = next(item for item in report["features"] if item["id"] == feature_id)
+        epic = next(item for item in report["epics"] if item["id"] == epic_id)
+        expected_feature_uuid = make_trace_uuid("feature", project_id, feature_id)
+        expected_epic_uuid = make_trace_uuid("epic", project_id, epic_id)
+
+        assert report["uuid_policy"] == "canonical-v5 + source-id"
+        assert feature["id"] == feature_id
+        assert feature["trace_uuid"] == expected_feature_uuid
+        assert feature["epic_id"] == epic_id
+        assert feature["epic_trace_uuid"] == expected_epic_uuid
+        assert epic["trace_uuid"] == expected_epic_uuid
+
+        out = tmp_path / "software-factory-trace.sqlite"
+        export_project_traceability_sqlite(project_id, str(out))
+
+        export_db = sqlite3.connect(out)
+        try:
+            exported_feature = export_db.execute(
+                "SELECT id, trace_uuid FROM features WHERE id=?",
+                (feature_id,),
+            ).fetchone()
+            exported_epic = export_db.execute(
+                "SELECT id, trace_uuid FROM epics WHERE id=?",
+                (epic_id,),
+            ).fetchone()
+            feature_registry = export_db.execute(
+                """SELECT source_id, display_id, trace_uuid
+                   FROM uuid_registry
+                   WHERE artifact_type='feature' AND source_id=? AND project_id=?""",
+                (feature_id, project_id),
+            ).fetchone()
+            epic_registry = export_db.execute(
+                """SELECT source_id, display_id, trace_uuid
+                   FROM uuid_registry
+                   WHERE artifact_type='epic' AND source_id=? AND project_id=?""",
+                (epic_id, project_id),
+            ).fetchone()
+            exported_link = export_db.execute(
+                """SELECT source_id, source_trace_uuid
+                   FROM traceability_links
+                   WHERE source_id=? AND target_id=? AND link_type='code'""",
+                (feature_id, artifact.id),
+            ).fetchone()
+
+            assert exported_feature == (feature_id, expected_feature_uuid)
+            assert exported_epic == (epic_id, expected_epic_uuid)
+            assert feature_registry == (feature_id, feature_id, expected_feature_uuid)
+            assert epic_registry == (epic_id, epic_id, expected_epic_uuid)
+            assert exported_link == (feature_id, expected_feature_uuid)
+        finally:
+            export_db.close()

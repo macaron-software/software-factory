@@ -8,8 +8,10 @@ This proves the FRACTAL approach generates more complete prompts.
 # Ref: feat-patterns
 
 import sys
+import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+pytest.importorskip("core", reason="legacy core package not available in this repo")
 
 from core.fractal import FractalDecomposer
 from core.project_registry import get_project

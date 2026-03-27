@@ -307,7 +307,7 @@ Then restart: `make run` (Docker) or `make dev` (local)
 
 | Provider | Env Variable | Models |
 |----------|-------------|--------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.7 |
 | **OpenAI-compatible** | `OPENAI_API_KEY` | any OpenAI-compatible model |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
@@ -950,17 +950,21 @@ monitoring:
 ## Testing
 
 ```bash
-# Run all tests
+# Fast deterministic smoke suite (default)
 make test
+make test-fast
+
+# Extended non-live suite (includes slow + LLM tests)
+make test-extended
+
+# Nightly full suite (live + slow + LLM)
+make test-nightly
 
 # E2E tests (Playwright — requires install first)
 cd platform/tests/e2e
 npm install
 npx playwright install --with-deps chromium
 npm test
-
-# Unit tests
-pytest tests/
 
 # Chaos engineering
 python3 tests/test_chaos.py
@@ -1070,7 +1074,7 @@ Every project automatically gets 4 operational missions:
 
 ### LLM Providers
 - **Multi-provider** with automatic fallback chain
-- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- MiniMax-M2.7, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
 - **Demo mode** for UI exploration without API keys
 
 ### Platform Improvements
@@ -1210,7 +1214,7 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **Role-based routing** — agents automatically get the right model based on their tags (`reasoner`, `architect`, `developer`, `tester`, `security`, `doc_writer`, etc.)
 - **DB-configurable** — routing matrix stored in `session_state`, editable live from Settings → LLM without restart
 - **60s cache** with instant invalidation on save
-- **Provider support** — Azure AI Foundry (gpt-5.2, gpt-5.1-codex, gpt-5.1-mini), Azure OpenAI (gpt-5-mini), MiniMax M2.5
+- **Provider support** — Azure AI Foundry (gpt-5.2, gpt-5.1-codex, gpt-5.1-mini), Azure OpenAI (gpt-5-mini), MiniMax-M2.7
 
 ### Darwin LLM Thompson Sampling
 - **Model-level A/B testing** — same team (agent + pattern) competes across different LLM models; the best model for each context wins automatically

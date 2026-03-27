@@ -1,4 +1,3 @@
-<!-- Ref: feat-mkt-ideation -->
 {# Idéation Business — htmx partial loaded in Portfolio tab #}
 
 <div class="mkt-layout">
@@ -406,12 +405,38 @@ function mktShowPopover(agentId, ev) {
   document.getElementById('mktIgPopRole').textContent = agent.short_role || '';
   let html = '';
   if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${migEsc(agent.tagline)}</div>`;
-  if(agent.description) html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${migEsc(agent.description.substring(0,300))}${agent.description.length>300?'…':''}</div></div>`;
+  if(agent.persona){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-user"/></svg> Persona</div>
+              <div class="ig-popover-text">${migEsc(agent.persona.substring(0,300))}${agent.persona.length>300?'…':''}</div></div>`;
+  }
+  if(agent.motivation){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-zap"/></svg> Motivation</div>
+              <div class="ig-popover-text">${migEsc(agent.motivation)}</div></div>`;
+  }
+  if(agent.description && !agent.persona){
+    html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${migEsc(agent.description.substring(0,300))}${agent.description.length>300?'…':''}</div></div>`;
+  }
+  if(agent.skills && agent.skills.length){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-layers"/></svg> Skills (${agent.skills.length})</div>
+              <div class="ig-popover-tags">${agent.skills.map(s=>`<span class="ig-popover-tag skill">${migEsc(s)}</span>`).join('')}</div></div>`;
+  }
+  if(agent.tools && agent.tools.length){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
+              <div class="ig-popover-tags">${agent.tools.map(t=>`<span class="ig-popover-tag tool">${migEsc(t)}</span>`).join('')}</div></div>`;
+  }
+  if(agent.can_veto){
+    const lvl = agent.veto_level ? ` — ${migEsc(agent.veto_level)}` : '';
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-shield"/></svg> Veto${lvl}</div></div>`;
+  }
+  if(agent.model || agent.provider){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-brain"/></svg> LLM</div>
+              <span class="ig-popover-tag">${migEsc((agent.provider||'')+' '+(agent.model||'default'))}</span></div>`;
+  }
   document.getElementById('mktIgPopBody').innerHTML = html;
   const vw=window.innerWidth, vh=window.innerHeight;
   let left=ev.clientX+12, top=ev.clientY-20;
   if(left+330>vw) left=vw-340;
-  if(top+250>vh) top=Math.max(10,vh-280);
+  if(top+400>vh) top=Math.max(10,vh-450);
   pop.style.left=left+'px'; pop.style.top=top+'px';
   overlay.classList.add('visible'); pop.classList.add('visible');
 }

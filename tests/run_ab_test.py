@@ -13,9 +13,11 @@ Captures generated code and compares.
 import asyncio
 import sys
 import time
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+pytest.importorskip("core", reason="legacy core package not available in this repo")
 
 from core.task_store import TaskStore
 from core.wiggum_tdd import WiggumWorker

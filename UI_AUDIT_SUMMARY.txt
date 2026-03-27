@@ -1,0 +1,216 @@
+════════════════════════════════════════════════════════════════════════════════
+                    📊 UI AUDIT - QUICK REFERENCE
+════════════════════════════════════════════════════════════════════════════════
+
+STATISTICS
+──────────
+  HTML Templates:         126 files
+  HTML Page Routes:       84 (GET with HTMLResponse)  
+  API Endpoints:          241 (REST APIs)
+  TOTAL ROUTES:           325 (Pages + APIs)
+  CSS Total:              13,681 lines
+  Route Code:             ~11,713 lines
+
+
+MAIN NAVIGATION (Sidebar in base.html)
+──────────────────────────────────────
+Simple UI:                Full UI (Role-Based):
+  1. Home                  1. Cockpit (Ops)
+  2. Projects              2. Home
+  3. Sessions              3. Portfolio
+  4. Teams/ART             4. Backlog
+  5. Metrics               5. PI Board
+  6. Users (Admin)         6. Workflows
+                           7. Projects
+                           8. Sessions
+                           9. Teams
+                          10. Metrics
+
+
+LARGEST MODULES (by code)
+─────────────────────────
+  1. wiki_content.py       5,875 lines
+  2. pages.py              4,158 lines
+  3. projects.py           3,987 lines
+  4. workflows.py          1,775 lines
+  5. sessions.py           1,365 lines
+
+
+COCKPIT DASHBOARD (13 Sections)
+────────────────────────────────
+ 1. Pipeline Value Stream
+ 2. Infrastructure
+ 3. Projects + Activity
+ 4. Architecture interne SF
+ 5. Agents/Skills/Tools/Teams/Workflows
+ 6. Integrations (6 boxes)
+ 7. Continuous Improvement (5 projects)
+ 8. Self-Healing
+ 9. Patterns Catalogue
+10. Memory Architecture
+11. Security & Isolation
+12. Engineering Concepts Badges
+13. KPIs
+
+
+ROLE-BASED ACCESS (11 perspectives)
+───────────────────────────────────
+  admin, overview, dsi, portfolio_manager, product_owner, architect,
+  business_owner, rte, scrum_master, qa_security, developer
+
+
+PAGE CATEGORIES (84 Pages Total)
+────────────────────────────────
+  Core Dashboard (8)         - Home, Cockpit, Dashboard, Portfolio, Backlog, PI, Workflows, Metrics
+  Project Management (7)     - Projects list, hub, detail, board, overview, product, workspace
+  Sessions/Agents (11)       - Sessions, agents, patterns, skills, chat
+  Business Views (8)         - DSI, Métier, Product, Teams, ART, Organization
+  Ideation (6)              - Ideation, brainstorming, generation, marketplace
+  Mission Control (6)       - Mission pages, replay, execution
+  Analytics (6)             - Quality, monitoring, DORA, memory, evals
+  Admin (7)                 - RBAC, users, settings, notifications, MCPs
+  Other (5)                 - Login, privacy, onboarding, setup, design system
+
+
+TEMPLATES (126 Total)
+─────────────────────
+  Main: base.html, base_partial.html, home.html, login.html
+  
+  Cockpit & Dashboards (6):
+    cockpit.html, dashboard.html, portfolio.html, dora_dashboard.html,
+    quality.html, monitoring.html
+  
+  Projects (7):
+    projects.html, project_hub.html, project_detail.html, project_board_page.html,
+    project_overview.html, project_product.html, project_workspace.html
+  
+  Sessions/Agents (11):
+    sessions.html, session_live.html, new_session.html, conversation.html,
+    agents.html, agent_edit.html, agent_chat.html, patterns.html,
+    pattern_edit.html, skills.html, mcps.html
+  
+  Business Views (8):
+    backlog.html, pi_board.html, dsi.html, dsi_workflow.html, mercato.html,
+    metier.html, product.html, org.html
+  
+  Ideation (6):
+    ideation.html, ideation_history.html, group_ideation.html, mkt_ideation.html,
+    generate.html, marketplace.html
+  
+  Mission Control (6):
+    missions.html, mission_control.html, mission_control_list.html,
+    mission_detail.html, mission_start.html, mission_replay.html
+  
+  Admin & Config (7):
+    rbac.html, admin_users.html, settings.html, notifications.html,
+    tool_builder.html, toolbox.html, evals.html
+  
+  Wiki/Content:
+    wiki_page.html, _partial_wiki.html, _partial_wiki_page.html
+  
+  Analytics:
+    metrics.html, teams.html, memory.html, dora_dashboard.html
+  
+  Misc:
+    login.html, privacy.html, onboarding.html, setup.html, design_system.html,
+    ac.html, annotate.html, bricks.html, ceremonies.html, workspaces.html
+  
+  Partials (10):
+    _partial_analytics.html, _partial_dora.html, _partial_knowledge.html,
+    _partial_monitoring.html, _partial_ops.html, _partial_pipeline.html,
+    _partial_quality.html, _partial_teams.html, _partial_tests.html,
+    _partial_wiki.html
+
+
+CSS MODULES
+───────────
+  main.css               2,199 lines  (Core)
+  mission-control.css    3,160 lines
+  components.css         1,223 lines
+  agents.css             1,508 lines
+  projects.css           1,118 lines
+  live.css               1,336 lines
+  project_workspace.css  1,077 lines
+  ideation.css             830 lines
+  Others                   851 lines
+
+
+JAVASCRIPT (7 files)
+────────────────────
+  agents.js, workspace.js, sse.js, htmx.min.js,
+  codemirror6.min.js, chart.umd.min.js, sortable.min.js
+
+
+API ENDPOINTS (241 Total)
+─────────────────────────
+  Pages APIs (Improvement):    8
+  Projects APIs:               40+
+  Sessions APIs:               15
+  Agents/Patterns/Skills:      25+
+  Analytics APIs:              15+
+  Dashboard APIs:              10
+  Auth APIs:                   18
+  Advanced APIs (24 modules):  100+
+    - Health & Monitoring (10)
+    - Memory (8)
+    - LLM (10)
+    - Integrations (9)
+    - Teams (12)
+    - Incidents (7)
+    - Screens (11)
+    - Search (12)
+    - Instincts (6)
+    - And more...
+
+
+KEY FEATURES
+────────────
+  ✓ Real-time: WebSockets, SSE, streaming
+  ✓ Project IDE: File browser, editor, terminal
+  ✓ Agent Orchestration: Multi-agent, patterns
+  ✓ AI Integration: LLM routing, providers
+  ✓ Memory System: Vector search, ingestion
+  ✓ Continuous Intelligence: Cycles, experiments, GA
+  ✓ Self-Healing: Autoheal, chaos testing
+  ✓ Mission Control: Task automation
+  ✓ DORA Metrics: Quality tracking
+  ✓ Jira Integration: Sync, tracking
+  ✓ Multi-level Planning: SAFe hierarchy
+
+
+ROUTE FILES
+───────────
+  Main Routes (30 files):
+    auth.py, pages.py, projects.py, sessions.py, agents.py,
+    analytics.py, workflows.py, wiki.py, wiki_content.py, ideation.py,
+    cto.py, group_ideation.py, mkt_ideation.py, and 17 more...
+  
+  API Routes (34 files in /api):
+    analytics.py, cockpit.py, dashboard.py, health.py, memory.py,
+    llm.py, teams.py, screens.py, search.py, and 25 more...
+
+
+USER JOURNEY
+────────────
+  Login → Setup → Home/Cockpit
+    ├─ Strategic Path: Portfolio → Backlog → PI Board
+    ├─ Ops Path: Cockpit → Workflows → Projects
+    ├─ Dev Path: Projects → Workspace → Sessions
+    └─ Ideation Path: Ideation → Ideas → Implementation
+
+
+ARCHITECTURAL INSIGHTS
+──────────────────────
+  - Two UI modes: Simple vs Full
+  - 11 role-based perspectives
+  - Sidebar navigation with icons
+  - Template composition with partials
+  - HTMX-based dynamic updates
+  - SSE for real-time data
+  - Streaming for long operations
+  - Role-based visibility at all levels
+
+
+════════════════════════════════════════════════════════════════════════════════
+Full detailed audit: UI_AUDIT_COMPLETE.md
+════════════════════════════════════════════════════════════════════════════════

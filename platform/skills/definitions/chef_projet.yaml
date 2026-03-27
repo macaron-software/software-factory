@@ -46,10 +46,10 @@ tools:
   - git_status
 
 llm:
-  model: MiniMax-M2.5
+  model: MiniMax-M2.7
   temperature: 0.5
   max_tokens: 4096
-  fallback_model: MiniMax-M2.5-mini
+  fallback_model: MiniMax-M2.7-mini
 
 permissions:
   can_veto: false

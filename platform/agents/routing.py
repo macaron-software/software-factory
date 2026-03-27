@@ -11,7 +11,7 @@ Azure model tiers:
   small talk / default  → azure-openai  gpt-5-mini
   pilotage / leadership → azure-openai  gpt-5.2
   code / tests          → azure-openai  gpt-5.2-codex  (or gpt-5.2-codex via AZURE_CODEX_MODEL)
-OVH: minimax MiniMax-M2.5
+OVH: minimax MiniMax-M2.7
 Local: local-mlx Qwen3.5-35B-A3B-4bit
 All: RTK prompt compression enabled by default
 """
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # Provider for tool-calling agents (OpenAI models handle tools reliably)
 TOOL_PROVIDER = "azure-openai"
 TOOL_MODEL = "gpt-5-mini"
-# Providers that support native function calling (minimax M2.5 supports tools)
+# Providers that support native function calling (minimax M2.7 supports tools)
 TOOL_CAPABLE_PROVIDERS = {
     "azure-openai",
     "azure-ai",
@@ -67,7 +67,7 @@ CHEAP_TOOLS = frozenset(
 )
 # Provider/model to use for cheap (non-code) tasks
 CHEAP_PROVIDER = "minimax"
-CHEAP_MODEL = "MiniMax-M2.5"
+CHEAP_MODEL = "MiniMax-M2.7"
 
 # Multi-model routing — roles/tags → (provider, model)
 _REASONING_ROLES = {

@@ -249,7 +249,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 | Provider | Env Variable | Models |
 |----------|-------------|--------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.7 |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
 | **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
@@ -899,7 +899,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ### LLM 提供商
 - **多提供商**支持自动回退链
-- MiniMax M2.5、Azure OpenAI GPT-5-mini、Azure AI Foundry、NVIDIA NIM
+- MiniMax-M2.7、Azure OpenAI GPT-5-mini、Azure AI Foundry、NVIDIA NIM
 - **演示模式**，无需 API 密钥即可探索 UI
 
 ### 平台改进

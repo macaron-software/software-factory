@@ -1103,5 +1103,140 @@ TRACEABILITY_SCHEMAS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_record",
+            "description": (
+                "Record a traceability artifact for a feature across the 13-layer chain: "
+                "persona, ihm, code, test_tu, test_e2e, crud, rbac, screen, nft. "
+                "Call this after writing code, tests, screens, CRUD endpoints, RBAC rules, or NFTs."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "feature_id": {"type": "string", "description": "Feature UUID (feat-XXXXXXXX)"},
+                    "epic_id": {"type": "string", "description": "Epic/run ID"},
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "layer": {
+                        "type": "string",
+                        "enum": ["code", "ihm", "test_tu", "tu", "test_e2e", "e2e", "crud", "rbac", "screen", "nft", "persona"],
+                        "description": "Which traceability layer this artifact covers (tu=alias for test_tu, e2e=alias for test_e2e)",
+                    },
+                    "artifact_id": {"type": "string", "description": "File path, test name, endpoint, role name, or external key"},
+                    "artifact_name": {"type": "string", "description": "Human-readable label"},
+                    "notes": {"type": "string", "description": "Optional context"},
+                    "persona_name": {"type": "string", "description": "Persona name (layer=persona only)"},
+                    "persona_role": {"type": "string", "description": "Persona role (layer=persona only)"},
+                    "nft_type": {
+                        "type": "string",
+                        "enum": ["perf", "security", "a11y", "i18n", "load", "compliance"],
+                        "description": "NFT category (layer=nft only)",
+                    },
+                    "criterion": {"type": "string", "description": "NFT success criterion, e.g. 'p95 < 200ms'"},
+                },
+                "required": ["feature_id", "layer"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_chain_report",
+            "description": (
+                "Get the full 13-layer traceability chain report for an epic. "
+                "Shows per-feature coverage: persona, ihm, code, tu, e2e, crud, rbac, screens, nft."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "epic_id": {"type": "string", "description": "Epic/run ID"},
+                },
+                "required": ["epic_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_check_e2e",
+            "description": (
+                "Validate the full E2E traceability chain for an epic. "
+                "Returns PASS/FAIL with per-layer coverage % and gap list. "
+                "Use at the end of a sprint or phase to confirm all layers are covered."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "epic_id": {"type": "string", "description": "Epic/run ID"},
+                    "threshold": {
+                        "type": "integer",
+                        "description": "Min % of features that must be fully covered (default 80)",
+                    },
+                },
+                "required": ["epic_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "project_traceability_report",
+            "description": (
+                "Get the full 13-layer traceability chain report for an entire project. "
+                "Aggregates all epics/features and reports coverage for persona, ihm, "
+                "code, tu, e2e, crud, rbac, screens, nft."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string", "description": "Project ID"},
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "project_traceability_check_e2e",
+            "description": (
+                "Validate the full project-wide traceability chain. "
+                "Returns PASS/FAIL with per-layer coverage % and gap list."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "threshold": {
+                        "type": "integer",
+                        "description": "Min % of features that must be fully covered (default 80)",
+                    },
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "project_traceability_export_sqlite",
+            "description": (
+                "Export a standalone SQLite DB containing the full project traceability graph: "
+                "epics, personas, features, stories, ACs, artifacts, links, screens, NFTs, "
+                "and per-feature coverage status."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output .sqlite path (optional; defaults to /tmp/{project_id}_traceability.sqlite)",
+                    },
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
 ]
-

@@ -1,5 +1,4 @@
 """Web routes — Generic multi-agent group ideation workspace."""
-# Ref: feat-ideation
 
 from __future__ import annotations
 
@@ -7,11 +6,10 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from .helpers import _templates
-from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -396,7 +394,7 @@ async def group_ideation_page(request: Request, group_id: str):
 # ── Launch multi-agent analysis ───────────────────────────────────
 
 
-@router.post("/api/group/{group_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/group/{group_id}")
 async def group_ideation_submit(request: Request, group_id: str):
     """Launch group ideation via multi-agent network pattern."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef

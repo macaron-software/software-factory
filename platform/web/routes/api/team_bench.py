@@ -1,13 +1,11 @@
 """Team Bench REST API — trigger + results for team bench harness."""
-# Ref: feat-art, feat-evals
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,7 +52,7 @@ async def team_bench_result(team_id: str) -> dict[str, Any]:
     return result
 
 
-@router.post("/api/team-bench/run", summary="Trigger team bench run (background)", dependencies=[Depends(require_auth())])
+@router.post("/api/team-bench/run", summary="Trigger team bench run (background)")
 async def team_bench_run(
     background_tasks: BackgroundTasks,
     team_id: str = Query(...),

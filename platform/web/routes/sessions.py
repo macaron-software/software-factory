@@ -1,5 +1,4 @@
 """Web routes — Session management and live views."""
-# Ref: feat-mission-replay
 
 from __future__ import annotations
 
@@ -9,7 +8,7 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -19,7 +18,6 @@ from fastapi.responses import (
 
 from .helpers import _templates, _agent_map_for_template
 from ...i18n import t, get_lang
-from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -29,25 +27,65 @@ logger = logging.getLogger(__name__)
 
 @router.get("/sessions", response_class=HTMLResponse)
 async def sessions_page(request: Request):
-    """Session list — shell with skeleton; grid loaded via HTMX."""
+    """Session list with search + pagination."""
+    from ...sessions.store import get_session_store
+
     q = request.query_params.get("q", "").strip()
     status = request.query_params.get("status", "").strip()
     try:
         page = max(1, int(request.query_params.get("page", 1)))
     except ValueError:
         page = 1
+    per_page = 20
+    offset = (page - 1) * per_page
 
+    store = get_session_store()
+    sessions_raw, total = store.search(
+        q=q, status=status, limit=per_page, offset=offset
+    )
+
+    patterns_map = {}
+    try:
+        from ...db.migrations import get_db as _gdb
+
+        conn = _gdb()
+        for r in conn.execute("SELECT id, name FROM patterns").fetchall():
+            patterns_map[r["id"]] = r["name"]
+        conn.close()
+    except Exception:
+        pass
+    projects_map = {}
+    try:
+        from ...projects.manager import get_project_store
+
+        for p in get_project_store().list_all():
+            projects_map[p.id] = p.name
+    except Exception:
+        pass
+    sessions = []
+    for s in sessions_raw:
+        sessions.append(
+            {
+                "session": s,
+                "pattern_name": patterns_map.get(s.pattern_id, ""),
+                "project_name": projects_map.get(s.project_id, ""),
+                "message_count": store.count_messages(s.id),
+            }
+        )
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
     return _templates(request).TemplateResponse(
         "sessions.html",
         {
             "request": request,
             "page_title": "Live",
+            "sessions": sessions,
             "q": q,
             "status": status,
             "page": page,
-            "total": 0,
-            "total_pages": 1,
-            "per_page": 20,
+            "total": total,
+            "total_pages": total_pages,
+            "per_page": per_page,
         },
     )
 
@@ -586,7 +624,7 @@ async def session_live_page(request: Request, session_id: str):
                         "Analysez les performances et proposez des optimisations",
                     ),
                 ],
-                "migration-sharelook": [
+                "migration-collabtool": [
                     (
                         "refresh-cw",
                         "Start Migration",
@@ -852,7 +890,7 @@ async def session_page(request: Request, session_id: str):
     )
 
 
-@router.post("/api/sessions", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions")
 async def create_session(request: Request):
     """Create a new session from form data."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -883,7 +921,7 @@ async def create_session(request: Request):
     return RedirectResponse(f"/sessions/{session.id}", status_code=303)
 
 
-@router.post("/api/sessions/{session_id}/messages", response_class=HTMLResponse, dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/messages", response_class=HTMLResponse)
 async def send_message(request: Request, session_id: str):
     """User sends a message — agent responds via LLM."""
     from ...sessions.store import get_session_store, MessageDef
@@ -987,7 +1025,7 @@ async def poll_messages(request: Request, session_id: str, after: str = ""):
     return HTMLResponse("".join(html_parts))
 
 
-@router.post("/api/sessions/{session_id}/stop", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/stop")
 async def stop_session(session_id: str):
     """Stop an active session."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1008,7 +1046,7 @@ async def stop_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/resume", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/resume")
 async def resume_session(session_id: str):
     """Resume a completed/stopped session back to active."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1026,7 +1064,7 @@ async def resume_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/run-pattern", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/run-pattern")
 async def run_session_pattern(request: Request, session_id: str):
     """Execute the pattern assigned to this session."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1092,7 +1130,7 @@ async def _run_pattern_background(pattern, session_id: str, task: str, project_i
         )
 
 
-@router.delete("/api/sessions/{session_id}", dependencies=[Depends(require_auth())])
+@router.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session and all its messages."""
     from ...sessions.store import get_session_store
@@ -1101,7 +1139,7 @@ async def delete_session(session_id: str):
     return HTMLResponse("")
 
 
-@router.post("/api/sessions/{session_id}/agents/start", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/agents/start")
 async def start_session_agents(request: Request, session_id: str):
     """Start agent loops for a session — the agents begin thinking autonomously."""
     from ...sessions.store import get_session_store
@@ -1143,7 +1181,7 @@ async def start_session_agents(request: Request, session_id: str):
     return JSONResponse({"started": started, "count": len(started)})
 
 
-@router.post("/api/sessions/{session_id}/agents/stop", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/agents/stop")
 async def stop_session_agents(session_id: str):
     """Stop all agent loops for a session."""
     from ...agents.loop import get_loop_manager
@@ -1153,7 +1191,7 @@ async def stop_session_agents(session_id: str):
     return JSONResponse({"stopped": True})
 
 
-@router.post("/api/sessions/{session_id}/agents/{agent_id}/message", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/agents/{agent_id}/message")
 async def send_to_agent(request: Request, session_id: str, agent_id: str):
     """Send a message to a specific agent via the bus (user → agent)."""
     from ...a2a.bus import get_bus
@@ -1191,7 +1229,7 @@ async def send_to_agent(request: Request, session_id: str, agent_id: str):
     return JSONResponse({"sent": True, "to": agent_id})
 
 
-@router.post("/api/sessions/{session_id}/conversation", dependencies=[Depends(require_auth())])
+@router.post("/api/sessions/{session_id}/conversation")
 async def start_conversation(request: Request, session_id: str):
     """Start a real multi-agent conversation with streaming.
 

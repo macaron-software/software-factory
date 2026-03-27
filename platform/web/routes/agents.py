@@ -1,5 +1,4 @@
 """Web routes — Agent, pattern, skill, MCP CRUD."""
-# Ref: feat-agents-list
 
 from __future__ import annotations
 
@@ -7,12 +6,11 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .helpers import _templates
 from ..schemas import AgentOut, AgentDetail, LlmProvider
-from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -22,12 +20,17 @@ logger = logging.getLogger(__name__)
 
 @router.get("/agents", response_class=HTMLResponse)
 async def agents_page(request: Request):
-    """Agent builder — shell with skeleton; grid loaded via HTMX."""
+    """Agent builder — list all agents."""
+    from ...agents.store import get_agent_store
+
+    store = get_agent_store()
+    agents = store.list_all()
     return _templates(request).TemplateResponse(
         "agents.html",
         {
             "request": request,
             "page_title": "Agents",
+            "agents": agents,
         },
     )
 
@@ -173,7 +176,7 @@ async def agent_save(request: Request, agent_id: str = ""):
     return RedirectResponse("/agents", status_code=303)
 
 
-@router.delete("/api/agents/{agent_id}", dependencies=[Depends(require_auth())])
+@router.delete("/api/agents/{agent_id}")
 async def agent_delete(agent_id: str):
     """Delete an agent."""
     from ...agents.store import get_agent_store
@@ -222,12 +225,16 @@ async def agent_details_json(agent_id: str):
 
 @router.get("/patterns", response_class=HTMLResponse)
 async def patterns_page(request: Request):
-    """Pattern builder — shell with skeleton; grid loaded via HTMX."""
+    """Pattern builder — list workflows."""
+    from ...patterns.store import get_pattern_store
+
+    patterns = get_pattern_store().list_all()
     return _templates(request).TemplateResponse(
         "patterns.html",
         {
             "request": request,
             "page_title": "Patterns",
+            "patterns": patterns,
         },
     )
 
@@ -348,7 +355,7 @@ async def pattern_save(request: Request, pattern_id: str = ""):
     return RedirectResponse("/patterns", status_code=303)
 
 
-@router.delete("/api/patterns/{pattern_id}", dependencies=[Depends(require_auth())])
+@router.delete("/api/patterns/{pattern_id}")
 async def pattern_delete(pattern_id: str):
     """Delete a pattern."""
     from ...patterns.store import get_pattern_store
@@ -489,7 +496,7 @@ async def mcps_page(request: Request):
     )
 
 
-@router.post("/api/mcps/{mcp_id}/start", dependencies=[Depends(require_auth())])
+@router.post("/api/mcps/{mcp_id}/start")
 async def api_mcp_start(mcp_id: str):
     """Start an MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -499,7 +506,7 @@ async def api_mcp_start(mcp_id: str):
     return {"ok": ok, "message": msg}
 
 
-@router.post("/api/mcps/{mcp_id}/stop", dependencies=[Depends(require_auth())])
+@router.post("/api/mcps/{mcp_id}/stop")
 async def api_mcp_stop(mcp_id: str):
     """Stop an MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -509,7 +516,7 @@ async def api_mcp_stop(mcp_id: str):
     return {"ok": ok, "message": msg}
 
 
-@router.post("/api/mcps/{mcp_id}/test", dependencies=[Depends(require_auth())])
+@router.post("/api/mcps/{mcp_id}/test")
 async def api_mcp_test(mcp_id: str):
     """Test an MCP server — start, discover tools, test call."""
     from ...mcps.manager import get_mcp_manager
@@ -519,7 +526,7 @@ async def api_mcp_test(mcp_id: str):
     return result
 
 
-@router.post("/api/mcps/{mcp_id}/call", dependencies=[Depends(require_auth())])
+@router.post("/api/mcps/{mcp_id}/call")
 async def api_mcp_call(mcp_id: str, request: Request):
     """Call a tool on a running MCP server."""
     from ...mcps.manager import get_mcp_manager
@@ -618,7 +625,7 @@ async def api_providers():
     return JSONResponse(providers)
 
 
-@router.post("/api/skills/reload", dependencies=[Depends(require_auth())])
+@router.post("/api/skills/reload")
 async def reload_skills():
     """Hot-reload skill definitions."""
     from ...skills.loader import get_skill_loader
@@ -627,7 +634,7 @@ async def reload_skills():
     return {"reloaded": count}
 
 
-@router.post("/api/admin/skills/update", dependencies=[Depends(require_auth())])
+@router.post("/api/admin/skills/update")
 async def update_skill_file(request: Request):
     """Overwrite a skill markdown file and invalidate the library cache.
     Body: {"name": "devops-pipeline", "content": "...markdown..."}
@@ -657,7 +664,7 @@ async def update_skill_file(request: Request):
     return {"status": "ok", "skill": name, "bytes": len(content)}
 
 
-@router.post("/api/skills/github/add", dependencies=[Depends(require_auth())])
+@router.post("/api/skills/github/add")
 async def add_github_skill_source(request: Request):
     """Add a GitHub repo as skill source."""
     from ...skills.library import get_skill_library
@@ -683,7 +690,7 @@ async def add_github_skill_source(request: Request):
     )
 
 
-@router.post("/api/skills/github/sync", dependencies=[Depends(require_auth())])
+@router.post("/api/skills/github/sync")
 async def sync_github_skills():
     """Sync all GitHub skill sources via git clone (runs in thread)."""
     import asyncio
@@ -704,7 +711,7 @@ async def sync_github_skills():
     )
 
 
-@router.post("/api/skills/github/remove", dependencies=[Depends(require_auth())])
+@router.post("/api/skills/github/remove")
 async def remove_github_skill_source(request: Request):
     """Remove a GitHub skill source."""
     from ...skills.library import get_skill_library
@@ -731,7 +738,7 @@ async def generate_page(request: Request):
     )
 
 
-@router.post("/api/generate-team", dependencies=[Depends(require_auth())])
+@router.post("/api/generate-team")
 async def generate_team(request: Request):
     """Generate team + workflow from natural language prompt, launch it."""
     from ...generators.team import TeamGenerator
@@ -1018,7 +1025,7 @@ async def agent_chat_page(request: Request, agent_id: str, project_id: str = "")
     )
 
 
-@router.post("/api/agents/{agent_id}/chat", dependencies=[Depends(require_auth())])
+@router.post("/api/agents/{agent_id}/chat")
 async def agent_chat(request: Request, agent_id: str):
     """Direct chat with an agent — SSE stream of tokens."""
     import json

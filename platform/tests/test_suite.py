@@ -940,7 +940,7 @@ class TestSemiFormalRLM:
         rlm.project_name = "test"
         rlm.project_path = "/tmp/test"
         rlm.provider = "minimax"
-        rlm.model = "MiniMax-M2.5"
+        rlm.model = "MiniMax-M2.7"
         return rlm
 
     def test_build_prompt_includes_premises_in_final_schema(self):

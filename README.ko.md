@@ -247,7 +247,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 | 공급자 | 환경 변수 | 모델 |
 |--------|----------|------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.7 |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
 | **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
@@ -936,7 +936,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ### LLM 공급자
 - **다중 공급자** — 자동 폴백 체인
-- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- MiniMax-M2.7, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
 - API 키 없이 UI 탐색을 위한 **데모 모드**
 
 ### 플랫폼 개선사항

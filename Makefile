@@ -1,4 +1,4 @@
-.PHONY: setup run stop logs clean dev test install-hooks install-deps quality quality-full test-coverage test-skills changelog
+.PHONY: setup run stop logs clean dev test test-fast test-extended test-nightly install-hooks install-deps quality quality-full test-coverage test-skills changelog
 
 # Quick start
 setup:
@@ -26,8 +26,18 @@ clean:
 dev:
 	PYTHONPATH=$$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none --log-level info
 
-test:
+test: test-fast
+
+test-fast:
 	PYTHONPATH=$$(pwd) python3 -m pytest tests/test_cache.py tests/test_auto_heal.py tests/test_vectors.py tests/test_i18n.py tests/test_demo.py -v
+
+test-extended:
+	@echo "Running extended non-live suite (includes slow + LLM tests)"
+	PYTHONPATH=$$(pwd) python3 -m pytest tests/ --run-slow --run-llm -v
+
+test-nightly:
+	@echo "Running nightly suite (live + slow + LLM)"
+	PYTHONPATH=$$(pwd) python3 -m pytest tests/ --run-live --run-slow --run-llm -v
 
 # Git Hooks + Quality Tools
 install-hooks:

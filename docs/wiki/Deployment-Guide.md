@@ -54,7 +54,7 @@ ssh <OVH_IP> "cd /opt/software-factory && sudo docker compose up -d --build"
 | Property | Value |
 |----------|-------|
 | URL | http://localhost:8099 (platform) / :8080 (dashboard) |
-| LLM | MiniMax / MiniMax-M2.5 |
+| LLM | MiniMax / MiniMax-M2.7 |
 | Module | `platform` (standard Python package) |
 | DB | SQLite (`data/platform.db`) |
 | No Docker | Direct uvicorn |

@@ -1,0 +1,427 @@
+# AGENT DISPATCH & SYSTEM PROMPT ARCHITECTURE SUMMARY
+# Software Factory Platform
+
+## QUICK REFERENCE: The Complete Flow
+
+1. MESSAGE ARRIVES
+   └─ AgentLoop._run_loop() waits in inbox
+
+2. BUILD EXECUTION CONTEXT
+   └─ _build_context() assembles:
+      • History (15-50 messages, depending on agent rank)
+      • Project memory (knowledge base entries)
+      • Project files (VISION.md, SPECS.md, CLAUDE.md)
+      • AUTO-INJECT SKILLS ← Key blending point
+      • Context tier (L0/L1/L2 detail control)
+
+3. BUILD SYSTEM PROMPT
+   └─ _build_system_prompt(ctx) combines:
+      • agent.system_prompt
+      • agent.persona
+      • agent.motivation
+      • PUA framework (Iron Rules + proactivity)
+      • Role-specific instructions (CTO vs QA vs Dev)
+      • Tool usage rules
+      • Architecture guidelines
+      • Project context (tier-aware)
+      • COMPOSED SKILLS (from step 2)
+      • Permissions (delegation, veto, approval)
+
+4. LLM CALL
+   └─ LLMClient.chat(
+        messages=[{role: "system", content: full_prompt}, ...],
+        provider="azure-openai",
+        model="gpt-5-mini",
+        system_prompt=full_assembled_prompt
+      )
+
+5. TOOL EXECUTION LOOP
+   └─ If tool_calls returned: execute → add to messages → loop
+   └─ Else: return final response
+
+---
+
+## KEY FILES & FUNCTIONS
+
+AGENT IDENTITY:
+  platform/agents/store.py :: AgentDef (dataclass with name, role, persona, motivation, skills)
+
+DISPATCH:
+  platform/agents/loop.py :: AgentLoop._run_loop()
+  platform/agents/loop.py :: AgentLoop._build_context()  ← Skills injection here
+  platform/agents/executor.py :: AgentExecutor.run()
+
+SKILLS INJECTION:
+  platform/agents/skills_integration.py :: enrich_agent_with_skills()
+  platform/agents/skills_integration.py :: _trigger_and_fallback_prompt()
+  platform/agents/skills_integration.py :: _detect_context_phase()
+
+PROMPT ASSEMBLY:
+  platform/agents/prompt_builder.py :: _build_system_prompt()
+  platform/agents/prompt_builder.py :: _build_messages()
+  platform/agents/pua.py :: build_motivation_block()
+
+LLM CLIENT:
+  platform/llm/client.py :: LLMClient.chat()
+  platform/llm/client.py :: LLMClient._do_chat()
+
+---
+
+## CONTEXT TIERS (Control Prompt Density)
+
+L0: Abstract (routing only)
+    • No memory/vision injected
+    • Smallest prompt
+    
+L1: Essential (standard agents)
+    • 3-5 memory entries
+    • No vision
+    • ~3,000 chars context
+    
+L2: Full Detail (organizers: CTO, Product, Architect)
+    • 10 memory entries
+    • Full project vision (3,000 chars)
+    • Full project context
+    • ~6,000 chars context
+
+---
+
+## SKILLS INJECTION MECHANISM
+
+PRIORITY ORDER:
+1. Azure embedding-based injection (if configured)
+   └─ Uses AgentEnhancer to match mission_description to skills via embeddings
+
+2. Trigger-based injection (keyword detection)
+   └─ Parse mission_description for phase keywords (debug, implement, review, etc.)
+   └─ Auto-select skill sets for detected phases
+   └─ Example: "debug" keyword → inject "systematic-debugging", "debugging-strategies"
+
+3. Fallback to manual skills
+   └─ Use agent.skills from YAML/database
+
+CONTEXT PATTERNS (Auto-triggers by phase):
+  debug     → systematic-debugging, debugging-strategies, ac-adversarial
+  review    → code-review, ac-adversarial-v2, ac-security
+  implement → automated-testing, software-architecture
+  plan      → ac-architect, architecture-design
+  test      → automated-testing, debugging-strategies
+  security  → ac-security, api-security-testing
+  deploy    → ac-cicd
+
+---
+
+## AGENT IDENTITY FIELDS (AgentDef)
+
+id            :: Unique identifier (e.g., "karim-cto")
+name          :: Display name (e.g., "Karim Benali")
+role          :: Role title (e.g., "CTO", "Backend Dev", "QA Lead")
+description   :: Role description
+system_prompt :: Base system instruction
+persona       :: Personality traits + character
+motivation    :: What drives this agent, goals, ambitions
+skills        :: Explicit skill IDs for injection
+tools         :: Tools available (code_read, code_write, memory_store, etc.)
+permissions   :: can_delegate, can_veto, can_approve, veto_keywords
+tags          :: Tags for classification (e.g., "orchestrator", "knowledge")
+hierarchy_rank :: 0=CEO, 10=Director, 20=Lead, 30=Senior, 40=Mid, 50=Junior
+disable_thinking :: Per-agent CoT override (true/false/None)
+provider      :: LLM provider (azure-openai, nvidia, minimax, etc.)
+model         :: Model name (gpt-5-mini, MiniMax-M2.7, etc.)
+temperature   :: 0.0-1.0 (creativity)
+max_tokens    :: Max response length
+
+---
+
+## HOW AGENT TRAITS COMPOSE INTO THE PROMPT
+
+EXAMPLE: CTO (Karim Benali) receiving message "Debug the failing deployment"
+
+1. IDENTITY LOADED FROM DB
+   AgentDef(
+     name="Karim Benali",
+     role="CTO",
+     persona="Visionary, decisive, detail-oriented...",
+     motivation="Orchestrate factory, empower teams...",
+     skills=["systematic-debugging", "ac-architect", "pua-debugging"],
+     tools=["create_project", "create_team", "deep_search", "memory_store"],
+     hierarchy_rank=0,  # CEO-level → gets L2 context
+     permissions={can_delegate: true, can_veto: true, can_approve: true}
+   )
+
+2. CONTEXT BUILT (_build_context)
+   • Load history (50 messages, full since rank=0)
+   • Load project memory (10 entries, full since organizer)
+   • AUTO-INJECT SKILLS:
+     - Mission contains "debug" → triggers "systematic-debugging" phase
+     - Manually declared: ["ac-architect"]
+     - Trigger-matched: none extra
+     - Final skills: [systematic-debugging, ac-architect, pua-debugging]
+
+3. SYSTEM PROMPT ASSEMBLED (_build_system_prompt)
+   ┌─────────────────────────────────────┐
+   │ You are Karim Benali, role: CTO.    │
+   │ Description: Strategic orchestrator │
+   │             and factory lead.       │
+   │                                     │
+   │ ## Persona & Character              │
+   │ Visionary, decisive, hands-on...    │
+   │                                     │
+   │ ## Motivation & Drive               │
+   │ Orchestrate the factory: balance... │
+   │                                     │
+   │ ## PUA Framework (Iron Rules)       │
+   │ [5-step debug methodology, L1-L4    │
+   │  pressure model from tanweai/pua]   │
+   │                                     │
+   │ ## Tools                            │
+   │ You can: create_project(),          │
+   │         create_team(),              │
+   │         deep_search(),              │
+   │         memory_store()              │
+   │                                     │
+   │ ## Memory (MANDATORY)               │
+   │ 1. ALWAYS call memory_search()...   │
+   │ 2. ALWAYS call memory_store()...    │
+   │                                     │
+   │ ## Software Factory — Rôle CTO      │
+   │ Tu peux: create_project(...)        │
+   │         create_mission(...)         │
+   │         create_team(...)            │
+   │         compose_workflow(...)       │
+   │                                     │
+   │ ## Project Vision (L2 tier)         │
+   │ [Full 3,000 chars from vision doc]  │
+   │                                     │
+   │ ## Project Context (L2 tier)        │
+   │ [10 memory entries about arch,      │
+   │  decisions, tech stack, conventions]│
+   │                                     │
+   │ ## Skills                           │
+   │ 1. Systematic Debugging             │
+   │    [4-phase root cause methodology] │
+   │ 2. Architecture                     │
+   │    [SOLID, design patterns, DDD]    │
+   │ 3. PUA Debugging                    │
+   │    [Proactive, urgent, aggressive]  │
+   │                                     │
+   │ ## Delegation                       │
+   │ You MUST delegate to team using:    │
+   │ [DELEGATE:dev-backend] Build X      │
+   │                                     │
+   │ You CAN veto decisions              │
+   │ You CAN approve work                │
+   └─────────────────────────────────────┘
+
+4. LLM CALLED
+   POST /openai/deployments/gpt-5-mini/chat/completions
+   {
+     "model": "gpt-5-mini",
+     "messages": [
+       {
+         "role": "system",
+         "content": "[FULL PROMPT FROM STEP 3 — 8,500+ tokens]"
+       },
+       {
+         "role": "user",
+         "content": "Debug the failing deployment"
+       }
+     ],
+     "tools": [tool_schemas for create_project, create_team, ...],
+     "temperature": 0.7,
+     "max_completion_tokens": 4096
+   }
+
+5. LLM RESPONDS (example)
+   {
+     "role": "assistant",
+     "content": "I'll debug this systematically...",
+     "tool_calls": [
+       {
+         "id": "call_1",
+         "function": {
+           "name": "memory_search",
+           "arguments": "{\"query\": \"deployment issues\"}"
+         }
+       },
+       {
+         "id": "call_2",
+         "function": {
+           "name": "deep_search",
+           "arguments": "{\"query\": \"how does CI/CD pipeline deploy\"}"
+         }
+       }
+     ]
+   }
+
+6. TOOL LOOP
+   • Execute memory_search() → returns recent memory entries
+   • Execute deep_search() → triggers RLM (recursive agent exploration)
+   • Add results to messages
+   • LLM responds with findings
+   • memory_store() to record debug findings
+   • Return final analysis + recommendations
+
+---
+
+## THE CRITICAL COMPOSITION POINTS
+
+1. SKILLS INJECTION (platform/agents/skills_integration.py)
+   Where: _build_context() → enrich_agent_with_skills()
+   How: Mission text parsed for keywords → phase detected → skill set selected
+   Result: skills_prompt (string to inject into system prompt)
+
+2. ROLE-SPECIFIC INSTRUCTIONS (platform/agents/prompt_builder.py:172-227)
+   Where: _build_system_prompt() → _classify_agent_role()
+   How: Agent role → check if CTO/QA/Dev/Security → inject role-specific block
+   Result: CTO gets "create_project", QA gets "run_e2e_tests", Dev gets code mandate
+
+3. CONTEXT TIER BLENDING (platform/agents/loop.py + executor.py)
+   Where: _build_context() → select_tier(hierarchy_rank, capability_grade)
+   How: Agent rank (0=CEO, 50=junior) → determine context size/detail
+   Result: CEO sees 10 memory entries + full vision; Junior sees 3 + no vision
+
+4. PERMISSION SYNTHESIS (platform/agents/prompt_builder.py:342-357)
+   Where: _build_system_prompt() → check permissions
+   How: can_delegate/can_veto/can_approve → inject delegation block
+   Result: Leaders get [DELEGATE:...], [VETO], [APPROVE]; workers don't
+
+5. PUA FRAMEWORK (platform/agents/pua.py)
+   Where: _build_system_prompt() → build_motivation_block()
+   How: Universal Iron Rules + proactivity mandate injected for ALL agents
+   Result: All agents get same drive framework (tanweai/pua MIT adapted)
+
+---
+
+## COMPLETE DATA STRUCTURE FLOW
+
+AgentDef (config)
+    ↓
+AgentLoop (receives message)
+    ↓
+_build_context()
+    • Load history (DB)
+    • Load project_context (DB memory)
+    • Load project_memory (filesystem: VISION.md, SPECS.md)
+    • enrich_agent_with_skills()
+        ├─ Detect phase from mission text
+        ├─ Select context patterns
+        ├─ Match skills by trigger
+        └─ Load skill content (from library)
+    • select_tier(hierarchy_rank, capability_grade)
+    • Load vision (if organizer)
+    └─ Return ExecutionContext
+        ↓
+ExecutionContext
+    agent: AgentDef
+    skills_prompt: str  ← COMPOSED SKILLS
+    project_context: str
+    project_memory: str
+    vision: str
+    history: list[dict]
+    context_tier: str (L0/L1/L2)
+        ↓
+_build_system_prompt(ctx)
+    1. agent.system_prompt
+    2. agent.persona
+    3. agent.motivation
+    4. PUA block (build_motivation_block)
+    5. Role-specific block (from _classify_agent_role)
+    6. Tool instructions (if tools_enabled)
+    7. Architecture guidelines (if available)
+    8. Project context (tier-aware)
+    9. SKILLS (ctx.skills_prompt) ← KEY COMPOSITION
+    10. Permissions (delegation, veto)
+    └─ Return full_system_prompt (str, ~8,500-12,000 tokens)
+        ↓
+_build_messages(ctx, user_message)
+    └─ Return [
+        LLMMessage(role="system", content=full_system_prompt),
+        ... history messages ...
+        LLMMessage(role="user", content=user_message)
+      ]
+        ↓
+LLMClient.chat(
+    messages=[system_msg, ...],
+    provider="azure-openai",
+    model="gpt-5-mini",
+    system_prompt=full_system_prompt,
+    tools=[...],
+    temperature=0.7,
+    max_tokens=4096
+)
+    └─ HTTP POST to provider
+        └─ Returns LLMResponse (content, tool_calls, tokens)
+            ↓
+Tool execution loop (if tool_calls)
+    └─ Execute tools → add results to messages → loop
+        ↓
+ExecutionResult
+    content: str (agent response)
+    tool_calls: list[dict]
+    tokens_in: int
+    tokens_out: int
+    agent_id: str
+
+---
+
+## BUILT-IN AGENTS (Examples of Real Composition)
+
+CTO (karim-cto)
+  name: Karim Benali
+  role: CTO
+  hierarchy: 0 (CEO-level)
+  persona: Visionary, decisive, detail-oriented
+  motivation: Orchestrate factory, empower teams, deliver on time
+  skills: [systematic-debugging, ac-architect, pua-debugging]
+  tools: [create_project, create_team, create_mission, deep_search, memory_store, ...]
+  permissions: {can_delegate: true, can_veto: true, can_approve: true}
+  → Gets L2 context (full vision + 10 memory entries)
+  → Gets CTO-specific tool block
+  → Gets delegation block
+
+Backend Developer (dev-backend)
+  name: Alex Chen
+  role: Backend Developer
+  hierarchy: 40 (mid-level)
+  persona: Pragmatic, thorough coder
+  motivation: Write clean, testable code. Catch bugs before QA.
+  skills: [automated-testing, api-security-testing]
+  tools: [code_read, code_write, code_edit, build, memory_store]
+  permissions: {can_delegate: false}
+  → Gets L1 context (3 memory entries, no vision)
+  → Gets dev tool mandate (code_read → code_write → build/test)
+  → Gets traceability block (every file must have # Ref: feature_id)
+  → NO delegation block
+
+QA Lead (qa-lead)
+  name: Maria Rodriguez
+  role: QA Lead
+  hierarchy: 20 (lead-level)
+  persona: Obsessive about quality, finds edge cases
+  motivation: Catch bugs before production, drive zero-defect mindset
+  skills: [ac-adversarial, ac-adversarial-v2, ac-security]
+  tools: [run_e2e_tests, code_read, create_ticket, memory_store]
+  permissions: {can_delegate: true}
+  → Gets L1 context (5 memory entries, no vision)
+  → Gets PUA_QA_BLOCK (special QA mandate):
+     "You are REVIEWER/VALIDATOR — NOT implementer"
+     "FORBIDDEN: code_write to create implementation files"
+     "ALLOWED: code_write only for TEST files"
+     "MANDATORY: run_e2e_tests() FIRST, then create_ticket() for failures"
+  → Gets delegation block (can delegate to team)
+
+---
+
+## KEY TAKEAWAYS
+
+✓ Agent identity (name, role, persona, motivation) flows from DB → Config → Prompt
+✓ Skills are AUTO-INJECTED based on mission text + agent role (superpowers-style)
+✓ Prompt assembly is modular: each component added in order
+✓ Context tier (L0/L1/L2) controls verbosity based on agent seniority
+✓ PUA framework (universal drive) + role-specific blocks = composition
+✓ Permissions (delegation, veto, approval) are permission-based synthesis
+✓ Tool usage rules are role-specific (CTO ≠ Dev ≠ QA)
+✓ LLM receives full composed prompt + conversation history + tool definitions
+✓ Streaming supported; tool-calling loop until no more tools or tool failure
+

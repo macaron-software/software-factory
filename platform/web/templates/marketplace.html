@@ -1,6 +1,4 @@
-<!-- Ref: feat-marketplace -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_marketplace %}
 
 {% block extra_head %}
 <style>
@@ -77,7 +75,7 @@
 </div>
 
 <div class="mkt-grid" id="mktGrid">
-    {{ skeleton_marketplace(8) }}
+    <div class="mkt-empty">Chargement…</div>
 </div>
 
 <!-- Detail panel -->

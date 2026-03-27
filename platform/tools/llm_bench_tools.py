@@ -180,7 +180,7 @@ async def run_llm_bench(
     """Run LLM bench for a specific model/provider combo.
 
     Args:
-        model: Model name (e.g. "gpt-5-mini", "MiniMax-M2.5")
+        model: Model name (e.g. "gpt-5-mini", "MiniMax-M2.7")
         provider: Provider name (e.g. "azure-openai", "minimax")
         cases_filter: Optional list of case IDs to run (runs all if None)
 
@@ -291,7 +291,7 @@ BENCH_MODELS = [
     {"model": "gpt-5-mini", "provider": "azure-openai"},
     {"model": "gpt-5.2", "provider": "azure-openai"},
     {"model": "gpt-5.2-codex", "provider": "azure-openai"},
-    {"model": "MiniMax-M2.5", "provider": "minimax"},
+    {"model": "MiniMax-M2.7", "provider": "minimax"},
 ]
 
 

@@ -47,7 +47,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - **llm**: tool_choice leaked into no-tools requests (broke judge)
 - **llm**: content policy fallback to gpt-5.2 + architect anti-SLOP rule
 - **llm**: MiniMax streaming path — native tool_calls M2.5 + strip name field
-- **llm**: use native tool_calls format for MiniMax M2.5
+- **llm**: use native tool_calls format for MiniMax-M2.7
 - **macos**: MissionPhase helpers + actor isolation + optionals
 - **monitor**: use /api/missions for SAFe epics + teams leaderboard tweaks
 - **monitor**: scp+run approach + SAFe endpoints (epics/cockpit/teams)
@@ -101,7 +101,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - AC = SUPERVISION not EXECUTION — documented everywhere
 - update CLAUDE.md with cycle 7 bench results
 - update CLAUDE.md with MODEL_PROFILES, bench results, LLM config
-- MiniMax M2.5 tool_calls fix + AC deux niveaux cockpit graph
+- MiniMax-M2.7 tool_calls fix + AC deux niveaux cockpit graph
 - cockpit memory graph AgeMem 8 patterns + PG pitfalls + AgeMem in CLAUDE.md
 - add macOS app section to all 15 language READMEs — v0.01 download link + features
 - add macOS app section to README (EN/FR/ZH) — v0.01 download, features, build from source
@@ -755,7 +755,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - Wireframe skeleton shimmer + Annotation help panel
 - Wireframe mode toggle in SF topbar
 - Self-Annotation Mode toggle in Settings + Traceability bar in Annotation Studio
-- multi-model routing Azure gpt-5.2/gpt-5.1-codex/gpt-5-mini + MiniMax M2.5
+- multi-model routing Azure gpt-5.2/gpt-5.1-codex/gpt-5-mini + MiniMax-M2.7
 - Ollama provider + fix _is_azure detection + Qwen3 thinking strip
 - faster LLM fallback on 429 + active features in dashboard
 - cockpit speaks SAFe — Epics/Features/Tasks hierarchy
@@ -1254,7 +1254,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - git init in auto_launch workspaces + MissionRun.type AttributeError
 - sessions INSERT needs name column (NOT NULL constraint)
 - create session row before launching mission run (FOREIGN KEY constraint)
-- minimax default model MiniMax-M1-80k → MiniMax-M2.5
+- minimax default model MiniMax-M1-80k → MiniMax-M2.7
 - heartbeat visibility on startup
 - auto-heal resilience + TMA notifications
 - New Epic → New Mission + bridge JS errors to auto-heal
@@ -1368,7 +1368,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - SSE queue overflow causing ideation to stop early
 - session_live streaming — unique bubble IDs, initials instead of emoji, metadata tags
 - populate agents/graph in session live for all workflow types
-- animated typing dots, all agents on MiniMax-M2.5
+- animated typing dots, all agents on MiniMax-M2.7
 - add Sessions link to sidebar navigation
 - ideation agents discuss instead of coding, robust SSE handling
 - agent collaboration - disable tools for strategic agents, improve delegation prompts
@@ -1544,7 +1544,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - **platform**: per-project agents instead of shared Brain
 - **platform**: agent avatars + taglines + 8 built-in agents with emoji identity
 - **platform**: chat persistence, conversation history & context compression
-- **platform**: upgrade to MiniMax-M2.5 (released 2025-02-12)
+- **platform**: upgrade to MiniMax-M2.7 (released 2025-02-12)
 - **platform**: LLM runtime, project-centric model, real agent responses
 - **po**: features table + auto-extraction from agent discussions
 - **portfolio**: add epics progression table + milestones Gantt
@@ -1747,7 +1747,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - **auth**: add /api/analytics to PUBLIC_PATHS for dashboard access
 - **dashboard**: replace emojis with feather SVG icons + add sparkline/gauge graphs
 - **dashboard**: perspective-aware endpoints, fix sprints/backlog crashes
-- **llm**: use env-driven model config instead of hardcoded MiniMax-M2.5
+- **llm**: use env-driven model config instead of hardcoded MiniMax-M2.7
 - **missions**: add workspace creation to launch endpoint
 - **missions**: create MissionRun in launch endpoint
 - **otel**: move OTEL setup to module-level, fix middleware crash

@@ -727,7 +727,7 @@ async def run_agent_bench(
             import dataclasses
 
             _default_models = {
-                "minimax": "MiniMax-M2.5",
+                "minimax": "MiniMax-M2.7",
                 "azure-openai": "gpt-5-mini",
                 "openai": "gpt-4o-mini",
             }

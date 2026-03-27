@@ -10,6 +10,7 @@ import pytest
 
 # Ensure platform package is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+pytest.importorskip("fastapi", reason="fastapi dependency missing in current venv")
 
 from fastapi.testclient import TestClient
 

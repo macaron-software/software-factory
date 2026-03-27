@@ -1,16 +1,14 @@
 """Integrations CRUD, AI providers & Jira endpoints."""
-# Ref: feat-projects
 
 from __future__ import annotations
 
 import logging
 import os
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from .input_models import IntegrationUpdate
-from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -37,7 +35,7 @@ async def list_integrations():
         db.close()
 
 
-@router.patch("/api/integrations/{integ_id}", dependencies=[Depends(require_auth())])
+@router.patch("/api/integrations/{integ_id}")
 async def update_integration(integ_id: str, body: IntegrationUpdate):
     """Toggle or update integration config."""
     import json as _json
@@ -67,7 +65,7 @@ async def update_integration(integ_id: str, body: IntegrationUpdate):
         db.close()
 
 
-@router.post("/api/integrations/{integ_id}/test", dependencies=[Depends(require_auth())])
+@router.post("/api/integrations/{integ_id}/test")
 async def test_integration(integ_id: str):
     """Test integration connectivity."""
     from ....db.migrations import get_db
@@ -134,7 +132,7 @@ async def list_ai_providers():
         db.close()
 
 
-@router.post("/api/ai-providers", dependencies=[Depends(require_auth())])
+@router.post("/api/ai-providers")
 async def create_ai_provider(request: Request):
     """Create a new custom AI provider."""
     import uuid
@@ -185,7 +183,7 @@ async def create_ai_provider(request: Request):
         db.close()
 
 
-@router.patch("/api/ai-providers/{provider_id}", dependencies=[Depends(require_auth())])
+@router.patch("/api/ai-providers/{provider_id}")
 async def update_ai_provider(provider_id: str, request: Request):
     """Update a custom AI provider."""
     from cryptography.fernet import Fernet
@@ -244,7 +242,7 @@ async def update_ai_provider(provider_id: str, request: Request):
         db.close()
 
 
-@router.delete("/api/ai-providers/{provider_id}", dependencies=[Depends(require_auth())])
+@router.delete("/api/ai-providers/{provider_id}")
 async def delete_ai_provider(provider_id: str):
     """Delete a custom AI provider."""
     from ....db.migrations import get_db
@@ -258,7 +256,7 @@ async def delete_ai_provider(provider_id: str):
         db.close()
 
 
-@router.post("/api/ai-providers/{provider_id}/test", dependencies=[Depends(require_auth())])
+@router.post("/api/ai-providers/{provider_id}/test")
 async def test_ai_provider(provider_id: str):
     """Test connection to a custom AI provider."""
     import httpx
@@ -335,7 +333,7 @@ async def jira_search_api(jql: str = "project=LPDATA"):
     return PlainTextResponse(result)
 
 
-@router.post("/api/jira/sync/{mission_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/jira/sync/{mission_id}")
 async def jira_sync_mission(mission_id: str, board_id: int = 8680):
     """Sync a mission's tasks/stories to Jira."""
     from ....tools.jira_tools import jira_sync_from_platform
@@ -344,7 +342,7 @@ async def jira_sync_mission(mission_id: str, board_id: int = 8680):
     return PlainTextResponse(result)
 
 
-@router.post("/api/jira/kanban-sync", dependencies=[Depends(require_auth())])
+@router.post("/api/jira/kanban-sync")
 async def jira_kanban_sync_api(direction: str = "both"):
     """Bidirectional kanban sync between Platform and Jira board."""
     from ....tools.jira_tools import jira_kanban_sync

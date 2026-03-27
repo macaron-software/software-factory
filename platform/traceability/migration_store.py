@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from ..db.migrations import get_db
+from .artifacts import make_id
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ class TraceabilityLink:
     link_type: str
     coverage_pct: int = 0
     notes: str = ""
+    project_id: str = ""
     created_at: str = ""
 
 
@@ -85,7 +86,7 @@ def create_legacy_item(
     source_line: int = 0,
 ) -> str:
     """Create a legacy item with auto-generated UUID. Returns the id."""
-    item_id = f"li-{uuid.uuid4().hex[:8]}"
+    item_id = make_id("li")
     meta_json = json.dumps(metadata or {}, ensure_ascii=False)
     db = get_db()
     try:
@@ -183,19 +184,28 @@ def create_link(
     link_type: str,
     coverage_pct: int = 0,
     notes: str = "",
+    project_id: str = "",
 ) -> int:
     """Create a traceability link. Returns the link id."""
     db = get_db()
     try:
+        effective_project_id = (
+            project_id
+            or _infer_project_id(db, source_id, source_type)
+            or _infer_project_id(db, target_id, target_type)
+        )
         cur = db.execute(
             """INSERT INTO traceability_links
             (source_id, source_type, target_id, target_type, link_type,
-             coverage_pct, notes, created_at)
-            VALUES (?,?,?,?,?,?,?,?)
+             coverage_pct, notes, project_id, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
             ON CONFLICT (source_id, target_id, link_type) DO UPDATE
-            SET coverage_pct = EXCLUDED.coverage_pct, notes = EXCLUDED.notes""",
+            SET coverage_pct = EXCLUDED.coverage_pct,
+                notes = EXCLUDED.notes,
+                project_id = EXCLUDED.project_id""",
             (source_id, source_type, target_id, target_type, link_type,
-             coverage_pct, notes, datetime.now(timezone.utc).isoformat()),
+             coverage_pct, notes, effective_project_id,
+             datetime.now(timezone.utc).isoformat()),
         )
         db.commit()
         return cur.lastrowid or 0
@@ -433,5 +443,54 @@ def _row_to_link(row) -> TraceabilityLink:
         link_type=row["link_type"],
         coverage_pct=row.get("coverage_pct", 0),
         notes=row.get("notes", ""),
+        project_id=row.get("project_id", ""),
         created_at=str(row.get("created_at", "")),
     )
+
+
+def _infer_project_id(db, item_id: str, item_type: str) -> str:
+    """Infer project_id from a traceable item when caller does not provide it."""
+    if not item_id or not item_type:
+        return ""
+
+    query_map = {
+        "legacy_item": ("SELECT project_id FROM legacy_items WHERE id = ?", (item_id,)),
+        "persona": ("SELECT project_id FROM personas WHERE id = ?", (item_id,)),
+        "nft_test": ("SELECT project_id FROM nft_tests WHERE id = ?", (item_id,)),
+        "screen": ("SELECT project_id FROM project_screens WHERE id = ?", (item_id,)),
+        "epic": ("SELECT project_id FROM missions WHERE id = ?", (item_id,)),
+        "feature": (
+            "SELECT m.project_id FROM features f JOIN missions m ON f.epic_id = m.id WHERE f.id = ?",
+            (item_id,),
+        ),
+        "story": (
+            """SELECT m.project_id
+               FROM user_stories us
+               JOIN features f ON us.feature_id = f.id
+               JOIN missions m ON f.epic_id = m.id
+               WHERE us.id = ?""",
+            (item_id,),
+        ),
+        "acceptance_criterion": (
+            """SELECT m.project_id
+               FROM acceptance_criteria ac
+               JOIN features f ON ac.feature_id = f.id
+               JOIN missions m ON f.epic_id = m.id
+               WHERE ac.id = ?""",
+            (item_id,),
+        ),
+    }
+    if item_type in {"ihm", "code", "test_tu", "test_e2e", "crud", "rbac"}:
+        query_map[item_type] = (
+            "SELECT project_id FROM traceability_artifacts WHERE id = ?",
+            (item_id,),
+        )
+
+    query = query_map.get(item_type)
+    if not query:
+        return ""
+
+    row = db.execute(query[0], query[1]).fetchone()
+    if not row:
+        return ""
+    return row.get("project_id", "")

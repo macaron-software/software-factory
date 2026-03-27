@@ -1,4 +1,3 @@
-<!-- Ref: feat-ideation -->
 {# Generic Group Ideation — htmx partial loaded in home tab #}
 
 <div class="mkt-layout">
@@ -349,26 +348,53 @@ function grpToggleGraph() {
   if(toggle) { toggle.classList.toggle('open', hidden); toggle.classList.toggle('closed', !hidden); }
 }
 
+function grpEsc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 function grpShowPopover(agentId, ev) {
   const agent = GRP_AGENTS.find(a=>a.id===agentId); if(!agent) return;
   const overlay = document.getElementById('grpIgOverlay');
   const pop = document.getElementById('grpIgPopover');
   const avatarEl = document.getElementById('grpIgPopAvatar');
   if(agent.avatar_url){
-    avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${agent.avatar_url}" alt="${agent.name}">`;
+    avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${agent.avatar_url}" alt="${grpEsc(agent.name)}">`;
   } else {
-    avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${agent.name.substring(0,2)}</div>`;
+    avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${grpEsc(agent.name.substring(0,2))}</div>`;
   }
   document.getElementById('grpIgPopName').textContent = agent.name;
   document.getElementById('grpIgPopRole').textContent = agent.short_role || '';
   let html = '';
-  if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${agent.tagline}</div>`;
-  if(agent.description) html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${agent.description.substring(0,300)}${agent.description.length>300?'…':''}</div></div>`;
+  if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${grpEsc(agent.tagline)}</div>`;
+  if(agent.persona){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-user"/></svg> Persona</div>
+              <div class="ig-popover-text">${grpEsc(agent.persona.substring(0,300))}${agent.persona.length>300?'…':''}</div></div>`;
+  }
+  if(agent.motivation){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-zap"/></svg> Motivation</div>
+              <div class="ig-popover-text">${grpEsc(agent.motivation)}</div></div>`;
+  }
+  if(agent.description && !agent.persona){
+    html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${grpEsc(agent.description.substring(0,300))}${agent.description.length>300?'…':''}</div></div>`;
+  }
+  if(agent.skills && agent.skills.length){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-layers"/></svg> Skills (${agent.skills.length})</div>
+              <div class="ig-popover-tags">${agent.skills.map(s=>`<span class="ig-popover-tag skill">${grpEsc(s)}</span>`).join('')}</div></div>`;
+  }
+  if(agent.tools && agent.tools.length){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-settings"/></svg> Tools (${agent.tools.length})</div>
+              <div class="ig-popover-tags">${agent.tools.map(t=>`<span class="ig-popover-tag tool">${grpEsc(t)}</span>`).join('')}</div></div>`;
+  }
+  if(agent.can_veto){
+    const lvl = agent.veto_level ? ` — ${grpEsc(agent.veto_level)}` : '';
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-shield"/></svg> Veto${lvl}</div></div>`;
+  }
+  if(agent.model || agent.provider){
+    html += `<div><div class="ig-popover-section-title"><svg><use href="#icon-brain"/></svg> LLM</div>
+              <span class="ig-popover-tag">${grpEsc((agent.provider||'')+' '+(agent.model||'default'))}</span></div>`;
+  }
   document.getElementById('grpIgPopBody').innerHTML = html;
   const vw=window.innerWidth, vh=window.innerHeight;
   let left=ev.clientX+12, top=ev.clientY-20;
   if(left+330>vw) left=vw-340;
-  if(top+250>vh) top=Math.max(10,vh-280);
+  if(top+400>vh) top=Math.max(10,vh-450);
   pop.style.left=left+'px'; pop.style.top=top+'px';
   overlay.classList.add('visible'); pop.classList.add('visible');
 }

@@ -2151,7 +2151,7 @@ async def _batch_judge(items: list[tuple[DeepCase, str, list[str]]],
         base_url = os.environ.get("OPENAI_BASE_URL", "https://api.minimax.io/v1")
         api_key = os.environ.get("MINIMAX_API_KEY",
                                  os.environ.get("LLM_API_KEY", ""))
-        model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
+        model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.7")
     elif provider == "azure-openai":
         base_url = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
         api_key = os.environ.get("AZURE_OPENAI_KEY", "")

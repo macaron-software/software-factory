@@ -371,19 +371,19 @@ For tasks producing documents, reports, or visualizations:
 
 ---
 
-## MiniMax M2.5 — Tool Calling (SF Platform specific)
+## MiniMax-M2.7 — Tool Calling (SF Platform specific)
 
 **⚠️ BUG RÉSOLU (2026-03-07) — Historique pour ne pas régresser**
 
 ### Problème
-MiniMax M2.5 supporte nativement le format OpenAI tool_calls/tool (voir https://platform.minimax.io/docs/guides/text-m2-function-call).
+MiniMax-M2.7 supporte nativement le format OpenAI tool_calls/tool (voir https://platform.minimax.io/docs/guides/text-m2-function-call).
 Le code SF convertissait à tort les messages d'historique en texte plat :
 ```
 # ❌ CE QUE LE CODE FAISAIT (mauvais — cause hallucinations)
 assistant: "[Appel outils: code_write]"        # sans les arguments !
 user:      "[Résultat de code_write]:\n{output}"
 
-# ✅ CE QUE M2.5 ATTEND (format natif)
+# ✅ CE QUE M2.7 ATTEND (format natif)
 assistant: {tool_calls: [{name: code_write, arguments: {path, content}}]}
 tool:      {tool_call_id: "...", content: output}
 ```
@@ -392,11 +392,11 @@ Sans les arguments dans l'historique, l'agent ne sait plus ce qu'il a écrit →
 "j'ai écrit INCEPTION.md" sans pouvoir vérifier → HALLUCINATION/ECHO/XXX escalations.
 
 ### Fix (platform/llm/client.py)
-- Mangling text désactivé pour M2.5 (actif uniquement pour `model == "MiniMax-M2.1"`)
-- `tool_choice = "required"` au lieu de `"auto"` (M2.5 supporte required)
+- Mangling text désactivé pour M2.7 (actif uniquement pour `model == "MiniMax-M2.7"`)
+- `tool_choice = "required"` au lieu de `"auto"` (M2.7 supporte required)
 - `parallel_tool_calls = False` (appels séquentiels plus fiables)
 
-### Paramètres M2.5 recommandés
+### Paramètres M2.7 recommandés
 ```python
 body["tool_choice"] = "required"          # force l'appel d'outil
 body["parallel_tool_calls"] = False       # séquentiel
@@ -405,5 +405,5 @@ body["max_tokens"] = max(max_tokens, 16000)  # pour les <think> blocks
 ```
 
 ### M2.1 legacy (garder mangling)
-MiniMax M2.1 rejette `role: "tool"` → convertir en `role: "user"`.
-Vérifier `model == "MiniMax-M2.1"` avant d'activer le workaround.
+MiniMax-M2.7 rejette `role: "tool"` → convertir en `role: "user"`.
+Vérifier `model == "MiniMax-M2.7"` avant d'activer le workaround.

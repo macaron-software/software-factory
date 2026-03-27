@@ -43,7 +43,7 @@ from platform.agents.subagent_prompts import (  # noqa: E402
 # Config
 # ---------------------------------------------------------------------------
 PROVIDER = os.environ.get("PROMPT_CI_PROVIDER", "minimax")
-MODEL = os.environ.get("PROMPT_CI_MODEL", "MiniMax-M2.5")
+MODEL = os.environ.get("PROMPT_CI_MODEL", "MiniMax-M2.7")
 TIMEOUT = int(os.environ.get("PROMPT_CI_TIMEOUT", "60"))
 
 # Tool schemas used in tests

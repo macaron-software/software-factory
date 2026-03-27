@@ -1,6 +1,4 @@
-<!-- Ref: feat-art -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_table, skeleton_stat_cards, skeleton_block, skeleton_feed %}
 
 {% block content %}
 <style>
@@ -321,7 +319,10 @@
     <!-- Cycles AC sub-panel -->
     <div id="ac-panel-cycles">
         <div id="art-amelio-content">
-            {{ skeleton_block(5) }}
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                Chargement…
+            </div>
         </div>
     </div>
 
@@ -371,7 +372,7 @@
                     </tr>
                 </thead>
                 <tbody id="sk-main-tbody">
-                    <tr><td colspan="7" style="padding:0">{{ skeleton_table(4, 7) }}</td></tr>
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -433,11 +434,11 @@
 
     <!-- Thompson Sampling sub-panel -->
     <div id="ac-panel-thompson" style="display:none">
-        <div class="sk" style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
-            <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total"><span class="sk sk-line" style="width:40%;height:1.8rem;display:inline-block"></span></p><p class="stat-label">avec données LLM</p></div>
-            <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted"><span class="sk sk-line" style="width:40%;height:1.8rem;display:inline-block"></span></p><p class="stat-label">toutes traces</p></div>
-            <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b"><span class="sk sk-line" style="width:40%;height:1.8rem;display:inline-block"></span></p><p class="stat-label">total tous agents</p></div>
-            <div class="stat-card"><h3>Darwin Fitness</h3><p class="stat-value" id="ts-art-hirej" style="color:#a78bfa"><span class="sk sk-line" style="width:40%;height:1.8rem;display:inline-block"></span></p><p class="stat-label">scores accumulés</p></div>
+        <div style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
+            <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
+            <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
+            <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
+            <div class="stat-card"><h3>Darwin Fitness</h3><p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p><p class="stat-label">scores accumulés</p></div>
         </div>
         <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
         <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
@@ -454,7 +455,7 @@
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
                     <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
                 </tr></thead>
-                <tbody id="ts-art-tbody"><tr><td colspan="8" style="padding:0">{{ skeleton_table(4, 8) }}</td></tr></tbody>
+                <tbody id="ts-art-tbody"><tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr></tbody>
             </table>
         </div>
         <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
@@ -479,28 +480,37 @@
     <!-- Darwin Teams sub-panel -->
     <div id="ac-panel-darwin" style="display:none">
         <div id="art-teams-content">
-            {{ skeleton_block(4) }}
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Darwin Teams…</p>
         </div>
     </div>
 
     <!-- Evolution sub-panel — GA proposals + run history -->
     <div id="ac-panel-evolution" style="display:none">
         <div id="art-evolution-content">
-            {{ skeleton_block(5) }}
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
+            </div>
         </div>
     </div>
 
     <!-- RL sub-panel — reward policy stats -->
     <div id="ac-panel-rl" style="display:none">
         <div id="art-rl-content">
-            {{ skeleton_block(5) }}
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Chargement…
+            </div>
         </div>
     </div>
 
     <!-- Self Healing sub-panel -->
     <div id="ac-panel-heal" style="display:none">
         <div id="art-heal-content">
-            {{ skeleton_block(5) }}
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
+            </div>
         </div>
     </div>
 
@@ -552,7 +562,7 @@
                     </tr>
                 </thead>
                 <tbody id="instinct-tbody">
-                    <tr><td colspan="7" style="padding:0">{{ skeleton_table(4, 7) }}</td></tr>
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Chargement…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -962,9 +972,6 @@ async function loadThompsonTab() {
         document.getElementById('ts-art-accepted').textContent = (s.total_calls || s.total_accepted || 0).toLocaleString();
         document.getElementById('ts-art-rejected').textContent = s.total_rejected.toLocaleString();
         document.getElementById('ts-art-hirej').textContent = (d.fitness || []).length;
-
-        const tsStats = document.getElementById('ts-art-stats');
-        if (tsStats) { tsStats.classList.remove('sk'); tsStats.classList.add('sk-loaded'); }
 
         // Provider A/B breakdown (dynamic cards)
         const abGrid = document.getElementById('ts-ab-grid');

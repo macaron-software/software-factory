@@ -1,6 +1,4 @@
-<!-- Ref: feat-dsi -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_table, skeleton_block, skeleton_stat_cards %}
 
 {% block topbar_actions %}
 {% for sp in system_patterns %}
@@ -218,7 +216,7 @@
             <a href="/api/incidents" class="btn btn-ghost" style="font-size:0.65rem;padding:0.15rem 0.4rem">{{ _("tout") }}</a>
         </div>
         <div class="dsi-panel-body" style="max-height:200px" id="incidents-content">
-            <div class="sk sk-line" style="width:60%;margin:0.5rem auto"></div><div class="sk sk-line" style="width:40%;margin:0.5rem auto"></div>
+            <div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.75rem">{{ _('loading_ellipsis') }}</div>
         </div>
     </div>
 </div>
@@ -233,7 +231,7 @@
          hx-get="/api/dashboard/overview-quality"
          hx-trigger="load"
          hx-swap="innerHTML">
-        <div style="padding:0.5rem 0"><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line" style="width:50%;margin-top:0.4rem"></div><div class="sk sk-line" style="width:60%;margin-top:0.4rem"></div></div>
+        <p class="text-muted" style="font-size:0.75rem">Loading quality data...</p>
     </div>
 </div>
 

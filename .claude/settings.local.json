@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(bash /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/.claude/hooks/detect-gaps.sh 2>&1)",
+      "Bash(/opt/homebrew/bin/git add:*)",
+      "Bash(/opt/homebrew/bin/git diff:*)",
+      "Bash(SKIP=presidio-pii-guard /opt/homebrew/bin/git commit -m \"feat: path-scoped rules + detect-gaps hook + 6 team-* slash commands:*)",
+      "Bash(FORCE_PUSH=1 /opt/homebrew/bin/git push origin main)",
+      "WebFetch(domain:www.anthropic.com)",
+      "Bash(SKIP=presidio-pii-guard /opt/homebrew/bin/git commit -m \"feat\\(harness\\): 5 patterns from Anthropic long-running harness design:*)"
+    ]
+  }
+}

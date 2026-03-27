@@ -14,6 +14,7 @@ __pycache__/
 .eggs/
 dist/
 build/
+.venv-presidio/
 
 # Env & secrets
 .env
@@ -42,7 +43,7 @@ platform/VERSION
 data/component_gallery.db
 
 # Monorepo — private dirs (NEVER push)
-_FINARY/
+_FINAPP/
 _FACTORY_CORE/
 _MIGRATION_FACTORY/
 _SOFTWARE_FACTORY-old/
@@ -74,6 +75,11 @@ deploy/QUICK_DEPLOY.md
 deploy/setup-dns.sh
 
 # Test artifacts
+platform/tests/e2e/.auth-state.json
 platform/tests/e2e/playwright-report/
 platform/tests/e2e/test-results/
 platform.bak
+
+# AI config personal overrides
+CLAUDE.local.md
+.claude/settings.local.json

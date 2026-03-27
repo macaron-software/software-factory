@@ -328,7 +328,7 @@ class OrgStore:
                 id="art-products",
                 name="ART Produits",
                 portfolio_id="portfolio-dsi",
-                description="Produits métier: Popinz, YoloNow, Finary, Veligo, PSY",
+                description="Produits métier: SaasApp, YoloNow, FinApp, MobilityApp, PSY",
                 lead_agent_id="release_train_engineer",
                 pi_cadence_weeks=10,
             )
@@ -340,7 +340,7 @@ class OrgStore:
                 id="art-services",
                 name="ART Services & Support",
                 portfolio_id="portfolio-dsi",
-                description="Services: LPD, Logs Facteur, Sharelook, Fervenza IoT",
+                description="Services: LPD, Logs Facteur, CollabTool, Fervenza IoT",
                 lead_agent_id="release_train_engineer",
                 pi_cadence_weeks=10,
             )
@@ -392,10 +392,10 @@ class OrgStore:
         ]
         product_teams = [
             Team(
-                id="team-popinz",
-                name="Team Popinz",
+                id="team-saasapp",
+                name="Team SaasApp",
                 art_id="art-products",
-                description="Popinz SaaS — événementiel & ticketing",
+                description="SaasApp SaaS — événementiel & ticketing",
                 scrum_master_id="agile_coach",
                 members=[
                     {"agent_id": "lead_dev", "role": "lead"},
@@ -406,10 +406,10 @@ class OrgStore:
                 ],
             ),
             Team(
-                id="team-veligo",
-                name="Team Veligo",
+                id="team-mobilityapp",
+                name="Team MobilityApp",
                 art_id="art-products",
-                description="Veligo Platform — mobilité douce",
+                description="MobilityApp Platform — mobilité douce",
                 scrum_master_id="scrum_master",
                 members=[
                     {"agent_id": "lead_dev", "role": "lead"},
@@ -422,10 +422,10 @@ class OrgStore:
         ]
         service_teams = [
             Team(
-                id="team-sharelook",
-                name="Team Sharelook",
+                id="team-collabtool",
+                name="Team CollabTool",
                 art_id="art-services",
-                description="Sharelook — formation & partage vidéo",
+                description="CollabTool — formation & partage vidéo",
                 scrum_master_id="scrum_master",
                 members=[
                     {"agent_id": "lead_dev", "role": "lead"},
@@ -771,7 +771,7 @@ class OrgStore:
                     id="art-mobile",
                     name="ART Mobile",
                     portfolio_id="portfolio-dsi",
-                    description="iOS and Android native development — Popinz, Veligo, YoloNow mobile apps.",
+                    description="iOS and Android native development — SaasApp, MobilityApp, YoloNow mobile apps.",
                     lead_agent_id="tech_lead_mobile",
                     pi_cadence_weeks=10,
                 )
@@ -978,10 +978,10 @@ class OrgStore:
                 ],
             ),
             Team(
-                id="team-finary",
-                name="Team Finary",
+                id="team-finapp",
+                name="Team FinApp",
                 art_id="art-products",
-                description="Finary — gestion patrimoine, finance personnelle, reporting",
+                description="FinApp — gestion patrimoine, finance personnelle, reporting",
                 scrum_master_id="scrum_master",
                 capacity=4,
                 wip_limit=3,

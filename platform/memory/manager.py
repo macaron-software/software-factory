@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -44,7 +46,11 @@ def _compute_relevance(
     else:
         recency = 0.1
 
-    access_boost = min(1.5, 1.0 + (access_count or 0) * 0.05)
+    try:
+        access_num = int(access_count or 0)
+    except Exception:
+        access_num = 0
+    access_boost = min(1.5, 1.0 + access_num * 0.05)
     return round(min(1.0, confidence * recency * access_boost), 4)
 
 
@@ -63,6 +69,48 @@ class MemoryEntry:
 
 _MEMORY_COMPRESS_THRESHOLD = int(__import__("os").environ.get("MEMORY_COMPRESS_THRESHOLD", "50"))
 _MEMORY_COMPRESS_KEEP = 20  # Keep the N most recent after compression
+_KO_DENSITY_SWITCH = int(os.environ.get("KO_DENSITY_SWITCH", "200"))
+_HARD_CONSTRAINT_CATEGORIES = {
+    "constraint",
+    "security",
+    "rbac",
+    "acceptance",
+    "ko-constraint",
+    "ko-security",
+    "ko-rbac",
+    "ko-acceptance",
+}
+
+
+def _ensure_ko_schema(conn) -> None:
+    """Create/upgrade deterministic Knowledge Object storage."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_objects (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'constraint',
+            key TEXT NOT NULL,
+            value TEXT NOT NULL,
+            mandatory INTEGER DEFAULT 0,
+            confidence REAL DEFAULT 1.0,
+            source TEXT DEFAULT 'system',
+            access_count INTEGER DEFAULT 0,
+            last_read_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ko_unique ON knowledge_objects(project_id, kind, key)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ko_project_mandatory ON knowledge_objects(project_id, mandatory)"
+        )
+    except Exception:
+        pass
 
 
 def _maybe_compress_project_memory(project_id: str) -> None:
@@ -78,10 +126,10 @@ def _maybe_compress_project_memory(project_id: str) -> None:
             # Fetch oldest entries (exclude the most recent ones we want to keep)
             old_rows = conn.execute(
                 "SELECT id, category, key, value FROM memory_project"
-                " WHERE project_id=?"
+                f" WHERE project_id=? AND COALESCE(category,'') NOT IN ({','.join('?' for _ in _HARD_CONSTRAINT_CATEGORIES)})"
                 " ORDER BY COALESCE(updated_at, created_at) ASC"
                 f" LIMIT {count - _MEMORY_COMPRESS_KEEP}",
-                (project_id,),
+                (project_id, *_HARD_CONSTRAINT_CATEGORIES),
             ).fetchall()
             if not old_rows:
                 return
@@ -182,6 +230,193 @@ class MemoryManager:
         return [dict(r) for r in rows]
 
     # ── Project Memory (Layer 3) ────────────────────────────────
+
+    def ko_store(
+        self,
+        project_id: str,
+        key: str,
+        value: str,
+        kind: str = "constraint",
+        mandatory: bool = False,
+        source: str = "system",
+        confidence: float = 1.0,
+    ) -> str:
+        """Store deterministic Knowledge Object (hash-addressed by project/kind/key)."""
+        conn = get_db()
+        _ensure_ko_schema(conn)
+        existing = conn.execute(
+            "SELECT id FROM knowledge_objects WHERE project_id=? AND kind=? AND key=?",
+            (project_id, kind, key),
+        ).fetchone()
+        if existing:
+            ko_id = existing["id"]
+            conn.execute(
+                "UPDATE knowledge_objects SET value=?, mandatory=?, confidence=?, source=?, "
+                "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (value, 1 if mandatory else 0, confidence, source, ko_id),
+            )
+        else:
+            ko_id = uuid.uuid4().hex[:16]
+            conn.execute(
+                "INSERT INTO knowledge_objects "
+                "(id, project_id, kind, key, value, mandatory, confidence, source) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    ko_id,
+                    project_id,
+                    kind,
+                    key,
+                    value,
+                    1 if mandatory else 0,
+                    confidence,
+                    source,
+                ),
+            )
+        conn.commit()
+        conn.close()
+        return ko_id
+
+    def ko_list_mandatory(self, project_id: str, limit: int = 50) -> list[dict]:
+        conn = get_db()
+        _ensure_ko_schema(conn)
+        rows = conn.execute(
+            "SELECT * FROM knowledge_objects WHERE project_id=? AND mandatory=1 "
+            "ORDER BY updated_at DESC LIMIT ?",
+            (project_id, limit),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def ko_get(self, project_id: str, key: str, kind: str = "") -> dict | None:
+        conn = get_db()
+        _ensure_ko_schema(conn)
+        if kind:
+            row = conn.execute(
+                "SELECT * FROM knowledge_objects WHERE project_id=? AND kind=? AND key=? LIMIT 1",
+                (project_id, kind, key),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM knowledge_objects WHERE project_id=? AND key=? "
+                "ORDER BY mandatory DESC, updated_at DESC LIMIT 1",
+                (project_id, key),
+            ).fetchone()
+        if row:
+            try:
+                conn.execute(
+                    "UPDATE knowledge_objects SET access_count=COALESCE(access_count,0)+1, "
+                    "last_read_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (row["id"],),
+                )
+                conn.commit()
+            except Exception:
+                pass
+        conn.close()
+        return dict(row) if row else None
+
+    def ko_search(
+        self,
+        project_id: str,
+        query: str,
+        kind: str = "",
+        limit: int = 20,
+        mandatory_only: bool = False,
+    ) -> list[dict]:
+        conn = get_db()
+        _ensure_ko_schema(conn)
+        where = ["project_id=?"]
+        params: list = [project_id]
+        if mandatory_only:
+            where.append("mandatory=1")
+        if kind:
+            where.append("kind=?")
+            params.append(kind)
+        if query:
+            where.append("(key LIKE ? OR value LIKE ?)")
+            params.extend([f"%{query}%", f"%{query}%"])
+        rows = conn.execute(
+            f"SELECT * FROM knowledge_objects WHERE {' AND '.join(where)} "
+            "ORDER BY mandatory DESC, updated_at DESC LIMIT ?",
+            (*params, limit),
+        ).fetchall()
+        try:
+            ids = [r["id"] for r in rows]
+            if ids:
+                conn.execute(
+                    f"UPDATE knowledge_objects SET access_count=COALESCE(access_count,0)+1, "
+                    f"last_read_at=CURRENT_TIMESTAMP WHERE id IN ({','.join('?' * len(ids))})",
+                    ids,
+                )
+                conn.commit()
+        except Exception:
+            pass
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def project_retrieve_adaptive(
+        self, project_id: str, query: str, limit: int = 12, agent_role: str = ""
+    ) -> tuple[str, list[dict]]:
+        """Density-adaptive retrieval: deterministic KO first, memory fallback when sparse."""
+        conn = get_db()
+        _ensure_ko_schema(conn)
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM memory_project WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        mem_count = int((row["c"] if row else 0) or 0)
+        conn.close()
+
+        mandatory = self.ko_list_mandatory(project_id, limit=8)
+        ko_hits = self.ko_search(project_id, query, limit=8) if query else []
+
+        def _to_out(src: dict, source: str) -> dict:
+            if source == "ko":
+                return {
+                    "source": "ko",
+                    "kind": src.get("kind", ""),
+                    "mandatory": bool(src.get("mandatory", 0)),
+                    "key": src.get("key", ""),
+                    "value": src.get("value", ""),
+                    "category": f"ko:{src.get('kind', '')}",
+                }
+            return {
+                "source": "memory",
+                "kind": "",
+                "mandatory": False,
+                "key": src.get("key", ""),
+                "value": src.get("value", ""),
+                "category": src.get("category", ""),
+            }
+
+        merged: list[dict] = []
+        seen: set[str] = set()
+        for item in [_to_out(x, "ko") for x in (mandatory + ko_hits)]:
+            sig = f"{item.get('source')}::{item.get('key')}::{item.get('kind')}"
+            if sig in seen:
+                continue
+            seen.add(sig)
+            merged.append(item)
+
+        if mem_count < _KO_DENSITY_SWITCH:
+            for item in self.project_search(project_id, query, limit=max(4, limit // 2)):
+                out = _to_out(item, "memory")
+                sig = f"{out.get('source')}::{out.get('key')}::{out.get('kind')}"
+                if sig in seen:
+                    continue
+                seen.add(sig)
+                merged.append(out)
+            mode = "hybrid"
+        else:
+            mode = "ko-only"
+
+        if not merged:
+            mode = "memory-only"
+            merged = [
+                _to_out(x, "memory")
+                for x in self.project_search(project_id, query, limit=limit)
+            ]
+
+        return mode, merged[:limit]
 
     def project_store(
         self,

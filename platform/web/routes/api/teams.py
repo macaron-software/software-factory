@@ -2,7 +2,6 @@
 
 Allows saving and loading agent team configurations as YAML templates.
 """
-# Ref: feat-art, feat-mercato
 
 from __future__ import annotations
 
@@ -10,9 +9,8 @@ import logging
 from pathlib import Path
 
 import yaml
-from fastapi import Depends,  APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -125,7 +123,7 @@ async def export_team(request: Request):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/api/teams/import", dependencies=[Depends(require_auth())])
+@router.post("/api/teams/import")
 async def import_team(request: Request):
     """Import a YAML team template — creates agents in DB.
 
@@ -309,7 +307,7 @@ async def team_leaderboard(
         )
 
 
-@router.post("/api/teams/{agent_id}/{pattern_id}/retire", dependencies=[Depends(require_auth())])
+@router.post("/api/teams/{agent_id}/{pattern_id}/retire")
 async def retire_team(
     agent_id: str,
     pattern_id: str,
@@ -333,7 +331,7 @@ async def retire_team(
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/api/teams/{agent_id}/{pattern_id}/unretire", dependencies=[Depends(require_auth())])
+@router.post("/api/teams/{agent_id}/{pattern_id}/unretire")
 async def unretire_team(
     agent_id: str,
     pattern_id: str,
@@ -398,7 +396,7 @@ async def list_okr(technology: str = "", phase_type: str = ""):
         return JSONResponse([])
 
 
-@router.post("/api/teams/okr/refresh", dependencies=[Depends(require_auth())])
+@router.post("/api/teams/okr/refresh")
 async def refresh_okr_kpis():
     """Auto-update OKR kpi_current values from live team_fitness data."""
     try:
@@ -441,7 +439,7 @@ async def refresh_okr_kpis():
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.put("/api/teams/okr/{okr_id}", dependencies=[Depends(require_auth())])
+@router.put("/api/teams/okr/{okr_id}")
 async def update_okr(okr_id: int, request: Request):
     """Update OKR target or current value."""
     try:

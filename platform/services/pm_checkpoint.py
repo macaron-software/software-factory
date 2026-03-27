@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Optional
 
@@ -86,6 +87,36 @@ class PMDecision:
     evidence_summary: str = ""
     test_result: TestResult | None = None
     anc_score: ANCScore | None = None
+
+
+def _evaluate_ko_drift(project_id: str, evidence_text: str) -> tuple[bool, list[str]]:
+    """Check if mandatory Knowledge Objects are still represented in phase evidence."""
+    if not project_id:
+        return False, []
+    try:
+        from ..memory.manager import get_memory_manager
+
+        mandatory = get_memory_manager().ko_list_mandatory(project_id, limit=100)
+        if not mandatory:
+            return False, []
+        haystack = (evidence_text or "").lower()
+        missing: list[str] = []
+        for ko in mandatory:
+            key = str(ko.get("key", "") or "").strip()
+            value = str(ko.get("value", "") or "").strip()
+            if not key:
+                continue
+            key_hit = key.lower() in haystack
+            value_hit = False
+            if value:
+                pivot = value[:80].lower()
+                value_hit = pivot in haystack if len(pivot) >= 8 else False
+            if not key_hit and not value_hit:
+                missing.append(key)
+        return len(missing) > 0, missing
+    except Exception as e:
+        logger.debug("KO drift evaluation skipped: %s", e)
+        return False, []
 
 
 # ── Build Gate ─────────────────────────────────────────────────
@@ -401,8 +432,17 @@ Score each criterion 0-10:
 IMPORTANT: Be strict. A score of 6/10 means "barely acceptable". 8+ means "good quality".
 If build FAILED, overall MUST be ≤3. If tests fail, overall MUST be ≤5.
 
-## Response Format (JSON only)
-{{"compilation": 0-10, "completeness": 0-10, "quality": 0-10, "tests": 0-10, "acceptance": 0-10, "overall": 0-10, "verdict": "APPROVE|RETRY|REJECT", "reason": "one sentence"}}
+## Response Format (XML only)
+<judge>
+  <compilation>0-10</compilation>
+  <completeness>0-10</completeness>
+  <quality>0-10</quality>
+  <tests>0-10</tests>
+  <acceptance>0-10</acceptance>
+  <overall>0-10</overall>
+  <verdict>APPROVE|RETRY|REJECT</verdict>
+  <reason>one sentence</reason>
+</judge>
 """
 
     llm = get_llm_client()
@@ -424,28 +464,34 @@ If build FAILED, overall MUST be ≤3. If tests fail, overall MUST be ≤5.
 
 
 def _parse_judge_response(content: str) -> tuple[float, str]:
-    """Parse judge LLM JSON response into (score, verdict)."""
-    import json
+    """Parse judge LLM response into (score, verdict), XML only."""
 
     # Strip markdown fences and thinking blocks
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
-    content = re.sub(r"```json\s*", "", content)
+    content = re.sub(r"```xml\s*", "", content)
     content = re.sub(r"```\s*", "", content)
     content = content.strip()
 
     try:
-        data = json.loads(content)
-        overall = float(data.get("overall", 5)) / 10.0
-        verdict = data.get("verdict", "RETRY")
-        reason = data.get("reason", "")
-        compilation = data.get("compilation", 5)
-        return overall, f"{verdict}: {reason} (compile={compilation}/10)"
-    except (json.JSONDecodeError, ValueError):
-        # Try to extract score from text
-        match = re.search(r'"overall"\s*:\s*(\d+)', content)
-        if match:
-            return float(match.group(1)) / 10.0, content[:200]
+        xml = content
+        m = re.search(r"<judge>.*?</judge>", xml, re.DOTALL)
+        if m:
+            xml = m.group(0)
+        root = ET.fromstring(xml)
+        if root.tag == "judge":
+            def _txt(tag: str, default: str = "") -> str:
+                n = root.find(tag)
+                return (n.text or "").strip() if n is not None and n.text else default
+
+            overall = float(_txt("overall", "5")) / 10.0
+            verdict = _txt("verdict", "RETRY")
+            reason = _txt("reason", "")
+            compilation = _txt("compilation", "5")
+            return overall, f"{verdict}: {reason} (compile={compilation}/10)"
+    except Exception:
         return 0.5, f"Judge parse error: {content[:200]}"
+
+    return 0.5, f"Judge parse error: {content[:200]}"
 
 
 def _list_deliverables(workspace: str) -> str:
@@ -487,6 +533,7 @@ async def pm_checkpoint(
     baseline_tests_passed: int = 0,
     target_tests_passed: int = 0,
     prior_anc_history: list[float] | None = None,
+    project_id: str = "",
 ) -> PMDecision:
     """PM checkpoint: collect evidence, run build gate, call judge, decide.
 
@@ -499,8 +546,6 @@ async def pm_checkpoint(
     6. Sprint count for retry awareness
     7. Prior feedback for learning across retries
     """
-    from ..llm.client import LLMMessage, get_llm_client
-
     # Step 1: Build gate (deterministic) — only for code-producing phases
     _BUILD_PHASE_KEYWORDS = ("dev", "sprint", "impl", "code", "fix", "tdd", "build", "cicd", "deploy")
     is_code_phase = any(
@@ -572,13 +617,20 @@ async def pm_checkpoint(
     if anc_score:
         direction = "improving" if anc_score.nc > 0 else "regressing" if anc_score.nc < 0 else "stable"
         anc_line = f"\nANC: {anc_score.anc:+.3f} (NC={anc_score.nc:+.3f}, {direction})"
+    ko_drift, missing_ko = _evaluate_ko_drift(
+        project_id=project_id,
+        evidence_text=f"{phase_output}\n{prior_feedback}",
+    )
+    ko_line = ""
+    if missing_ko:
+        ko_line = f"\nKO drift: missing mandatory constraints → {', '.join(missing_ko[:8])}"
     evidence_summary = (
         f"Build: {'PASS' if build_result.success else f'FAIL ({build_result.error_count} errors)'}\n"
         f"Judge: {quality_score:.1%} — {judge_verdict}\n"
         f"Pattern: {'success' if phase_success else 'failed'}\n"
         f"Adversarial rejections: {adversarial_rejections}\n"
         f"Sprint: {sprint_num}/{max_sprints}"
-        f"{test_line}{anc_line}"
+        f"{test_line}{anc_line}{ko_line}"
     )
 
     # Hard rules (deterministic, no LLM needed):
@@ -613,6 +665,20 @@ async def pm_checkpoint(
         return PMDecision(
             action="retry",
             reason=f"Test regression — ANC NC={anc_score.nc:+.3f} (tests went from {anc_score.baseline_passed} to {anc_score.current_passed}). Fix regressions before proceeding.",
+            build_result=build_result,
+            quality_score=quality_score,
+            evidence_summary=evidence_summary,
+            test_result=test_result,
+            anc_score=anc_score,
+        )
+
+    if ko_drift and sprint_num < max_sprints:
+        return PMDecision(
+            action="retry",
+            reason=(
+                "Mandatory knowledge constraints drifted — "
+                f"missing: {', '.join(missing_ko[:8])}"
+            ),
             build_result=build_result,
             quality_score=quality_score,
             evidence_summary=evidence_summary,

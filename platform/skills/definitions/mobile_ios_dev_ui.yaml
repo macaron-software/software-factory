@@ -41,7 +41,7 @@ tools:
   - code_edit
 
 llm:
-  model: MiniMax-M2.5
+  model: MiniMax-M2.7
   temperature: 0.6
   max_tokens: 8192
 

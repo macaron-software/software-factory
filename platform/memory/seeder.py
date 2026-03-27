@@ -33,7 +33,7 @@ _GLOBAL_SEEDS = [
     (
         "architecture",
         "llm-providers",
-        "Multi-provider: Azure OpenAI → MiniMax M2.5 → GLM-4.7 (fallback chain)",
+        "Multi-provider: Azure OpenAI → MiniMax-M2.7 → GLM-4.7 (fallback chain)",
         0.9,
     ),
     (

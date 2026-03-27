@@ -1,5 +1,4 @@
 """Code simplification endpoint — parallel 3-agent analysis of a git diff."""
-# Ref: feat-settings
 
 from __future__ import annotations
 
@@ -7,9 +6,8 @@ import asyncio
 import json
 import logging
 
-from fastapi import Depends,  APIRouter
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -96,7 +94,7 @@ async def _analyze_axis(diff: str, axis: str) -> list[dict]:
         return []
 
 
-@router.post("/api/simplify", dependencies=[Depends(require_auth())])
+@router.post("/api/simplify")
 async def simplify_code(request: dict):
     """Analyze a git diff with 3 parallel agents (reuse, quality, efficiency).
 

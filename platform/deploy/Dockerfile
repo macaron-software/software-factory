@@ -31,7 +31,7 @@ COPY mf_projects/ /app/mf_projects/
 COPY mcp_lrm/ /app/mcp_lrm/
 
 # Remove personal/local-only project configs (not deployed to Azure)
-RUN rm -f /app/projects/ppz.yaml /app/projects/psy.yaml \
+RUN rm -f /app/projects/saas.yaml /app/projects/psy.yaml \
           /app/projects/yolonow.yaml /app/projects/fervenza.yaml
 
 # Capture build info

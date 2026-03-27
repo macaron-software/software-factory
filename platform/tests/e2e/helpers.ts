@@ -90,6 +90,13 @@ export async function safeGoto(page: Page, path: string) {
  */
 export const SF_URL = process.env.BASE_URL || "http://localhost:8090";
 
+function cookieScope(hostname: string) {
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return { url: SF_URL };
+  }
+  return { domain: hostname, path: "/" };
+}
+
 /**
  * Ensure auth session is active. The storageState in playwright.config.ts pre-loads
  * the access_token cookie for all tests. This function is kept as a lightweight
@@ -97,16 +104,17 @@ export const SF_URL = process.env.BASE_URL || "http://localhost:8090";
  */
 export async function setupSession(page: Page) {
   const hostname = new URL(SF_URL).hostname;
-  // Ensure onboarding bypass cookie is present
-  const cookies = await page.context().cookies();
-  const hasOnboarding = cookies.some((c) => c.name === "onboarding_done");
+  const scope = cookieScope(hostname);
+  const scopedCookies = await page.context().cookies([SF_URL]);
+  // Ensure onboarding bypass cookie is present for the current base URL host
+  const hasOnboarding = scopedCookies.some((c) => c.name === "onboarding_done");
   if (!hasOnboarding) {
     await page.context().addCookies([
-      { name: "onboarding_done", value: "1", domain: hostname, path: "/" },
+      { name: "onboarding_done", value: "1", ...scope },
     ]);
   }
-  // Re-auth if access_token is missing (storageState expired or not loaded)
-  const hasAuth = cookies.some((c) => c.name === "access_token");
+  // Re-auth if access_token is missing for the current base URL host
+  const hasAuth = scopedCookies.some((c) => c.name === "access_token");
   if (!hasAuth) {
     await page.request.post(`${SF_URL}/api/auth/demo`);
   }

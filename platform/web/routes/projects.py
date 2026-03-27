@@ -1,5 +1,4 @@
 """Web routes — Project management routes."""
-# Ref: feat-projects, feat-backlog
 
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ import pty
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -22,7 +21,6 @@ from fastapi.responses import (
 
 from .helpers import _templates, _parse_body, _is_json_request
 from ..schemas import ProjectOut, OkResponse
-from ...auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -88,27 +86,49 @@ def _auto_git_init(project):
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
-    """Projects list — shell with skeleton; grid loaded via HTMX."""
+    """Projects list with search + type filter + pagination."""
+    from ...projects.manager import get_project_store
+
     q = request.query_params.get("q", "").strip()
     factory_type = request.query_params.get("type", "").strip()
     has_workspace = request.query_params.get("ws", "").strip()
+    try:
+        page = max(1, int(request.query_params.get("page", 1)))
+    except ValueError:
+        page = 1
+    per_page = 24
+    offset = (page - 1) * per_page
+
+    store = get_project_store()
+    projects, total = store.search(
+        q=q,
+        factory_type=factory_type,
+        has_workspace=has_workspace,
+        limit=per_page,
+        offset=offset,
+    )
+    total_pages = max(1, (total + per_page - 1) // per_page)
 
     return _templates(request).TemplateResponse(
         "projects.html",
         {
             "request": request,
             "page_title": "Projects",
+            "projects": [
+                {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
+                for p in projects
+            ],
             "q": q,
             "factory_type": factory_type,
             "has_workspace": has_workspace,
-            "total": 0,
-            "page": 1,
-            "total_pages": 1,
+            "page": page,
+            "total": total,
+            "total_pages": total_pages,
         },
     )
 
 
-@router.post("/api/projects/heal", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/heal")
 async def projects_heal():
     """Scaffold all projects: ensure workspace + git + docker + docs + code exist."""
     import asyncio
@@ -119,7 +139,7 @@ async def projects_heal():
     return result
 
 
-@router.post("/api/projects/{project_id}/phase", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/phase")
 async def project_set_phase(project_id: str, request: Request):
     """Set the current phase of a project (triggers mission status update).
     Accepts ?force=true to bypass gate check."""
@@ -295,7 +315,7 @@ async def project_missions_suggest(project_id: str):
     )
 
 
-@router.post("/api/projects/{project_id}/scaffold", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/scaffold")
 async def project_scaffold(project_id: str):
     """Scaffold a single project (idempotent)."""
     import asyncio
@@ -433,163 +453,6 @@ async def project_hub(request: Request, project_id: str):
                 "active": active_count,
                 "completed": completed_count,
                 "blocked": blocked_count,
-            },
-        },
-    )
-
-
-@router.get("/projects/{project_id}/product", response_class=HTMLResponse)
-async def project_product(request: Request, project_id: str):
-    """Product View — product-centric view with personas, journeys, features, traceability."""
-    from ...projects.manager import get_project_store
-    from ...missions.store import get_mission_store
-    from ...agents.store import get_agent_store
-    from ...memory.project_files import get_project_memory
-    from ...traceability.artifacts import get_ac_store, get_journey_store
-
-    ps = get_project_store()
-    project = ps.get(project_id)
-    if not project:
-        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
-
-    ms = get_mission_store()
-    all_m = ms.list_missions(limit=500)
-    proj_m = [m for m in all_m if m.project_id == project_id]
-
-    # Stats
-    active_count = sum(1 for m in proj_m if m.status == "active")
-    completed_count = sum(1 for m in proj_m if m.status == "completed")
-    blocked_count = sum(1 for m in proj_m if m.status == "blocked")
-    total = len(proj_m) or 1
-    health = max(0, min(100, int(
-        (active_count / total) * 40 + (completed_count / total) * 50
-        - (blocked_count / total) * 30
-        + (20 if project.exists else 0) + (10 if project.has_git else 0)
-    )))
-
-    # Personas
-    config = project.config if isinstance(project.config, dict) else {}
-    personas = config.get("personas", []) or []
-
-    # Journeys — from DB table (UUID-tagged)
-    journey_store = get_journey_store()
-    journeys_db = journey_store.list_by_project(project_id)
-    journeys = [
-        {"id": j.id, "title": j.title, "persona_id": j.persona_id,
-         "description": j.description, "steps": j.steps,
-         "pain_points": j.pain_points, "opportunities": j.opportunities,
-         "status": j.status}
-        for j in journeys_db
-    ]
-    # Migrate legacy config journeys if DB empty but config has them
-    config_journeys = config.get("journeys", []) or []
-    if not journeys and config_journeys:
-        journey_store.migrate_from_config(project_id, config_journeys)
-        journeys_db = journey_store.list_by_project(project_id)
-        journeys = [
-            {"id": j.id, "title": j.title, "persona_id": j.persona_id,
-             "description": j.description, "steps": j.steps,
-             "pain_points": j.pain_points, "opportunities": j.opportunities,
-             "status": j.status}
-            for j in journeys_db
-        ]
-
-    # Features from SAFe backlog
-    features = []
-    feature_ids = []
-    try:
-        from ...missions.product import ProductBacklog
-        pb = ProductBacklog()
-        # Get features for all project epics
-        for m in proj_m:
-            for feat in pb.list_features(m.id):
-                features.append({
-                    "id": feat.id,
-                    "name": feat.name,
-                    "epic_name": m.name,
-                    "priority": feat.priority,
-                    "status": feat.status,
-                    "story_points": feat.story_points,
-                    "stories_count": len(pb.list_stories(feat.id)),
-                })
-                feature_ids.append(feat.id)
-    except Exception:
-        pass
-
-    # AC coverage from DB (UUID-tagged)
-    ac_store = get_ac_store()
-    ac_coverage = ac_store.coverage_summary(feature_ids) if feature_ids else {
-        "total_ac": 0, "passed": 0, "failed": 0, "pending": 0, "coverage_pct": 0,
-    }
-
-    # Architecture docs from memory
-    arch_docs = []
-    memory_files = []
-    try:
-        pmem = get_project_memory(project_id, project.path or "")
-        for mf in pmem.files:
-            entry = {"path": mf.path, "label": mf.label, "content": mf.content, "size": mf.size}
-            memory_files.append(entry)
-            low = mf.path.lower()
-            if any(kw in low for kw in ("arch", "adr", "design", "infra", "stack")):
-                arch_docs.append(entry)
-    except Exception:
-        pass
-
-    # Traceability matrix with AC coverage per feature
-    traceability = {
-        "features_total": len(features),
-        "features_with_code": sum(1 for f in features if f.get("status") not in ("backlog", "new")),
-        "features_with_tests": sum(1 for f in features if f.get("stories_count", 0) > 0),
-        "ac_total": ac_coverage["total_ac"],
-        "ac_passed": ac_coverage["passed"],
-        "ac_coverage_pct": ac_coverage["coverage_pct"],
-        "code_pct": round(sum(1 for f in features if f.get("status") not in ("backlog", "new")) / max(len(features), 1) * 100),
-        "test_pct": round(sum(1 for f in features if f.get("stories_count", 0) > 0) / max(len(features), 1) * 100),
-        "matrix": [],
-    }
-    for f in features[:30]:
-        fid = f.get("id", "")
-        f_ac = ac_store.coverage_by_feature(fid) if fid else {"total": 0, "passed": 0, "coverage_pct": 0}
-        traceability["matrix"].append({
-            "feature": f["name"],
-            "feature_id": fid,
-            "stories": f.get("stories_count", 0),
-            "ac_total": f_ac["total"],
-            "ac_passed": f_ac["passed"],
-            "ac_pct": f_ac["coverage_pct"],
-            "status": f.get("status", "—"),
-        })
-
-    # PO agent
-    po_agent = None
-    if project.lead_agent_id:
-        try:
-            po_agent = get_agent_store().get(project.lead_agent_id)
-        except Exception:
-            pass
-
-    return _templates(request).TemplateResponse(
-        "project_product.html",
-        {
-            "request": request,
-            "page_title": f"{project.name} — Produit",
-            "project": project,
-            "personas": personas,
-            "journeys": journeys,
-            "features": features,
-            "arch_docs": arch_docs,
-            "traceability": traceability,
-            "memory_files": memory_files,
-            "po_agent": po_agent,
-            "health": health,
-            "stats": {
-                "total": len(proj_m),
-                "personas": len(personas),
-                "journeys": len(journeys),
-                "features": len(features),
-                "memory_files": len(memory_files),
-                "ac_total": ac_coverage["total_ac"],
             },
         },
     )
@@ -1082,16 +945,13 @@ async def api_projects():
                 "status": p.status,
                 "has_vision": bool(p.vision),
                 "values": p.values,
-                "git_url": p.git_url,
-                "agents": p.agents,
-                "container_url": p.container_url or "",
             }
             for p in store.list_all()
         ]
     )
 
 
-@router.post("/api/projects", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth())])
+@router.post("/api/projects", responses={200: {"model": OkResponse}})
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project
@@ -1117,22 +977,6 @@ async def create_project(request: Request):
     # Auto-load vision
     if p.exists:
         p.vision = p.load_vision_from_file()
-
-    # Fuzzy dedup: reject if a project with very similar name+description exists
-    from difflib import SequenceMatcher
-    existing_projects = store.list_all()
-    _new_sig = f"{p.name.lower().strip()} {p.description.lower().strip()[:100]}"
-    for _ep in existing_projects:
-        _ex_sig = f"{_ep.name.lower().strip()} {(_ep.description or '').lower().strip()[:100]}"
-        _sim = SequenceMatcher(None, _new_sig, _ex_sig).ratio()
-        if _sim >= 0.80 and _ep.id != p.id:
-            if _is_json_request(request):
-                return JSONResponse(
-                    {"error": f"Project too similar to existing '{_ep.name}' (id={_ep.id}, similarity={_sim:.0%}). Use that project or choose a distinct name."},
-                    status_code=409,
-                )
-            return RedirectResponse(f"/projects/{_ep.id}?warn=duplicate", status_code=303)
-
     store.create(p)
 
     # Auto-provision TMA, Security, Tech Debt missions
@@ -1159,7 +1003,7 @@ async def create_project(request: Request):
     return RedirectResponse(f"/projects/{p.id}", status_code=303)
 
 
-@router.post("/api/projects/{project_id}/vision", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/vision")
 async def update_vision(request: Request, project_id: str):
     """Update project vision."""
     from ...projects.manager import get_project_store
@@ -1170,7 +1014,7 @@ async def update_vision(request: Request, project_id: str):
     return HTMLResponse('<span class="badge badge-green">Saved</span>')
 
 
-@router.post("/api/projects/{project_id}/chat", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/chat")
 async def project_chat(request: Request, project_id: str):
     """Quick chat with a project's lead agent — creates or reuses session."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -1281,7 +1125,7 @@ async def project_chat(request: Request, project_id: str):
 # ── Conversation Management ──────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/conversations", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/conversations")
 async def create_conversation(request: Request, project_id: str):
     """Create a new conversation session for a project."""
     from ...sessions.store import get_session_store, SessionDef
@@ -1318,7 +1162,7 @@ async def create_conversation(request: Request, project_id: str):
 # ── Streaming Chat (SSE) ────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/chat/stream", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/chat/stream")
 async def project_chat_stream(request: Request, project_id: str):
     """Stream agent response via SSE — shows live progress to the user."""
     from ...sessions.store import get_session_store, SessionDef, MessageDef
@@ -2255,7 +2099,7 @@ async def ws_read_file(project_id: str, path: str):
     return JSONResponse({"content": content, "path": path})
 
 
-@router.post("/api/projects/{project_id}/workspace/file/save", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/file/save")
 async def ws_save_file(project_id: str, request: Request):
     """Save file content (write to disk)."""
     from ...projects.manager import get_project_store
@@ -2426,7 +2270,7 @@ async def ws_docker_status(project_id: str):
     return JSONResponse({"containers": containers, "docker_files": docker_files})
 
 
-@router.post("/api/projects/{project_id}/workspace/docker/{action}", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/docker/{action}")
 async def ws_docker_action(project_id: str, action: str, request: Request):
     """Perform docker action: start / stop / rebuild / compose_up."""
     import shutil
@@ -2548,7 +2392,7 @@ async def ws_git(project_id: str):
     return JSONResponse({"commits": commits, "changes": changes, "branch": branch})
 
 
-@router.post("/api/projects/{project_id}/workspace/git/commit", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/git/commit")
 async def ws_git_commit(project_id: str, request: Request):
     """Run git commit (and optionally push) in project directory."""
     import subprocess
@@ -2673,7 +2517,7 @@ async def ws_db_list(project_id: str):
     return JSONResponse({"files": files})
 
 
-@router.post("/api/projects/{project_id}/workspace/db/query", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/db/query")
 async def ws_db_query(project_id: str, request: Request):
     """Execute a SELECT query on a SQLite database file."""
     import sqlite3
@@ -2820,7 +2664,7 @@ async def ws_get_secrets(project_id: str):
     return JSONResponse({"files": files})
 
 
-@router.post("/api/projects/{project_id}/workspace/secrets/save", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/secrets/save")
 async def ws_save_secrets(project_id: str, request: Request):
     """Save .env file with updated KEY=VALUE pairs."""
     from ...projects.manager import get_project_store
@@ -2862,7 +2706,7 @@ async def ws_save_secrets(project_id: str, request: Request):
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/projects/{project_id}/workspace/dbgate/configure", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/dbgate/configure")
 async def ws_dbgate_configure(project_id: str):
     """Auto-configure DbGate connections from project .env files."""
     import httpx
@@ -3264,7 +3108,7 @@ async def project_export(project_id: str):
     )
 
 
-@router.post("/api/projects/import", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/import")
 async def project_import(request: Request):
     """Import a project from a ZIP archive (previously exported)."""
     import io
@@ -3515,7 +3359,7 @@ async def ws_packages(project_id: str, request: Request):
     )
 
 
-@router.post("/api/projects/{project_id}/workspace/packages/install", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/packages/install")
 async def ws_packages_install(project_id: str, request: Request):
     """Install a package or run the full install command. Returns SSE stream."""
     from ...auth.middleware import get_current_user
@@ -3702,7 +3546,7 @@ async def ws_get_branches(project_id: str, request: Request):
         return JSONResponse({"branches": [], "current": "main", "error": str(exc)})
 
 
-@router.post("/api/projects/{project_id}/workspace/checkout", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/checkout")
 async def ws_checkout_branch(project_id: str, request: Request):
     """Checkout a branch in the project."""
     import subprocess
@@ -3733,7 +3577,7 @@ async def ws_checkout_branch(project_id: str, request: Request):
 # ── Workspace: GitHub import ──────────────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/workspace/import-git", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/import-git")
 async def ws_import_git(project_id: str, request: Request):
     """Clone a GitHub/GitLab repo into the project workspace (SSE stream)."""
     import subprocess
@@ -3786,7 +3630,7 @@ async def ws_import_git(project_id: str, request: Request):
 # ── Workspace: AI Chat ────────────────────────────────────────────────────────
 
 
-@router.post("/api/projects/{project_id}/workspace/chat", dependencies=[Depends(require_auth())])
+@router.post("/api/projects/{project_id}/workspace/chat")
 async def ws_workspace_chat(project_id: str, request: Request):
     """AI chat for the workspace — streaming SSE."""
     from ...projects.manager import get_project_store
@@ -3938,50 +3782,3 @@ async def ws_deploy_logs(project_id: str, request: Request):
         yield f"data: {json.dumps({'line': '[FIN DU STREAM]', 'src': 'system'})}\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
-
-
-# ── Compliance Audit ─────────────────────────────────────────────
-
-
-@router.post("/api/projects/{project_id}/audit")
-async def api_start_audit(project_id: str, request: Request):
-    """Start a compliance audit on a project. Returns report immediately."""
-    from ...ops.project_audit import run_audit
-
-    # Determine workspace
-    from ...projects.manager import get_project_store
-    store = get_project_store()
-    proj = store.get(project_id)
-    workspace = ""
-    if proj:
-        workspace = getattr(proj, "workspace", "") or getattr(proj, "path", "")
-    if not workspace:
-        workspace = os.getcwd()
-
-    user = "system"
-    u = getattr(request.state, "user", None)
-    if u:
-        user = getattr(u, "email", "system")
-
-    report = await run_audit(project_id, workspace, user)
-    return JSONResponse(report.to_dict())
-
-
-@router.get("/api/projects/{project_id}/audit/report")
-async def api_audit_report(project_id: str):
-    """Get latest audit report for a project."""
-    from ...ops.project_audit import get_latest_report
-
-    report = await get_latest_report(project_id)
-    if not report:
-        return JSONResponse({"error": "No audit report found"}, status_code=404)
-    return JSONResponse(report)
-
-
-@router.get("/api/projects/{project_id}/audit/history")
-async def api_audit_history(project_id: str, limit: int = 10):
-    """Get audit history for a project."""
-    from ...ops.project_audit import get_audit_history
-
-    history = await get_audit_history(project_id, limit)
-    return JSONResponse({"history": history})

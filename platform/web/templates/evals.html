@@ -1,7 +1,5 @@
-<!-- Ref: feat-evals -->
 {% extends "base.html" %}
 {% block content %}
-{% from "partials/skeleton.html" import skeleton_block, skeleton_table %}
 <style>
 .evals-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; height: calc(100vh - 80px); }
 .evals-sidebar { background: var(--bg-secondary); border-radius: 10px; padding: 14px; overflow-y: auto; border: 1px solid var(--border); }
@@ -38,9 +36,7 @@ textarea.form-input { font-family: monospace; font-size: 0.8rem; resize: vertica
   <!-- Sidebar datasets -->
   <div class="evals-sidebar">
     <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Datasets</div>
-    <div id="datasets-list">
-        {{ skeleton_block(5) }}
-    </div>
+    <div id="datasets-list"></div>
   </div>
 
   <!-- Main panel -->
@@ -99,9 +95,7 @@ textarea.form-input { font-family: monospace; font-size: 0.8rem; resize: vertica
       <h3>Historique des Runs</h3>
       <table class="runs-table">
         <thead><tr><th>ID</th><th>Dataset</th><th>Agent</th><th>Status</th><th>Score</th><th>Date</th><th></th></tr></thead>
-        <tbody id="runs-tbody">
-          <tr><td colspan="7">{{ skeleton_table(4, 7) }}</td></tr>
-        </tbody>
+        <tbody id="runs-tbody"></tbody>
       </table>
     </div>
 

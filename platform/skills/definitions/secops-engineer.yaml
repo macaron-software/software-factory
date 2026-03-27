@@ -77,10 +77,10 @@ tools:
   - chaos_test
 
 llm:
-  model: MiniMax-M2.5
+  model: MiniMax-M2.7
   temperature: 0.2
   max_tokens: 6000
-  fallback_model: MiniMax-M2.5-mini
+  fallback_model: MiniMax-M2.7-mini
 
 permissions:
   can_veto: false

@@ -77,7 +77,7 @@ llm:
   model: gpt-5.1
   temperature: 0.5
   max_tokens: 8000
-  fallback_model: MiniMax-M2.5
+  fallback_model: MiniMax-M2.7
 
 permissions:
   can_veto: true

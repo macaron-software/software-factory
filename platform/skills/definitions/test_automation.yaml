@@ -50,10 +50,10 @@ tools:
   - git_commit
 
 llm:
-  model: MiniMax-M2.5
+  model: MiniMax-M2.7
   temperature: 0.3
   max_tokens: 8000
-  fallback_model: MiniMax-M2.5-mini
+  fallback_model: MiniMax-M2.7-mini
 
 permissions:
   can_veto: true

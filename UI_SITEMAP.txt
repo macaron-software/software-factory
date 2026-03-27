@@ -1,0 +1,447 @@
+════════════════════════════════════════════════════════════════════════════════
+                    🗺️  APPLICATION SITEMAP & NAVIGATION TREE
+════════════════════════════════════════════════════════════════════════════════
+
+ROOT LEVEL
+──────────
+
+  /login              Login page (login.html)
+  /setup              Initial setup (setup.html)
+  /privacy            Privacy policy (privacy.html)
+  /onboarding         Onboarding flow (onboarding.html)
+
+AUTHENTICATED USERS
+───────────────────
+
+  /                   Home/Dashboard (home.html)
+
+
+FULL UI MODE (11+ pages based on role)
+──────────────────────────────────────
+
+  /cockpit
+    ├─ Section 1: Pipeline Value Stream
+    ├─ Section 2: Infrastructure
+    ├─ Section 3: Projects + Activity Feed
+    ├─ Section 4: Architecture interne SF
+    ├─ Section 5: Agents/Skills/Tools/Teams/Workflows/Workspace
+    ├─ Section 6: Integrations (6 boxes)
+    ├─ Section 7: Continuous Improvement (5 pilot projects)
+    ├─ Section 8: Self-Healing
+    ├─ Section 9: Patterns Catalogue
+    ├─ Section 10: Memory Architecture
+    ├─ Section 11: Security & Isolation
+    ├─ Section 12: Engineering Concepts
+    └─ Section 13: KPIs
+
+  /portfolio          Portfolio dashboard (portfolio.html)
+  
+  /backlog?tab=       Product backlog (backlog.html)
+    ├─ Backlog tab
+    ├─ Ideation tab
+    └─ Product tab
+  
+  /pi                 PI (Program Increment) board (pi_board.html)
+  
+  /workflows          Workflow templates & patterns (workflows.html)
+    ├─ Tab: templates (default)
+    ├─ GET /workflows/list
+    ├─ GET /workflows/evolution
+    ├─ GET /workflows/improvement (Continuous Improvement)
+    │   └─ GET /workflows/improvement/cycles/{project_id}
+    └─ POST /api/improvement/* (8 improvement cycle APIs)
+
+
+PROJECTS MANAGEMENT
+──────────────────
+
+  /projects           Projects list (projects.html)
+    ├─ Grid view
+    └─ API: GET /api/projects
+
+  /projects/{id}/hub              Project hub (project_hub.html)
+  /projects/{id}/detail           Project detail (project_detail.html)
+  /projects/{id}                  Project page (project_detail.html)
+  /projects/{id}/board            Project board (project_board_page.html)
+  /projects/{id}/overview         Project overview (project_overview.html)
+  /projects/{id}/product          Project product view (project_product.html)
+  
+  /projects/{id}/workspace        Project workspace - IDE-like environment
+                                  (project_workspace.html)
+    ├─ File browser
+    ├─ Code editor (CodeMirror)
+    ├─ Terminal
+    └─ APIs:
+        ├─ GET /api/projects/{id}/workspace/files
+        ├─ GET /api/projects/{id}/workspace/file
+        ├─ POST /api/projects/{id}/workspace/file/save
+        ├─ GET /api/projects/{id}/workspace/diff
+        ├─ GET /api/projects/{id}/workspace/metrics
+        ├─ GET /api/projects/{id}/workspace/progress
+        ├─ GET /api/projects/{id}/workspace/messages
+        ├─ GET /api/projects/{id}/workspace/live
+        ├─ GET /api/projects/{id}/workspace/tool-calls
+        ├─ GET /api/projects/{id}/workspace/run
+        └─ GET /api/projects/{id}/workspace/docker
+
+  Project Management APIs:
+    ├─ GET /api/projects (JSON)
+    ├─ POST /api/projects (create)
+    ├─ GET /api/projects/{id}/phase
+    ├─ POST /api/projects/{id}/phase (set phase)
+    ├─ GET /api/projects/{id}/gate
+    ├─ GET /api/projects/{id}/health
+    ├─ GET /api/projects/{id}/missions/suggest
+    ├─ POST /api/projects/{id}/scaffold
+    ├─ GET /api/projects/{id}/git-status
+    ├─ POST /api/projects/{id}/vision
+    ├─ POST /api/projects/{id}/chat (chat endpoint)
+    ├─ POST /api/projects/{id}/conversations
+    └─ POST /api/projects/{id}/chat/stream (streaming chat)
+
+  Screen & Annotation Management:
+    ├─ POST /api/projects/{id}/wireframe (create wireframe)
+    ├─ GET /api/projects/{id}/screens (list screens)
+    ├─ GET /api/projects/{id}/screens/{screen_id}/svg
+    ├─ DELETE /api/projects/{id}/screens/{screen_id}
+    ├─ GET /api/projects/{id}/annotations (list)
+    ├─ POST /api/projects/{id}/annotations (create)
+    ├─ PATCH /api/projects/{id}/annotations/{ann_id}
+    ├─ DELETE /api/projects/{id}/annotations/{ann_id}
+    ├─ GET /api/projects/{id}/annotations/export
+    └─ POST /api/projects/{id}/annotations/fix-all
+
+
+SESSIONS & AGENT CHAT
+────────────────────
+
+  /sessions           Sessions list (sessions.html)
+  /sessions/new       Create session (new_session.html)
+  /sessions/{id}      Session detail page
+  /sessions/{id}/live Session live view (session_live.html)
+  
+  Session APIs:
+    ├─ POST /api/sessions (create)
+    ├─ GET /api/sessions/{id}/messages
+    ├─ POST /api/sessions/{id}/messages (send message)
+    ├─ GET /api/sessions/{id}/messages/json
+    ├─ POST /api/sessions/{id}/stop
+    ├─ POST /api/sessions/{id}/resume
+    ├─ POST /api/sessions/{id}/run-pattern
+    ├─ DELETE /api/sessions/{id}
+    ├─ POST /api/sessions/{id}/agents/start
+    ├─ POST /api/sessions/{id}/agents/stop
+    ├─ POST /api/sessions/{id}/agents/{agent_id}/message
+    ├─ POST /api/sessions/{id}/conversation
+    ├─ GET /api/sessions/{id}/checkpoints
+    ├─ GET /api/sessions/{id}/sse
+    ├─ GET /api/sessions/{id}/stream
+    └─ GET /api/sessions/{session_id}/stream
+
+
+AGENTS, PATTERNS, SKILLS
+────────────────────────
+
+  /agents             Agents list (agents.html)
+  /agents/new         Create agent (agent_new.html)
+  /agents/{id}/edit   Edit agent (agent_edit.html)
+  
+  Agent APIs:
+    ├─ GET /api/agents (JSON)
+    ├─ POST /api/agents (create)
+    ├─ POST /api/agents/{id} (update)
+    ├─ DELETE /api/agents/{id}
+    └─ GET /api/agents/{id}/details (JSON)
+
+  /patterns           Patterns library (patterns.html)
+  /patterns/list      Pattern list view (patterns_list.html)
+  /patterns/new       Create pattern (pattern_new.html)
+  /patterns/{id}/edit Edit pattern (pattern_edit.html)
+  
+  Pattern APIs:
+    ├─ POST /api/patterns (create)
+    ├─ POST /api/patterns/{id} (update)
+    ├─ DELETE /api/patterns/{id}
+    ├─ POST /api/patterns/recommend
+    └─ GET /api/analytics/patterns/ab
+
+  /skills             Skills directory (skills.html)
+  /skills/{id}        Skill detail (skill_detail.html)
+  
+  Skill APIs:
+    ├─ GET /api/llm/providers
+    ├─ POST /api/skills/reload
+    ├─ POST /api/admin/skills/update
+    ├─ POST /api/skills/github/add
+    ├─ POST /api/skills/github/sync
+    ├─ POST /api/skills/github/remove
+    ├─ GET /api/skills/stocktake
+    ├─ GET /api/skills/eval (coverage)
+    ├─ GET /api/skills/list
+    ├─ GET /api/skills/eval/{skill_name}
+    └─ POST /api/skills/eval/{skill_name}/run
+
+  /mcps               MCP Servers (mcps.html)
+  
+  MCP APIs:
+    ├─ POST /api/mcps/{id}/start
+    ├─ POST /api/mcps/{id}/stop
+    ├─ POST /api/mcps/{id}/test
+    ├─ POST /api/mcps/{id}/call
+    └─ GET /api/mcps/status
+
+  /org                Organization tree (org.html)
+  
+  Org API:
+    └─ GET /api/org/tree
+
+
+TEAMS & ORGANIZATION
+───────────────────
+
+  /art                ART/Teams view (teams.html)
+  /teams              Teams analytics (teams.html)
+  /teams/partial      Teams snippet (_partial_teams.html)
+  
+  Team APIs:
+    ├─ GET /api/teams (all teams)
+    ├─ GET /api/teams/export
+    ├─ POST /api/teams/import
+    ├─ GET /api/teams/contexts
+    ├─ GET /api/teams/leaderboard
+    ├─ POST /api/teams/{agent_id}/{pattern_id}/retire
+    ├─ POST /api/teams/{agent_id}/{pattern_id}/unretire
+    ├─ GET /api/teams/okr
+    ├─ POST /api/teams/okr/refresh
+    ├─ PUT /api/teams/okr/{okr_id}
+    ├─ GET /api/teams/evolution
+    ├─ GET /api/teams/selections
+    ├─ GET /api/teams/ab-tests
+    ├─ GET /api/teams/llm-leaderboard
+    └─ GET /api/teams/llm-ab-tests
+
+
+METRICS & ANALYTICS
+──────────────────
+
+  /metrics            Metrics dashboard (metrics.html)
+  
+  Metrics Tabs (via HTMX):
+    ├─ GET /metrics/tab/dora          (_partial_dora.html)
+    ├─ GET /metrics/tab/quality       (_partial_quality.html)
+    ├─ GET /metrics/tab/analytics     (_partial_analytics.html)
+    ├─ GET /metrics/tab/monitoring    (_partial_monitoring.html)
+    ├─ GET /metrics/tab/pipeline      (_partial_pipeline.html)
+    ├─ GET /metrics/tab/knowledge     (_partial_knowledge.html)
+    └─ GET /metrics/tab/ops           (_partial_ops.html)
+
+  Metrics APIs:
+    ├─ GET /api/metrics/dora/{project_id}
+    ├─ GET /api/metrics/prometheus
+    ├─ GET /api/metrics/burndown/{epic_id}
+    ├─ POST /api/quality/scan/{project_id}
+    ├─ GET /api/version
+    └─ GET /api/metrics/load
+
+
+BUSINESS VIEWS
+──────────────
+
+  /portfolio          Portfolio dashboard (portfolio.html)
+  /dsi                DSI board (dsi.html)
+  /dsi_workflow       DSI workflow (dsi_workflow.html)
+  /metier             Métier/Business view (metier.html)
+  /product            Product view (product.html)
+  /product_line       Product line (product_line.html)
+  /mercato            Market view (mercato.html)
+
+
+IDEATION & INNOVATION
+─────────────────────
+
+  /ideation           Ideation workspace (ideation.html)
+  /ideation/history   Idea history (ideation_history.html)
+  /group_ideation     Group brainstorming (group_ideation.html)
+  /mkt_ideation       Market ideation (mkt_ideation.html)
+  /generate           Content generation (generate.html)
+  /marketplace        Skills marketplace (marketplace.html)
+
+
+MISSION CONTROL
+───────────────
+
+  /missions           Missions list (missions.html)
+  /mission_control    Mission control panel (mission_control.html)
+  /mission_control_list Mission list (mission_control_list.html)
+  /mission_detail     Mission detail (mission_detail.html)
+  /mission_start      Start mission (mission_start.html)
+  /mission_replay     Replay mission (mission_replay.html)
+  
+  Dashboard APIs:
+    ├─ GET /api/dashboard/kpis
+    ├─ GET /api/dashboard/missions
+    ├─ GET /api/dashboard/features
+    ├─ GET /api/dashboard/sprints
+    ├─ GET /api/dashboard/backlog
+    ├─ GET /api/dashboard/projects
+    ├─ GET /api/dashboard/quality
+    └─ GET /api/dashboard/activity
+
+
+QUALITY & MONITORING
+───────────────────
+
+  /quality            Quality metrics (quality.html)
+  /monitoring         System monitoring (monitoring.html)
+  /ops                Operations view (ops.html)
+  /evals              Evaluations (evals.html)
+  /memory             Memory management (memory.html)
+  /dora_dashboard     DORA metrics (dora_dashboard.html)
+  
+  Quality APIs:
+    ├─ GET /api/quality/{project_id}
+    ├─ GET /api/quality
+    ├─ GET /api/quality/{project_id}
+    ├─ GET /api/dashboard/quality-badge
+    └─ GET /api/dashboard/quality-mission
+  
+  Memory APIs:
+    ├─ GET /api/memory/vector/search
+    ├─ GET /api/memory/vector/stats
+    ├─ GET /api/memory/project/{project_id}
+    ├─ POST /api/memory/project/{project_id}
+    ├─ GET /api/memory/global
+    ├─ POST /api/memory/global
+    ├─ GET /api/memory/search
+    ├─ GET /api/memory/stats
+    ├─ GET /api/memory/health
+    ├─ POST /api/memory/ingest
+    ├─ GET /api/memory/query
+    └─ POST /api/memory/compact
+
+
+ADMIN & CONFIGURATION
+────────────────────
+
+  /rbac               RBAC management (rbac.html)
+  /admin_users        User administration (admin_users.html)
+  /settings           System settings (settings.html)
+  /notifications      Notifications center (notifications.html)
+  /tool_builder       Custom tool builder (tool_builder.html)
+  /toolbox            Toolbox (toolbox.html)
+  
+  Admin APIs:
+    ├─ POST /api/admin/reload-agents
+    ├─ POST /api/admin/skills/update
+    ├─ POST /api/ops/cleanup-phantom-runs
+    ├─ GET /api/settings/rate-limits
+    ├─ PUT /api/settings/rate-limits
+    ├─ GET /api/settings/quality
+    ├─ PUT /api/settings/quality
+    ├─ GET /api/settings/general
+    ├─ POST /api/settings/general
+    └─ More...
+
+  Auth Routes:
+    ├─ POST /api/auth/login
+    ├─ POST /api/auth/register
+    ├─ POST /api/auth/refresh
+    ├─ POST /api/auth/logout
+    ├─ GET /api/auth/me
+    ├─ GET /api/auth/list-users
+    ├─ GET /api/auth/users/{id}
+    ├─ POST /api/auth/users/{id}
+    ├─ DELETE /api/auth/users/{id}
+    ├─ POST /api/auth/forgot-password
+    ├─ POST /api/auth/verify-reset
+    ├─ POST /api/auth/reset-password
+    ├─ POST /api/auth/export-data
+    └─ DELETE /api/auth/delete-account
+
+  RBAC APIs:
+    ├─ GET /api/rbac/agent/{agent_id}
+    ├─ GET /api/rbac/check
+    ├─ GET /api/permissions/denials
+    └─ GET /api/permissions/stats
+
+
+SYSTEM & MONITORING
+──────────────────
+
+  Health & Status APIs:
+    ├─ GET /api/health
+    ├─ GET /api/ready
+    ├─ GET /api/health/modules
+    ├─ GET /api/cluster/nodes
+    ├─ POST /api/cluster/heartbeat
+    ├─ GET /api/cluster/nodes-badge
+    ├─ GET /api/sandbox/status
+    ├─ GET /api/watchdog/metrics
+    ├─ GET /api/monitoring/live
+    └─ POST /api/ops/cleanup-phantom-runs
+
+  Incident Management:
+    ├─ GET /api/incidents/stats
+    ├─ GET /api/incidents
+    ├─ POST /api/incidents
+    ├─ PATCH /api/incidents/{id}
+    ├─ GET /api/autoheal/stats
+    ├─ GET /api/autoheal/heartbeat
+    ├─ POST /api/autoheal/trigger
+    ├─ GET /api/chaos/history
+    └─ POST /api/chaos/trigger
+
+  Hooks & Integrations:
+    ├─ GET /api/hooks
+    ├─ GET /api/hooks/types
+    ├─ GET /api/hooks/log
+    ├─ POST /api/hooks
+    ├─ PATCH /api/hooks/{id}/toggle
+    ├─ DELETE /api/hooks/{id}
+    ├─ GET /api/integrations
+    ├─ PATCH /api/integrations/{id}
+    ├─ POST /api/integrations/{id}/test
+    └─ More...
+
+  LLM APIs:
+    ├─ GET /api/llm/stats
+    ├─ GET /api/llm/traces
+    ├─ GET /api/llm/usage
+    ├─ GET /api/llm/routing
+    ├─ POST /api/llm/routing
+    ├─ POST /api/llm/routing/reset
+    ├─ POST /api/llm/providers/{id}/toggle
+    ├─ GET /api/llm/providers/{id}/models
+    ├─ POST /api/llm/local/ensure
+    └─ GET /api/tools/thompson
+
+
+UTILITIES
+────────
+
+  /design_system      Design system showcase (design_system.html)
+  /ac                 Automation center (ac.html)
+  /annotate           Annotation tool (annotate.html)
+  /bricks             Component library (bricks.html)
+  /ceremonies         Agile ceremonies (ceremonies.html)
+  /workspace          Workspace view (workspace.html)
+  /workspaces         All workspaces (workspaces.html)
+  /conversation       Conversation view (conversation.html)
+
+  Other APIs:
+    ├─ GET /api/workspaces
+    ├─ GET /api/search
+    ├─ POST /api/retrospectives/generate
+    ├─ GET /api/retrospectives
+    ├─ GET /api/projects/{id}/si-blueprint
+    ├─ PUT /api/projects/{id}/si-blueprint
+    ├─ GET /api/set-lang/{lang}
+    ├─ GET /api/i18n/{lang}.json
+    ├─ POST /api/perspective
+    ├─ GET /api/perspective
+    ├─ GET /api/reactions/stats
+    ├─ GET /api/reactions/history
+    └─ More specialized endpoints...
+
+
+════════════════════════════════════════════════════════════════════════════════

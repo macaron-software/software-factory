@@ -500,7 +500,6 @@ async def ideation_create_epic(request: Request):
     # ── Step 2 & 3: Create project or use existing ──
     existing_project_id = data.get("project_id", "").strip()
     project_store = get_project_store()
-    stack = proj_data.get("stack", [])  # init early — used in both branches + after try/except
 
     if existing_project_id:
         # Use existing project
@@ -511,10 +510,7 @@ async def ideation_create_epic(request: Request):
     else:
         # Create new project directory + git init
         project_id = proj_data.get("id", "new-project")
-        # Use DATA_DIR/workspaces/ for project paths (FACTORY_ROOT.parent = / in Docker)
-        from ...config import DATA_DIR
-        _ws_dir = DATA_DIR / "workspaces"
-        project_path = str(_ws_dir / project_id)
+        project_path = str(FACTORY_ROOT.parent / project_id)
         proj_dir = Path(project_path)
         vision_content = ""
 
@@ -843,7 +839,7 @@ async def ideation_create_epic(request: Request):
                 f"Goal: {mission.goal or mission.description}\n"
                 f"Stack: {', '.join(stack)}\n"
                 f"Features: {', '.join(f.get('name', '') for f in features_data)}\n"
-                f"Répertoire projet: {project_path}"
+                f"Répertoire projet: {str(FACTORY_ROOT.parent / project_id)}"
             )
             asyncio.create_task(
                 _run_workflow_background(wf, session.id, task_desc, project_id)

@@ -1,7 +1,7 @@
-team_id: team-popinz
+team_id: team-saasapp
 technology: react
 phase_type: development
-description: Team team-popinz — end-to-end collaboration bench
+description: Team team-saasapp — end-to-end collaboration bench
 pattern:
   type: hierarchical
   agents:

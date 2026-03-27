@@ -121,6 +121,64 @@ class TestProjectMemory:
         assert len(results) >= 1
         assert any("JWT" in r.get("value", "") for r in results)
 
+    def test_ko_store_and_get(self, mem):
+        ko_id = mem.ko_store(
+            PROJECT_ID,
+            key="rbac-admin-only",
+            value="Only admin can delete users",
+            kind="rbac",
+            mandatory=True,
+            source="test",
+            confidence=0.95,
+        )
+        assert ko_id
+        entry = mem.ko_get(PROJECT_ID, key="rbac-admin-only", kind="rbac")
+        assert entry is not None
+        assert entry["kind"] == "rbac"
+        assert bool(entry["mandatory"]) is True
+
+    def test_ko_store_upsert_stable_id(self, mem):
+        first = mem.ko_store(
+            PROJECT_ID,
+            key="ac-login",
+            value="Login requires email and password",
+            kind="acceptance",
+            mandatory=True,
+            source="test",
+        )
+        second = mem.ko_store(
+            PROJECT_ID,
+            key="ac-login",
+            value="Login requires email+password and error on invalid credentials",
+            kind="acceptance",
+            mandatory=True,
+            source="test",
+        )
+        assert first == second
+        updated = mem.ko_get(PROJECT_ID, key="ac-login", kind="acceptance")
+        assert "invalid credentials" in (updated or {}).get("value", "")
+
+    def test_project_retrieve_adaptive_hybrid(self, mem):
+        mem.project_store(
+            PROJECT_ID,
+            "scheduler-timezone",
+            "Scheduler runs in Europe/Paris timezone",
+            category="architecture",
+            confidence=0.8,
+        )
+        mem.ko_store(
+            PROJECT_ID,
+            key="security-no-public-eval",
+            value="Evaluation records are private by default",
+            kind="security",
+            mandatory=True,
+            source="test",
+        )
+        mode, entries = mem.project_retrieve_adaptive(PROJECT_ID, "Evaluation")
+        assert mode in ("hybrid", "ko-only", "memory-only")
+        assert isinstance(entries, list)
+        assert any(e.get("source") in ("ko", "memory") for e in entries)
+
 
 # ── Layer 4: Global Memory ────────────────────────────────────────
 

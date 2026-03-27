@@ -1,4 +1,3 @@
-<!-- Ref: feat-onboarding -->
 <!DOCTYPE html>
 <html lang="{{ request.state.lang|default('en') }}" dir="{{ 'rtl' if request.state.lang|default('en') == 'ar' else 'ltr' }}">
 <head>
@@ -67,52 +66,52 @@
             <div class="role-grid">
                 <div class="role-card" data-role="overview" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-home"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Overview</h2>
+                    <h3>Overview</h3>
                     <p>Full visibility across all projects and teams</p>
                 </div>
                 <div class="role-card" data-role="dsi" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-monitor"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">DSI</h2>
+                    <h3>DSI</h3>
                     <p>IT governance, strategic alignment, multi-project oversight</p>
                 </div>
                 <div class="role-card" data-role="portfolio_manager" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-briefcase"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Portfolio Manager</h2>
+                    <h3>Portfolio Manager</h3>
                     <p>Govern epics, WSJF prioritization, portfolio kanban</p>
                 </div>
                 <div class="role-card" data-role="rte" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-workflow"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">RTE</h2>
+                    <h3>RTE</h3>
                     <p>PI planning, ceremonies, train coordination</p>
                 </div>
                 <div class="role-card" data-role="product_owner" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-layers"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Product Owner</h2>
+                    <h3>Product Owner</h3>
                     <p>Backlog, features, stories, acceptance</p>
                 </div>
                 <div class="role-card" data-role="scrum_master" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Scrum Master</h2>
+                    <h3>Scrum Master</h3>
                     <p>Sprints, velocity, retrospectives, impediments</p>
                 </div>
                 <div class="role-card" data-role="developer" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-code"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Developer</h2>
+                    <h3>Developer</h3>
                     <p>Code, chat agents, tasks, toolbox</p>
                 </div>
                 <div class="role-card" data-role="architect" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-grid"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Architect</h2>
+                    <h3>Architect</h3>
                     <p>Technical vision, enablers, architecture decisions</p>
                 </div>
                 <div class="role-card" data-role="qa_security" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-shield"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">QA / Security</h2>
+                    <h3>QA / Security</h3>
                     <p>Test campaigns, security audits, quality gates</p>
                 </div>
                 <div class="role-card" data-role="business_owner" onclick="selectRole(this)">
                     <span class="role-icon"><svg class="icon icon-sm"><use href="#icon-chart"/></svg></span>
-                    <h2 style="font-size:.95rem;margin:.5rem 0">Business Owner</h2>
+                    <h3>Business Owner</h3>
                     <p>GO/NOGO decisions, ROI, business value</p>
                 </div>
             </div>
@@ -135,7 +134,7 @@
             <div class="project-grid">
                 {% for p in projects %}
                 <div class="project-card" data-project="{{ p.id }}" onclick="toggleProject(this)">
-                    <h3 style="font-size:.85rem;margin:.25rem 0">{{ p.name }}</h3>
+                    <h4>{{ p.name }}</h4>
                     <small>{{ p.factory_type or '' }}</small>
                 </div>
                 {% endfor %}

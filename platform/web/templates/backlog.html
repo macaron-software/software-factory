@@ -1,6 +1,4 @@
-<!-- Ref: feat-backlog -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_item_grid, skeleton_table %}
 {% block content %}
 {% set p = request.state.perspective|default('admin') %}
 <div class="tabs">
@@ -15,13 +13,11 @@
     {% endif %}
     <button class="tab" id="tab-kanban" hx-get="/api/portfolio/kanban" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("portfolio_kanban") }}</button>
 </div>
-<div id="tab-content">{{ skeleton_table(8, 5) }}</div>
-<template id="sk-backlog">{{ skeleton_table(8, 5) }}</template>
+<div id="tab-content"></div>
 <script>
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-content').innerHTML = document.getElementById('sk-backlog').innerHTML;
 }
 </script>
 {% endblock %}

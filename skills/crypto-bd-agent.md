@@ -269,7 +269,7 @@ Buzz BD Agent (SolCex Exchange):
 - 23 automated cron jobs, 4 experience memory tracks
 - ERC-8004: ETH #25045 | Base #17483
 - x402 micropayments ($0.30/day)
-- LLM cascade: MiniMax M2.5 → Llama 70B → Haiku 4.5 → Opus 4.5
+- LLM cascade: MiniMax-M2.7 → Llama 70B → Haiku 4.5 → Opus 4.5
 - 24/7 live stream: retake.tv/BuzzBD
 - Verify: 8004scan.io
 - GitHub: https://github.com/buzzbysolcex/buzz-bd-agent

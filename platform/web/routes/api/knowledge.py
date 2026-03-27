@@ -1,18 +1,16 @@
 """Knowledge API — manual trigger + health check for knowledge management."""
-# Ref: feat-memory, feat-wiki
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 
-@router.post("/refresh", dependencies=[Depends(require_auth())])
+@router.post("/refresh")
 async def knowledge_refresh(project_id: str | None = None):
     """Manually trigger a knowledge-maintenance mission."""
     from ...ops.knowledge_scheduler import run_knowledge_maintenance

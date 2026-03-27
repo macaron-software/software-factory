@@ -1076,12 +1076,18 @@ def _ensure_darwin_tables(conn) -> None:
             link_type TEXT NOT NULL,
             coverage_pct INTEGER DEFAULT 0,
             notes TEXT DEFAULT '',
+            project_id TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        conn.execute("ALTER TABLE traceability_links ADD COLUMN project_id TEXT DEFAULT ''")
+    except Exception:
+        pass
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tlink_pair ON traceability_links(source_id, target_id, link_type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tlink_source ON traceability_links(source_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tlink_target ON traceability_links(target_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tlink_project ON traceability_links(project_id)")
 
     # Seed RTK integration
     conn.execute("""

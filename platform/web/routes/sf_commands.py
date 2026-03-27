@@ -1,15 +1,13 @@
 """
 SF Native Commands — Software Factory specific CLI commands
 """
-# Ref: feat-toolbox
 
 import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import Depends,  APIRouter
+from fastapi import APIRouter
 from pydantic import BaseModel
-from ...auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -825,7 +823,7 @@ SF_COMMANDS = {
 }
 
 
-@router.post("/api/sf/execute", dependencies=[Depends(require_auth())])
+@router.post("/api/sf/execute")
 async def execute_sf_command(request: SFCommandRequest) -> SFCommandResponse:
     """Execute SF native command."""
     try:

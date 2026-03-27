@@ -1488,10 +1488,10 @@ _PROJECT_PM: dict[str, dict] = {
         "avatar": "user",
         "tagline": "Product Manager — Logs Facteur Support N1",
     },
-    "sharelook": {
+    "collabtool": {
         "name": "Claire Dubois",
         "avatar": "user",
-        "tagline": "Product Manager — Sharelook Platform",
+        "tagline": "Product Manager — CollabTool Platform",
     },
     "software-factory": {
         "name": "Émilie Laurent",
@@ -1508,25 +1508,25 @@ _PROJECT_PM: dict[str, dict] = {
         "avatar": "user",
         "tagline": "Product Manager — Solaris Design System",
     },
-    "veligo": {
+    "mobilityapp": {
         "name": "Antoine Lefèvre",
         "avatar": "user",
-        "tagline": "Product Manager — Veligo Platform",
+        "tagline": "Product Manager — MobilityApp Platform",
     },
     "fervenza": {
         "name": "Lucas Morel",
         "avatar": "user",
         "tagline": "Product Manager — Fervenza IoT",
     },
-    "finary": {
+    "finapp": {
         "name": "Sophie Blanc",
         "avatar": "user",
-        "tagline": "Product Manager — Finary",
+        "tagline": "Product Manager — FinApp",
     },
-    "popinz": {
+    "saasapp": {
         "name": "Hugo Petit",
         "avatar": "user",
-        "tagline": "Product Manager — Popinz SaaS",
+        "tagline": "Product Manager — SaasApp SaaS",
     },
     "psy": {
         "name": "Camille Roux",
@@ -1538,10 +1538,10 @@ _PROJECT_PM: dict[str, dict] = {
         "avatar": "user",
         "tagline": "Product Manager — YoloNow",
     },
-    "sharelook-2": {
+    "collabtool-2": {
         "name": "Claire Dubois",
         "avatar": "user",
-        "tagline": "Product Manager — Sharelook 2.0",
+        "tagline": "Product Manager — CollabTool 2.0",
     },
     # Demo projects
     "neobank-api": {
@@ -1587,13 +1587,13 @@ def _project_color(project_id: str) -> str:
     colors = {
         "factory": "#bc8cff",
         "fervenza": "#f0883e",
-        "veligo": "#58a6ff",
-        "ppz": "#3fb950",
+        "mobilityapp": "#58a6ff",
+        "saas": "#3fb950",
         "psy": "#a371f7",
         "yolonow": "#f85149",
         "solaris": "#d29922",
-        "sharelook": "#79c0ff",
-        "finary": "#56d364",
+        "collabtool": "#79c0ff",
+        "finapp": "#56d364",
         "lpd": "#db6d28",
         "logs-facteur": "#8b949e",
         "software-factory": "#c084fc",

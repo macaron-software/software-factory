@@ -33,6 +33,11 @@ skills:
 tools:
   - traceability_coverage
   - traceability_validate
+  - traceability_chain_report
+  - traceability_check_e2e
+  - project_traceability_report
+  - project_traceability_check_e2e
+  - project_traceability_export_sqlite
   - memory_search
   - memory_store
   - deep_search

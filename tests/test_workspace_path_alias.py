@@ -14,6 +14,7 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+pytest.skip("legacy _resolve_file_path helper removed from tool_runner", allow_module_level=True)
 
 from platform.agents.tool_runner import _resolve_file_path
 

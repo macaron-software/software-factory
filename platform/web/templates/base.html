@@ -1,4 +1,3 @@
-<!-- Ref: feat-cockpit, feat-rbac -->
 <!DOCTYPE html>
 <html lang="{{ request.state.lang|default('en') }}" dir="{{ 'rtl' if request.state.lang|default('en') == 'ar' else 'ltr' }}" data-theme="dark">
 <head>
@@ -12,7 +11,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SF Platform">
-    <meta name="description" content="{% block meta_description %}Software Factory — AI-powered multi-agent platform for software engineering, quality gates, and compliance.{% endblock %}">
     <link rel="stylesheet" href="/static/css/main.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
@@ -90,7 +88,7 @@
 <body>
     {% include "partials/svg_sprites.html" %}
     <div class="layout">
-        <!-- Sidebar -->
+        <!-- Sidebar (icon-only) -->
         <nav class="sidebar">
             <div class="sidebar-header">
                 <h1 class="logo"><svg class="icon icon-logo"><use href="#icon-macaron"/></svg></h1>
@@ -99,36 +97,6 @@
             {% set p = request.state.perspective|default('admin') %}
             <div class="sidebar-section">
                 <ul class="nav-links">
-                {% if simple_ui %}
-                    {# ── Simple UI: minimal nav ── #}
-                    <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-home"/></svg>
-                    </a></li>
-                    <li><a href="/pulse" data-tooltip="Pulse" class="{% if page_title == 'Pulse' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-zap"/></svg>
-                    </a></li>
-                    <li><a href="/projects" data-tooltip="Projects" class="{% if page_title in ('Projects', 'Project') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-folder"/></svg>
-                    </a></li>
-                    <li><a href="/sessions" data-tooltip="Sessions" class="{% if page_title in ('Live', 'Sessions', 'Session') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-message-circle"/></svg>
-                    </a></li>
-                    <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-users"/></svg>
-                    </a></li>
-                    <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title in ('Metrics', 'Ops') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-chart"/></svg>
-                    </a></li>
-                    {% if request.state.user and request.state.user.role == 'admin' %}
-                    <li><a href="/rbac" data-tooltip="Users" class="{% if page_title in ('RBAC', 'Users & Roles') %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-shield"/></svg>
-                    </a></li>
-                    {% endif %}
-                {% else %}
-                    {# ── Full UI ── #}
-                    <li><a href="/pulse" data-tooltip="Pulse" class="{% if page_title == 'Pulse' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-zap"/></svg>
-                    </a></li>
                     <li><a href="/cockpit" data-tooltip="Cockpit" class="{% if page_title == 'Cockpit' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
                     </a></li>
@@ -194,7 +162,6 @@
                         <svg class="icon"><use href="#icon-shield"/></svg>
                     </a></li>
                     {% endif %}
-                {% endif %}
                 </ul>
             </div>
 
@@ -236,24 +203,20 @@
                 </ul>
             </div>
 
-            {% if not simple_ui %}
             <div class="sidebar-footer">
                 <div class="workspace-badge" onclick="location.href='/workspaces'" title="Changer de workspace" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin:4px 6px;border-radius:8px;cursor:pointer;background:var(--bg-secondary);border:1px solid var(--border);font-size:0.72rem;color:var(--text-secondary);overflow:hidden">
                     <span class="ws-dot" style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:{{ request.state.workspace_color | default('#6366f1') }}"></span>
                     <span class="ws-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ request.state.workspace_name | default('Default') }}</span>
                 </div>
-                <a href="/privacy" style="display:block;padding:2px 16px 6px;font-size:0.65rem;color:var(--text-secondary);opacity:.6;text-decoration:none" title="Privacy Policy">Privacy</a>
             </div>
-            {% endif %}
         </nav>
 
         <!-- Main content -->
         <main class="content">
             <header class="topbar">
-                <h2>{% if instance_name %}<span style="color:var(--accent,#6c63ff);font-size:.7em;font-weight:700;margin-right:6px">{{ instance_name }}</span>{% endif %}{{ page_title }} <span class="app-version" title="commit {{ app_commit }}">{{ app_version }}</span></h2>
+                <h2>{{ page_title }} <span class="app-version" title="commit {{ app_commit }}">{{ app_version }}</span></h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
-                    {% if not simple_ui %}
                     <!-- SAFe Perspective Selector -->
                     <div class="perspective-wrapper" style="position:relative">
                         <button class="perspective-btn" id="perspectiveBtn" onclick="document.getElementById('perspectiveDropdown').classList.toggle('show')" title="SAFe Perspective">
@@ -304,25 +267,14 @@
                     <button id="sfSpecBtn" class="topbar-bell" title="Spec — feature, persona, user stories (clic)" onclick="toggleSpecBar()" aria-label="Toggle spec bar">
                         <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </button>
-                    <!-- Wireframe Mode Toggle (visible only when annotation active) -->
-                    <button id="sfWireframeBtn" class="topbar-bell" title="Wireframe mode — lo-fi skeleton view" onclick="toggleWireframeMode()" aria-label="Toggle wireframe mode" style="display:none">
+                    <!-- Wireframe Mode Toggle -->
+                    <button id="sfWireframeBtn" class="topbar-bell" title="Wireframe mode — lo-fi skeleton view" onclick="toggleWireframeMode()" aria-label="Toggle wireframe mode">
                         <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M3 15h6"/></svg>
                     </button>
                     <button id="sfPushBtn" class="topbar-bell" aria-label="Enable push notifications"
                             title="Enable push notifications"
                             onclick="sfRequestPush().then(ok=>{ if(ok) this.style.display='none'; })"
                             style="display:none"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
-                    {% endif %}{# end not simple_ui #}
-                    {% if instance_peer_url %}
-                    <!-- Instance switch -->
-                    <div class="instance-switch" style="display:flex;align-items:center;gap:6px;padding:2px 10px;border-radius:20px;background:var(--bg-secondary);border:1px solid var(--border);font-size:.7rem;cursor:pointer" onclick="window.location.href='{{ instance_peer_url }}'">
-                        <span style="color:var(--text-tertiary)">{{ instance_peer_url.replace('https://','').replace('http://','').split('.')[0].replace('sf-','').replace('sf','demo') | title }}</span>
-                        <span style="position:relative;display:inline-block;width:28px;height:16px;background:{% if simple_ui %}var(--accent,#6c63ff){% else %}var(--border){% endif %};border-radius:8px;transition:.2s">
-                            <span style="position:absolute;top:2px;{% if simple_ui %}right:2px{% else %}left:2px{% endif %};width:12px;height:12px;background:#fff;border-radius:50%;transition:.2s"></span>
-                        </span>
-                        <span style="font-weight:600;color:var(--text-primary)">{{ instance_name or 'This' }}</span>
-                    </div>
-                    {% endif %}
                     <div class="user-menu-wrapper" style="position:relative">
                         <button class="topbar-avatar" id="userMenuBtn" onclick="document.getElementById('userDropdown').classList.toggle('show')" title="{{ request.state.user.display_name if request.state.user else 'User' }}">
                             {{ (request.state.user.display_name[:1] if request.state.user else 'U') | upper }}
@@ -597,7 +549,7 @@
         <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
       </div>
       <div>
-        <h2 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h2>
+        <h3 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h3>
         <p id="dcm-subtitle" style="margin:0;font-size:0.78rem;color:var(--text-secondary)">Cette action est irréversible</p>
       </div>
     </div>
@@ -948,10 +900,10 @@ body.sf-wireframe #sfWireframeBtn {
 <!-- Annotation Help Panel -->
 <div id="sfAnnHelp">
   <button class="ann-close" onclick="document.getElementById('sfAnnHelp').style.display='none'">×</button>
-  <h2 style="font-size:.9rem;margin:0 0 .5rem">
+  <h4>
     <svg style="width:14px;height:14px;stroke:#58a6ff;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
     Annotations SF
-  </h2>
+  </h4>
   <div class="ann-step">
     <span class="ann-step-num">1</span>
     <span class="ann-step-text">Activez <strong>Self-Annotation Mode</strong> dans Settings → General</span>
@@ -1072,7 +1024,9 @@ body.sf-wireframe #sfWireframeBtn {
     setTimeout(applySkeleton, 50);
   }
 
-  /* Wireframe only activates via annotation mode — no auto-restore on load */
+  if (sessionStorage.getItem(WF_KEY) === '1') {
+    document.addEventListener('DOMContentLoaded', activate);
+  }
 
   window.toggleWireframeMode = function() {
     if (document.body.classList.contains('sf-wireframe')) {
@@ -1322,6 +1276,5 @@ body.sf-wireframe #sfWireframeBtn {
   });
 })();
 </script>
-{% include "partials/cmd_palette.html" %}
 </body>
 </html>

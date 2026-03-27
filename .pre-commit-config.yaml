@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: presidio-pii-guard
+        name: presidio pii guard
+        entry: .venv-presidio/bin/python scripts/presidio_precommit_hook.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

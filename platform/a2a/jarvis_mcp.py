@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, Optional
 
@@ -54,12 +55,19 @@ def _login() -> str:
     global _token
     if _token:
         return _token
-    resp = httpx.post(
-        f"{SF_API_URL}/api/auth/login",
-        json={"email": SF_EMAIL, "password": SF_PASSWORD},
-        timeout=20,
-    )
-    resp.raise_for_status()
+    try:
+        resp = httpx.post(
+            f"{SF_API_URL}/api/auth/login",
+            json={"email": SF_EMAIL, "password": SF_PASSWORD},
+            timeout=20,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # Local/dev often rotates demo password; fallback to demo login endpoint.
+        if exc.response.status_code != 401:
+            raise
+        resp = httpx.post(f"{SF_API_URL}/api/auth/demo", json={}, timeout=20)
+        resp.raise_for_status()
     tok = resp.cookies.get("access_token", "")
     if not tok:
         raise RuntimeError("Login failed: no access_token cookie")
@@ -74,13 +82,14 @@ def _chat_jarvis(project_id: str, message: str) -> str:
     """Send a message to Jarvis and collect full streamed response."""
     url = f"{SF_API_URL}/api/projects/{project_id}/chat/stream"
     full_text = ""
+    done_html = ""
 
     for attempt in range(2):
         try:
             with httpx.stream(
                 "POST",
                 url,
-                json={"message": message},
+                json={"content": message},
                 headers={
                     "Cookie": f"access_token={_login()}",
                     "Accept": "text/event-stream",
@@ -102,6 +111,16 @@ def _chat_jarvis(project_id: str, message: str) -> str:
                         text = evt.get("text", "")
                         if text:
                             full_text += text
+                        html = evt.get("html", "")
+                        if html:
+                            done_html += html
+            if full_text:
+                return full_text
+            if done_html:
+                # SSE "done" may only provide HTML without chunk text.
+                plain = re.sub(r"<[^>]+>", " ", done_html)
+                plain = re.sub(r"\s+", " ", plain).strip()
+                return plain
             return full_text
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401 and attempt == 0:
@@ -140,7 +159,7 @@ def _get_tools() -> list:
                 "Jarvis is project-agnostic: he has a global view of all SF projects, ARTs, teams, "
                 "epics, and technical decisions. Use for architecture advice, cross-project strategy, "
                 "SF roadmap, team/mission creation, or any CTO-level question. "
-                "For project-specific questions (Véligo, PSY, Finary...), use pm_chat instead."
+                "For project-specific questions (MobilityApp, PSY, FinApp...), use pm_chat instead."
             ),
             "inputSchema": {
                 "type": "object",
@@ -176,14 +195,14 @@ def _get_tools() -> list:
                 "Chat with the Program Manager (Alexandre Moreau) of a specific SF project. "
                 "Project-centric: knows the project's backlog, Jira stories, specs, tech stack, "
                 "and team. Use for project-level questions: feature status, sprint, CARE 360, etc. "
-                "Examples of project_id: 'acme', 'psy', 'finary'."
+                "Examples of project_id: 'acme', 'psy', 'finapp'."
             ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "project_id": {
                         "type": "string",
-                        "description": "SF project ID (e.g. 'acme', 'psy', 'finary')",
+                        "description": "SF project ID (e.g. 'acme', 'psy', 'finapp')",
                     },
                     "message": {
                         "type": "string",

@@ -1,0 +1,341 @@
+================================================================================
+                        SFENGINE CODING STYLE REFERENCE
+                              COMPLETE INDEX
+================================================================================
+
+PRIMARY DOCUMENT (SAVED TO PLATFORM):
+📄 /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/platform/
+   SFENGINE_CODING_STYLE_GUIDE.md
+
+   This is the definitive guide containing:
+   ✓ All coding patterns used in SFEngine
+   ✓ Complete function signatures
+   ✓ All critical call sequences
+   ✓ AgentEvent enum reference
+   ✓ Error handling patterns
+   ✓ LLM communication patterns
+   ✓ Protocol injection patterns
+   ✓ Database access patterns
+   ✓ Best practices (Do's and Don'ts)
+   ✓ Complete file reference
+
+================================================================================
+SOURCE FILES ANALYZED
+================================================================================
+
+All files from: /Users/sylvain/_MACARON-SOFTWARE/simple-sf/SFEngine/src/engine/
+
+1. mod.rs
+   - Module declarations
+   - Public API re-exports
+   - 10 sub-modules
+
+2. types.rs (MUST READ)
+   - All constants (PHASE_TIMEOUT_SECS, MAX_NETWORK_ROUNDS, etc.)
+   - PhaseType enum (Once, Sprint, Gate, FeedbackLoop)
+   - PhaseDef and WorkflowPlan structs
+   - YOLO_MODE atomic bool
+   - STYLE_RULES constant (French format rules)
+   - strip_emoji() function
+   - truncate_ctx() function
+   - emit_rich() function (JSON event generation)
+   - store_agent_msg() function
+
+3. executor.rs (CRITICAL - Agent Execution Loop)
+   - MAX_ROUNDS = 100
+   - AgentEvent enum (7 variants - see guide)
+   - EventCallback type definition
+   - run_agent() function signature
+   - Tool-calling loop implementation
+   - Message history management
+   - Streaming vs non-streaming
+
+4. patterns.rs (BASIC PATTERNS - 376 lines)
+   - run_pattern() dispatcher
+   - run_network() - discussion rounds
+   - run_sequential() - sequential execution
+   - run_parallel() - parallel execution
+   - run_solo() - single agent
+   - run_loop() - writer/reviewer cycle
+   - All follow universal signature
+
+5. patterns_ext.rs (ADVANCED PATTERNS - 400 lines)
+   - run_hierarchical() - manager decompose/integrate
+   - run_aggregator() - all agents + aggregator
+   - run_router() - specialist routing
+   - run_wave() - dependency waves
+   - Public test wrappers for all patterns
+
+6. discussion.rs (268 lines)
+   - run_intake() - SAFe intake discussion
+   - run_intake_with_team() - configurable team
+   - RTE framing → Expert discussion → PO decision
+   - emit_discuss() for rich JSON events
+   - store_discussion_msg() function
+   - load_conversation_history() function
+
+7. mission.rs (380 lines)
+   - run_mission() entry point
+   - execute_workflow_plan() state machine
+   - Handles all PhaseType variants
+   - Gate loopback implementation (max 3)
+   - Auto-build checks before QA
+   - Memory system integration
+   - YOLO mode support
+
+8. phase.rs (~100+ lines)
+   - execute_single_phase() wrapper
+   - Timeout handling (15 min)
+   - Veto/feedback condition injection
+   - Phase output storage to memory
+   - Gate detection (check_gate_raw)
+
+9. workflow.rs (~100+ lines)
+   - default_plan() - 14-phase SAFe plan
+   - plan_via_pm() - dynamic planning
+   - pm_create_plan() - RTE+PO analysis
+   - parse_workflow_plan() - JSON parsing
+   - check_gate_raw() - verdict detection
+
+10. build.rs (~80+ lines)
+    - auto_build_check() - project detection
+    - finalize_build() - release build
+    - Project type detection (Swift, Rust, Node, Make, Go, CMake)
+
+11. resilience.rs (~100+ lines)
+    - run_phase_with_retry() - exponential backoff
+    - llm_health_probe() - LLM connectivity check
+    - restart_llm_server() - auto-restart
+    - Error feedback injection
+
+================================================================================
+KEY REFERENCE SECTIONS IN GUIDE
+================================================================================
+
+Section 1: UNIVERSAL PATTERN FUNCTION SIGNATURE
+   → Copy-paste template for all pattern functions
+
+Section 2: COMPLETE CALL SEQUENCE
+   → Step-by-step: Get agents → Get protocol → Build system → Call executor
+   → Guard check → Emit events → Store DB → Return
+
+Section 3: AgentEvent ENUM
+   → All 7 variants with usage examples
+   → Thinking, Reasoning, ToolCall, ToolResult, Response, ResponseChunk, Error
+
+Section 4: LLM COMMUNICATION
+   → Patterns layer (non-streaming) examples
+   → Executor layer (streaming with tools) examples
+   → Message history management
+
+Section 5: PROTOCOL INJECTION
+   → How protocols are obtained
+   → System prompt 3-part structure
+   → STYLE_RULES constant (French format enforcement)
+
+Section 6: ERROR HANDLING
+   → 5 patterns: Option→Result, Result propagation, Match, .into(), eprintln!
+
+Section 7: GUARD CHECK PATTERN
+   → guard::check_l0() usage
+   → GuardResult fields
+   → Warning-only behavior
+
+Section 8: EMOJI STRIPPING
+   → strip_emoji() function details
+   → Content truncation pattern
+
+Section 9: DATABASE STORAGE
+   → db::with_db() pattern
+   → store_agent_msg() function
+   → store_discussion_msg() function
+
+Section 10: EVENT EMISSION
+   → emit_rich() JSON structure
+   → to_agents[] format
+   → Round numbering
+
+Section 11: PATTERNS SUMMARY
+   → Table of all 9 patterns (5 basic + 4 advanced)
+   → Dispatcher routing
+   → Test wrapper functions
+
+Section 12: BEST PRACTICES
+   → 14 DO's ✓
+   → 12 DON'Ts ✗
+
+Section 13: SUMMARY TABLE
+   → Quick reference of all key aspects
+
+================================================================================
+CRITICAL FACTS FOR NEW PATTERNS
+================================================================================
+
+1. ALWAYS use &[&str] for agent_ids
+   → Never Vec<String>
+   → Always check agents::get_agent() returns Some()
+
+2. ALWAYS use Result<String, String>
+   → No custom error types
+   → Convert with .into()
+
+3. ALWAYS call executor::run_agent() with protocol
+   → protocol = protocols::protocol_for_role(&agent.role, phase)
+   → Pass as Some(protocol)
+
+4. ALWAYS call guard::check_l0() after execution
+   → Even if you ignore result
+   → Emit Response if guard fails
+
+5. ALWAYS emit events
+   → AgentEvent::Thinking before work
+   → AgentEvent::Response for all results
+   → Optional: AgentEvent::Error for failures
+
+6. ALWAYS strip emoji
+   → content = strip_emoji(&result.content.unwrap_or_default())
+
+7. ALWAYS store messages
+   → store_agent_msg() or store_discussion_msg()
+
+8. ALWAYS handle empty agent_ids
+   → return Err("No agents found".into())
+
+9. ALWAYS use French in prompts
+   → STYLE_RULES enforces French formatting
+   → Append STYLE_RULES to every system prompt
+
+10. ALWAYS join outputs with separator
+    → outputs.join("\n\n---\n\n")
+
+================================================================================
+CONSTANTS YOU NEED TO KNOW
+================================================================================
+
+PHASE_TIMEOUT_SECS = 900                    (15 minutes)
+MAX_NETWORK_ROUNDS = 3                      (discussion rounds)
+CONTEXT_BUDGET = 12000                      (token budget)
+MAX_PHASE_RETRIES = 3                       (retry attempts)
+MAX_ROUNDS (executor) = 100                 (tool-call rounds)
+MAX_LOOP_ITERATIONS = 5                     (writer-reviewer)
+MAX_GATE_LOOPBACKS = 3                      (gate retry)
+
+================================================================================
+AGENTEVENTS YOU NEED TO KNOW
+================================================================================
+
+AgentEvent::Thinking
+   → Status: agent is thinking
+   → Usage: on_event(&agent.id, AgentEvent::Thinking)
+
+AgentEvent::Response { content: String }
+   → MOST USED: final text, JSON, or status
+   → Usage: on_event(&agent.id, AgentEvent::Response { 
+            content: "text or JSON".into() })
+
+AgentEvent::ToolCall { tool: String, args: String }
+   → Tool being invoked (executor only)
+
+AgentEvent::ToolResult { tool: String, result: String }
+   → Tool result returned (executor only)
+
+AgentEvent::Error { message: String }
+   → Error condition
+
+AgentEvent::Reasoning { active: bool }
+   → Extended thinking indicator (o1 models)
+
+AgentEvent::ResponseChunk { content: String }
+   → Streaming chunk (executor only)
+
+================================================================================
+COMMAND LINE TO VIEW ORIGINAL SOURCE
+================================================================================
+
+View source files:
+$ cd /Users/sylvain/_MACARON-SOFTWARE/simple-sf/SFEngine/src/engine/
+$ ls -la                                      # List all files
+$ cat mod.rs                                  # View module declarations
+$ cat patterns.rs                             # Basic patterns
+$ cat executor.rs                             # Executor engine
+
+View complete patterns:
+$ grep -n "pub async fn run_" *.rs            # Show all pattern functions
+$ grep -n "executor::run_agent" *.rs          # Show all executor calls
+$ grep -n "guard::check_l0" *.rs              # Show all guard checks
+
+Search for examples:
+$ grep -A 10 "guard::check_l0" patterns.rs   # Show guard usage with context
+$ grep -A 5 "store_agent_msg" types.rs       # Show DB storage
+$ grep -A 10 "emit_rich" types.rs            # Show rich event emission
+
+================================================================================
+DOCUMENT USAGE
+================================================================================
+
+For NEW PATTERN implementation:
+1. Read "UNIVERSAL PATTERN FUNCTION SIGNATURE" section
+2. Copy the exact signature template
+3. Read "COMPLETE CALL SEQUENCE" section
+4. Follow steps 1-8 exactly
+5. Reference "BEST PRACTICES" for Do's/Don'ts
+6. Use "SUMMARY TABLE" for quick checks
+
+For DEBUGGING existing patterns:
+1. Check error handling section
+2. Review guard check pattern
+3. Verify event emission
+4. Confirm database storage
+5. Check protocol injection
+
+For UNDERSTANDING executor.rs:
+1. Read "AgentEvent enum" section
+2. Read "LLM Communication Patterns" section (executor layer)
+3. Understand tool-calling loop (4 conditions)
+4. Check message history sliding window
+5. Review error handling pattern
+
+For UNDERSTANDING discussions:
+1. Review "EVENT EMISSION FOR RICH UI" section
+2. Check JSON structure of emit_rich()
+3. Understand round numbering
+4. Review to_agents[] format
+5. See emit_discuss() usage in discussion.rs
+
+================================================================================
+FILE SIZES
+================================================================================
+
+mod.rs ...................... ~35 lines
+types.rs ................... ~103 lines (MUST READ)
+executor.rs ............... ~185 lines (CRITICAL)
+patterns.rs ............... ~376 lines (BASIC PATTERNS)
+patterns_ext.rs ........... ~400 lines (ADVANCED PATTERNS)
+discussion.rs ............. ~268 lines (SAFe INTAKE)
+mission.rs ................ ~380 lines (ORCHESTRATION)
+phase.rs .................. ~100+ lines
+workflow.rs ............... ~100+ lines
+build.rs .................. ~80+ lines
+resilience.rs ............. ~100+ lines
+
+Total: ~1600+ lines of code
+
+================================================================================
+READY TO IMPLEMENT
+================================================================================
+
+You now have:
+✓ Complete coding style guide
+✓ All pattern signatures
+✓ All call sequences
+✓ All error handling patterns
+✓ All event types
+✓ All constants
+✓ All guard patterns
+✓ All database patterns
+✓ All best practices
+✓ Complete source file reference
+
+Ready to implement new orchestration patterns following SFEngine conventions!
+
+================================================================================

@@ -1,4 +1,3 @@
-<!-- Ref: feat-agent-chat -->
 {# WhatsApp-style message bubble #}
 <div class="message-bubble {% if msg.from_agent == 'user' %}from-user{% elif msg.from_agent == 'system' %}from-system{% else %}from-agent{% endif %} msg-type-{{ msg.message_type }}"
      data-msg-id="{{ msg.id }}">

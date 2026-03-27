@@ -154,7 +154,7 @@ hf cache verify gpt2             # Verify checksums from cache
 hf models ls                                        # List top trending models
 hf models ls --search "MiniMax" --author MiniMaxAI  # Search models
 hf models ls --filter "text-generation" --limit 20  # Filter by task
-hf models info MiniMaxAI/MiniMax-M2.1               # Get model info
+hf models info MiniMaxAI/MiniMax-M2.7               # Get model info
 
 # Datasets
 hf datasets ls                                      # List top trending datasets

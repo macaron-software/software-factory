@@ -5,6 +5,9 @@ Tools:
 - traceability_link: create link between traceable items
 - traceability_coverage: coverage analysis (% covered, orphans)
 - traceability_validate: judge tool — pass/fail + gap list
+- project_traceability_report: 13-layer project report across all epics
+- project_traceability_check_e2e: project-wide PASS/FAIL E2E traceability gate
+- project_traceability_export_sqlite: export standalone project SQLite DB
 """
 # Ref: feat-annotate
 
@@ -178,6 +181,7 @@ class TraceabilityLinkTool(BaseTool):
             link_type=params["link_type"],
             coverage_pct=int(params.get("coverage_pct", 0)),
             notes=params.get("notes", ""),
+            project_id=params.get("project_id", ""),
         )
         return json.dumps({
             "link_id": link_id,
@@ -495,6 +499,7 @@ class TraceabilityRecordTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         from ..traceability.chain import (
             get_persona_store, get_nft_store, update_feature_coverage,
+            record_trace_artifact,
             Persona, NFTTest,
         )
         from ..traceability.migration_store import create_link
@@ -529,6 +534,7 @@ class TraceabilityRecordTool(BaseTool):
             p = get_persona_store().create(p)
             result_id = p.id
             create_link(
+                project_id=project_id,
                 source_id=p.id, source_type="persona",
                 target_id=feature_id, target_type="feature",
                 link_type="persona", notes=notes,
@@ -545,6 +551,7 @@ class TraceabilityRecordTool(BaseTool):
             t = get_nft_store().create(t)
             result_id = t.id
             create_link(
+                project_id=project_id,
                 source_id=feature_id, source_type="feature",
                 target_id=t.id, target_type="nft_test",
                 link_type="nft", notes=notes,
@@ -570,13 +577,26 @@ class TraceabilityRecordTool(BaseTool):
             finally:
                 _db.close()
             create_link(
+                project_id=project_id,
                 source_id=feature_id, source_type="feature",
                 target_id=result_id, target_type="screen",
                 link_type="screen", notes=notes,
             )
 
         else:
+            artifact = record_trace_artifact(
+                project_id=project_id,
+                epic_id=epic_id,
+                feature_id=feature_id,
+                layer=layer,
+                artifact_key=artifact_id or artifact_name,
+                artifact_name=artifact_name,
+                notes=notes,
+                metadata={"source_artifact_id": artifact_id} if artifact_id else {},
+            )
+            result_id = artifact.id
             create_link(
+                project_id=project_id,
                 source_id=feature_id, source_type="feature",
                 target_id=result_id, target_type=layer,
                 link_type=layer, notes=notes,
@@ -588,6 +608,7 @@ class TraceabilityRecordTool(BaseTool):
             "recorded": True,
             "layer": layer,
             "artifact_id": result_id,
+            "artifact_key": artifact_id or artifact_name or result_id,
             "feature_id": feature_id,
             "coverage_pct": cov["coverage_pct"],
             "flags": cov["flags"],
@@ -636,6 +657,69 @@ class TraceabilityCheckE2ETool(BaseTool):
         return json.dumps(result, ensure_ascii=False, default=str)
 
 
+class ProjectTraceabilityReportTool(BaseTool):
+    name = "project_traceability_report"
+    description = (
+        "Get the full 13-layer traceability chain report for a whole project. "
+        "Aggregates all epics/features and shows coverage for persona, ihm, code, tu, "
+        "e2e, crud, rbac, screens, nft. Args: project_id"
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import get_project_chain_report
+
+        project_id = params.get("project_id", "")
+        if not project_id:
+            return "Error: project_id required"
+
+        report = get_project_chain_report(project_id)
+        return json.dumps(report, ensure_ascii=False, default=str)
+
+
+class ProjectTraceabilityCheckE2ETool(BaseTool):
+    name = "project_traceability_check_e2e"
+    description = (
+        "Validate the full project-wide traceability chain across all epics. "
+        "Returns PASS/FAIL with per-layer coverage % and gap list. "
+        "Args: project_id, threshold (default 80)"
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import validate_project_chain
+
+        project_id = params.get("project_id", "")
+        threshold = int(params.get("threshold", 80))
+        if not project_id:
+            return "Error: project_id required"
+
+        result = validate_project_chain(project_id, threshold=threshold)
+        return json.dumps(result, ensure_ascii=False, default=str)
+
+
+class ProjectTraceabilityExportSQLiteTool(BaseTool):
+    name = "project_traceability_export_sqlite"
+    description = (
+        "Export a standalone SQLite DB for a project traceability graph. "
+        "Includes epics, personas, features, stories, acceptance criteria, generic "
+        "artifacts, links, screens, NFTs, and feature coverage status. "
+        "Args: project_id, output_path (optional)"
+    )
+    category = "traceability"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..traceability.chain import export_project_traceability_sqlite
+
+        project_id = params.get("project_id", "")
+        output_path = params.get("output_path", "") or f"/tmp/{project_id}_traceability.sqlite"
+        if not project_id:
+            return "Error: project_id required"
+
+        result = export_project_traceability_sqlite(project_id, output_path)
+        return json.dumps(result, ensure_ascii=False, default=str)
+
+
 def register_traceability_tools(registry):
     """Register all traceability tools."""
     registry.register(LegacyScanTool())
@@ -645,3 +729,6 @@ def register_traceability_tools(registry):
     registry.register(TraceabilityRecordTool())
     registry.register(TraceabilityChainReportTool())
     registry.register(TraceabilityCheckE2ETool())
+    registry.register(ProjectTraceabilityReportTool())
+    registry.register(ProjectTraceabilityCheckE2ETool())
+    registry.register(ProjectTraceabilityExportSQLiteTool())

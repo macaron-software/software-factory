@@ -1,6 +1,4 @@
-<!-- Ref: feat-skills -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_table %}
 
 {% block topbar_actions %}
 {% include "partials/view_switcher.html" %}
@@ -146,12 +144,6 @@
     <div class="sac-kpi"><div id="sac-trigger" class="sac-kpi-val">—</div><div class="sac-kpi-lbl">Avg trigger accuracy</div></div>
   </div>
 
-  <!-- Skeleton initial state for AC tab -->
-  <div id="sac-skeleton">
-    {{ skeleton_stat_cards(4) }}
-    <div style="margin-top:1rem">{{ skeleton_table(6, 6) }}</div>
-  </div>
-
   <!-- Results table -->
   <div id="sac-table-wrap" style="display:none">
     <table class="sac-table">
@@ -228,8 +220,6 @@ async function loadSkillAC(force) {
 }
 
 function renderSkillAC(data) {
-    const skEl = document.getElementById('sac-skeleton');
-    if (skEl) skEl.style.display = 'none';
     const s = data.summary || {};
     document.getElementById('sac-total').textContent   = s.total_bricks ?? '—';
     document.getElementById('sac-passing').textContent = s.fully_passing ?? '—';

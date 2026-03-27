@@ -509,8 +509,8 @@ class PlatformLaunchEpicRunTool(BaseTool):
         try:
             from ..epics.store import get_epic_store, get_epic_run_store
             from ..workflows.store import get_workflow_store
-            from ..models import EpicRun, PhaseRun, PhaseStatus
-            from ..sessions.store import SessionDef, MessageDef, get_session_store
+            from ..models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+            from ..sessions.store import SessionDef, get_session_store
             import uuid
 
             epic_store = get_epic_store()
@@ -527,12 +527,12 @@ class PlatformLaunchEpicRunTool(BaseTool):
                 return _json.dumps({"error": f"Workflow '{wf_id}' not found"})
 
             # Build phase runs
-            phases = wf.phases_json if isinstance(wf.phases_json, list) else []
+            phases = wf.phases if isinstance(wf.phases, list) else []
             phase_runs = [
                 PhaseRun(
-                    phase_id=p["id"],
-                    phase_name=p.get("name", p["id"]),
-                    pattern_id=p.get("pattern_id", "sequential"),
+                    phase_id=p.id,
+                    phase_name=p.name or p.id,
+                    pattern_id=p.pattern_id or "sequential",
                     status=PhaseStatus.PENDING,
                 )
                 for p in phases
@@ -547,37 +547,30 @@ class PlatformLaunchEpicRunTool(BaseTool):
                 workflow_name=wf.name,
                 project_id=mission.project_id,
                 parent_epic_id=epic_id,
-                status="paused",
-                phases_json=phase_runs,
+                status=EpicStatus.PENDING,
+                phases=phase_runs,
+                brief=mission.goal or mission.name,
             )
             run_store = get_epic_run_store()
-            run_store.create_run(run)
+            run_store.create(run)
 
             # Create session
             ss = get_session_store()
             s = SessionDef(
                 id=session_id,
+                name=f"{mission.name} — {wf.name}",
+                goal=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
                 project_id=mission.project_id,
-                title=f"{mission.name} — {wf.name}",
-                messages=[
-                    MessageDef(
-                        role="user",
-                        content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
-                    )
-                ],
+                status="active",
+                config={"lead_agent": "brain", "type": "epic_run"},
             )
-            ss.create_session(s)
+            ss.create(s)
 
-            # Resume immediately
-            from ..workflows.store import run_workflow
+            # Schedule the workflow execution
             import asyncio
-
+            from ..services.auto_resume import _launch_run
             loop = asyncio.get_event_loop()
-            loop.create_task(
-                asyncio.to_thread(
-                    run_workflow, wf, session_id, mission.name, mission.project_id
-                )
-            )
+            loop.create_task(_launch_run(run_id))
 
             return _json.dumps(
                 {
@@ -586,7 +579,7 @@ class PlatformLaunchEpicRunTool(BaseTool):
                     "session_id": session_id,
                     "workflow_id": wf_id,
                     "epic_id": epic_id,
-                    "phases": [p["id"] for p in phases],
+                    "phases": [p.id for p in phases],
                 }
             )
         except Exception as e:
@@ -847,6 +840,9 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
         if m_def["workflow_id"] in existing_workflows:
             continue  # Already exists — skip
         try:
+            from ..workflows.store import get_workflow_store
+            from ..models import PhaseRun, PhaseStatus
+
             mission = MissionDef(
                 name=m_def["name"],
                 description=m_def["description"],
@@ -856,11 +852,28 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
                 status="active",
             )
             mission = m_store.create_mission(mission)
+            wf = get_workflow_store().get(m_def["workflow_id"])
+            phase_runs = []
+            if wf and isinstance(wf.phases, list):
+                phase_runs = [
+                    PhaseRun(
+                        phase_id=p.id,
+                        phase_name=p.name or p.id,
+                        pattern_id=p.pattern_id or "sequential",
+                        status=PhaseStatus.PENDING,
+                    )
+                    for p in wf.phases
+                ]
             run = EpicRun(
                 id=str(uuid.uuid4())[:8],
-                mission_id=mission.id,
+                workflow_id=m_def["workflow_id"],
+                workflow_name=wf.name if wf else m_def["workflow_id"],
+                session_id=mission.id,
+                parent_epic_id=mission.id,
                 status=EpicStatus.PENDING,
                 project_id=project_id,
+                phases=phase_runs,
+                brief=mission.goal or mission.name,
             )
             run = run_store.create(run)
             created.append(
@@ -1035,18 +1048,39 @@ class PlatformCreateMissionTool(BaseTool):
         run_info = {}
         try:
             from ..epics.store import get_epic_run_store
-            from ..models import EpicRun, EpicStatus
+            from ..models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+            from ..workflows.store import get_workflow_store
             import uuid
             import asyncio
+
+            wf_id = mission.workflow_id or ""
+            if not wf_id:
+                raise ValueError("Mission has no workflow_id")
+            wf = get_workflow_store().get(wf_id)
+            if not wf:
+                raise ValueError(f"Workflow '{wf_id}' not found")
+            phase_runs = [
+                PhaseRun(
+                    phase_id=p.id,
+                    phase_name=p.name or p.id,
+                    pattern_id=p.pattern_id or "sequential",
+                    status=PhaseStatus.PENDING,
+                )
+                for p in (wf.phases if isinstance(wf.phases, list) else [])
+            ]
 
             run_store = get_epic_run_store()
             run = EpicRun(
                 id=str(uuid.uuid4())[:8],
-                mission_id=mission.id,
+                workflow_id=wf_id,
+                workflow_name=wf.name,
+                session_id=mission.id,
+                parent_epic_id=mission.id,
                 status=EpicStatus.PENDING,
                 project_id=mission.project_id or "",
                 workspace_path=workspace_path,
-                context={"target_branch": target_branch} if target_branch else {},
+                phases=phase_runs,
+                brief=mission.goal or mission.name,
             )
             run = run_store.create(run)
             run_info = {"epic_run_id": run.id}

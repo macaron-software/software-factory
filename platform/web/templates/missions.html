@@ -1,4 +1,3 @@
-<!-- Ref: feat-mission-control -->
 {% extends "base.html" %}
 
 {% block topbar_actions %}
@@ -47,9 +46,52 @@
     {% endfor %}
 </div>
 
-{% from "partials/skeleton.html" import skeleton_missions %}
-<div id="missions-grid" hx-get="/partial/missions/grid?status={{ filter_status or '' }}&amp;project={{ filter_project or '' }}" hx-trigger="load" hx-swap="innerHTML">
-  {{ skeleton_missions(6) }}
+<div class="item-grid" data-view-grid data-view="card">
+    {% for m in missions %}
+    <a href="/epics/{{ m.mission.id }}" class="item-card epic-card">
+        <div class="item-icon">
+            <span class="status-dot {% if m.mission.status == 'active' %}active{% elif m.mission.status == 'completed' %}done{% elif m.mission.status == 'blocked' %}error{% else %}idle{% endif %}"></span>
+            {% if m.sprint_count > 0 %}
+            <span class="mc-sprint-badge">S{{ m.current_sprint }}</span>
+            {% endif %}
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ m.mission.name }}</div>
+            <div class="item-subtitle">
+                {{ m.project_name }}
+                {% if m.mission.wsjf_score > 0 %} · <span class="mc-wsjf">WSJF {{ m.mission.wsjf_score|round(1) }}</span>{% endif %}
+            </div>
+            <div class="item-detail">
+                {% if m.mission.goal %}
+                <p class="item-desc">{{ m.mission.goal[:120] }}{% if m.mission.goal|length > 120 %}…{% endif %}</p>
+                {% endif %}
+
+                {% if m.total_tasks > 0 %}
+                <div class="mc-progress">
+                    <div class="mc-progress-bar">
+                        <div class="mc-progress-fill" style="width:{{ m.progress_pct }}%"></div>
+                    </div>
+                    <span class="mc-progress-text">{{ m.done_tasks }}/{{ m.total_tasks }}</span>
+                </div>
+                {% endif %}
+
+                {% if m.mission.created_by %}
+                <div class="mc-creator">{{ _('created_by') }} {{ m.mission.created_by }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="item-meta">
+            <span class="item-badge">{{ m.sprint_count }} sprint{{ 's' if m.sprint_count != 1 }}</span>
+            <span class="item-badge muted">{{ m.mission.created_at | ts('date') }}</span>
+        </div>
+    </a>
+    {% else %}
+    <div class="empty-state">
+        <p>{{ _('no_epic') }}</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_epics") }}</p>
+        <a href="/epics?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
+    </div>
+    {% endfor %}
 </div>
 
 {% if show_new_form %}

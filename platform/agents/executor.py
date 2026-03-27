@@ -16,6 +16,7 @@ import json
 import logging
 import re
 import time
+import xml.etree.ElementTree as ET
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
@@ -567,9 +568,9 @@ async def _extract_session_memory(
 
     extract_prompt = (
         "Extract structured facts from this conversation that would be useful for future sessions. "
-        "Return a JSON array of objects with keys: key (short label), value (the fact), category "
-        "(one of: tech_stack | architecture | preference | constraint | pattern | decision). "
-        "Only include facts with lasting value. Return [] if nothing notable.\n\n"
+        "Return XML only in this shape: "
+        "<facts><fact><key>...</key><value>...</value><category>tech_stack|architecture|preference|constraint|pattern|decision</category></fact></facts>. "
+        "Only include facts with lasting value. Return <facts></facts> if nothing notable.\n\n"
         "Conversation:\n" + "\n".join(digest)
     )
     try:
@@ -584,9 +585,22 @@ async def _extract_session_memory(
         # Strip markdown fences if any
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        import json as _json
-
-        facts = _json.loads(raw)
+        facts: list[dict] = []
+        xml = raw
+        m = re.search(r"<facts>.*?</facts>", xml, re.DOTALL)
+        if m:
+            xml = m.group(0)
+        root = ET.fromstring(xml)
+        if root.tag != "facts":
+            raise ValueError(f"Invalid memory facts XML root tag: {root.tag}")
+        for node in root.findall("./fact"):
+            facts.append(
+                {
+                    "key": (node.findtext("key") or "").strip(),
+                    "value": (node.findtext("value") or "").strip(),
+                    "category": (node.findtext("category") or "fact").strip(),
+                }
+            )
         if not isinstance(facts, list):
             return
         from ..memory.manager import get_memory_manager

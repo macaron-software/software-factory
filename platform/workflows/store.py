@@ -13,6 +13,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from typing import Optional
+from xml.sax.saxutils import escape as _xml_escape
 
 from ..db.migrations import get_db
 from ..patterns.store import get_pattern_store
@@ -754,6 +755,84 @@ def _format_templates_section() -> str:
     return "\n".join(lines)
 
 
+def _pm_decision_to_xml(decision: dict) -> str:
+    """Serialize PM decision dict to XML for traceability."""
+    dec = str(decision.get("decision", "next") or "next")
+    phase_id = str(decision.get("phase_id", "") or "")
+    reason = str(decision.get("reason", "") or "")
+    findings = str(decision.get("findings", "") or "")
+    phase = decision.get("phase", {}) if isinstance(decision.get("phase", {}), dict) else {}
+    team = phase.get("team", []) if isinstance(phase.get("team", []), list) else []
+    feedback = phase.get("feedback", []) if isinstance(phase.get("feedback", []), list) else []
+
+    team_xml = "".join(f"<agent_id>{_xml_escape(str(a))}</agent_id>" for a in team)
+    feedback_xml = "".join(f"<type>{_xml_escape(str(t))}</type>" for t in feedback)
+    phase_xml = ""
+    if phase:
+        phase_xml = (
+            "<phase>"
+            f"<name>{_xml_escape(str(phase.get('name', '') or ''))}</name>"
+            f"<pattern>{_xml_escape(str(phase.get('pattern', '') or ''))}</pattern>"
+            f"<gate>{_xml_escape(str(phase.get('gate', '') or ''))}</gate>"
+            f"<max_iterations>{_xml_escape(str(phase.get('max_iterations', '') or ''))}</max_iterations>"
+            f"<task>{_xml_escape(str(phase.get('task', '') or ''))}</task>"
+            f"<team>{team_xml}</team>"
+            f"<feedback>{feedback_xml}</feedback>"
+            "</phase>"
+        )
+
+    return (
+        "<pm_decision>"
+        f"<decision>{_xml_escape(dec)}</decision>"
+        f"<phase_id>{_xml_escape(phase_id)}</phase_id>"
+        f"<reason>{_xml_escape(reason)}</reason>"
+        f"<findings>{_xml_escape(findings)}</findings>"
+        f"{phase_xml}"
+        "</pm_decision>"
+    )
+
+
+def _parse_pm_decision(raw: str) -> dict:
+    """Parse PM decision from XML only."""
+    import re
+    import xml.etree.ElementTree as _ET
+
+    text = (raw or "").strip()
+    if "```" in text:
+        m_xml = re.search(r"```xml\s*\n?(.*?)\n?```", text, re.DOTALL)
+        if m_xml:
+            text = m_xml.group(1).strip()
+
+    root = _ET.fromstring(text)
+    if root.tag != "pm_decision":
+        raise ValueError(f"Invalid PM XML root tag: {root.tag}")
+    out = {
+        "decision": (root.findtext("decision") or "next").strip(),
+        "phase_id": (root.findtext("phase_id") or "").strip(),
+        "reason": (root.findtext("reason") or "").strip(),
+        "findings": (root.findtext("findings") or "").strip(),
+    }
+    phase_el = root.find("phase")
+    if phase_el is not None:
+        team = [n.text.strip() for n in phase_el.findall("./team/agent_id") if n.text]
+        feedback = [n.text.strip() for n in phase_el.findall("./feedback/type") if n.text]
+        max_iter_txt = (phase_el.findtext("max_iterations") or "").strip()
+        try:
+            max_iter = int(max_iter_txt) if max_iter_txt else 5
+        except ValueError:
+            max_iter = 5
+        out["phase"] = {
+            "name": (phase_el.findtext("name") or "").strip(),
+            "pattern": (phase_el.findtext("pattern") or "sequential").strip(),
+            "team": team,
+            "gate": (phase_el.findtext("gate") or "no_veto").strip(),
+            "feedback": feedback,
+            "max_iterations": max_iter,
+            "task": (phase_el.findtext("task") or "").strip(),
+        }
+    return out
+
+
 _PM_DECISION_PROMPT_V2 = """\
 Project: {project_id}
 Phase completed: "{phase_name}"
@@ -777,23 +856,35 @@ Loop: {loop_count}/{loop_limit}
 ## Feedback: {feedback_types}
 ## Gates: {gate_types}
 
-─── DECISION ───
-Return ONE JSON object. Pick the BEST option:
+─── DECISION (XML ONLY) ───
+Return ONE XML block. Pick the BEST option:
 
 1. ADVANCE to next phase (phase succeeded):
-{{"decision": "next", "reason": "..."}}
+<pm_decision><decision>next</decision><reason>...</reason></pm_decision>
 
 2. RE-RUN same phase (minor fix needed, max 2 loops):
-{{"decision": "loop", "phase_id": "<phase>", "reason": "...", "findings": "..."}}
+<pm_decision><decision>loop</decision><phase_id>&lt;phase&gt;</phase_id><reason>...</reason><findings>...</findings></pm_decision>
 
 3. SKIP to a later phase:
-{{"decision": "skip", "phase_id": "<phase>", "reason": "...", "findings": "..."}}
+<pm_decision><decision>skip</decision><phase_id>&lt;phase&gt;</phase_id><reason>...</reason><findings>...</findings></pm_decision>
 
 4. DONE (all AC met + build OK + tests pass):
-{{"decision": "done", "reason": "...", "findings": "..."}}
+<pm_decision><decision>done</decision><reason>...</reason><findings>...</findings></pm_decision>
 
 5. COMPOSE a new dynamic phase — PICK THE RIGHT PATTERN for the situation:
-{{"decision": "phase", "phase": {{"name": "<name>", "pattern": "<pattern>", "team": ["<agent_id>", ...], "gate": "<gate>", "feedback": ["<type>", ...], "max_iterations": <int>, "task": "<instructions>"}}, "reason": "..."}}
+<pm_decision>
+  <decision>phase</decision>
+  <reason>...</reason>
+  <phase>
+    <name>&lt;name&gt;</name>
+    <pattern>&lt;pattern&gt;</pattern>
+    <team><agent_id>&lt;agent_id&gt;</agent_id></team>
+    <gate>&lt;gate&gt;</gate>
+    <feedback><type>&lt;type&gt;</type></feedback>
+    <max_iterations>&lt;int&gt;</max_iterations>
+    <task>&lt;instructions&gt;</task>
+  </phase>
+</pm_decision>
 
 ─── PATTERN SELECTION GUIDE ───
 Pick the pattern that matches the situation:
@@ -1027,7 +1118,7 @@ async def _pm_checkpoint(
         _sys = (
             "You are a Product Manager orchestrating an agile software project. "
             "You decide workflow progression: advance, loop, compose new phases, or finish. "
-            "Respond with a SINGLE JSON object, no markdown, no explanation. "
+            "Respond with a SINGLE XML block <pm_decision>...</pm_decision>, no markdown, no explanation. "
             "Prefer composing new dynamic phases ('phase' decision) over looping the same phase repeatedly."
         )
         msgs = [
@@ -1037,13 +1128,7 @@ async def _pm_checkpoint(
         result = await llm.chat(msgs)
         raw = result.content.strip()
 
-        if "```" in raw:
-            import re
-            m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", raw, re.DOTALL)
-            if m:
-                raw = m.group(1).strip()
-
-        decision = _json.loads(raw)
+        decision = _parse_pm_decision(raw)
         dec_type = decision.get("decision", "?")
         logger.warning(
             "PM_CHECKPOINT phase=%s decision=%s target=%s reason=%s",
@@ -1930,7 +2015,7 @@ async def run_workflow(
                             session_id=session_id,
                             from_agent=_pm_decision.get("_agent", "product"),
                             to_agent="all",
-                            content=f"```json\n{__import__('json').dumps(_pm_decision, ensure_ascii=False)}\n```",
+                            content=f"```xml\n{_pm_decision_to_xml(_pm_decision)}\n```",
                             message_type="text",
                         )
                     )

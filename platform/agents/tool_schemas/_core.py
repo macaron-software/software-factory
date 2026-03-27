@@ -204,6 +204,14 @@ def _core_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "Search query"},
+                        "kind": {
+                            "type": "string",
+                            "description": "Optional KO kind filter (constraint, security, rbac, acceptance, ...)",
+                        },
+                        "mandatory_only": {
+                            "type": "boolean",
+                            "description": "When true, only mandatory KOs are returned for KO matches",
+                        },
                         "scope": {
                             "type": "string",
                             "description": "Memory scope: project | global",
@@ -261,6 +269,67 @@ def _core_schemas() -> list[dict]:
                         "key": {"type": "string", "description": "Exact key to delete (optional)"},
                         "category": {"type": "string", "description": "Delete all entries in this category (optional)"},
                         "older_than_days": {"type": "integer", "description": "Delete entries older than N days (optional)"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ko_store",
+                "description": "Store deterministic Knowledge Object for project constraints and invariants.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "key": {"type": "string", "description": "KO key"},
+                        "value": {"type": "string", "description": "KO content"},
+                        "kind": {
+                            "type": "string",
+                            "description": "KO type: constraint | security | rbac | acceptance | architecture",
+                        },
+                        "mandatory": {
+                            "type": "boolean",
+                            "description": "Mark as mandatory invariant that must be preserved",
+                        },
+                        "confidence": {
+                            "type": "number",
+                            "description": "Confidence score (0..1)",
+                        },
+                    },
+                    "required": ["key", "value"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ko_get",
+                "description": "Retrieve one deterministic Knowledge Object by key.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "key": {"type": "string", "description": "KO key"},
+                        "kind": {"type": "string", "description": "Optional KO kind"},
+                    },
+                    "required": ["key"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ko_search",
+                "description": "Search deterministic Knowledge Objects (KO-first retrieval).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                        "kind": {"type": "string", "description": "Optional KO kind"},
+                        "mandatory_only": {
+                            "type": "boolean",
+                            "description": "Filter mandatory KO only",
+                        },
+                        "limit": {"type": "integer", "description": "Result limit (max 50)"},
                     },
                 },
             },
@@ -743,5 +812,4 @@ def _web_schemas() -> list[dict]:
             },
         },
     ]
-
 

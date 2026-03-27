@@ -8,6 +8,7 @@ import pytest
 import pytest_asyncio
 
 pytestmark = pytest.mark.asyncio
+pytest.importorskip("pydantic", reason="pydantic dependency missing in current venv")
 
 from platform.tools.ast_tools import AstParseTool, AstImportsTool, AstExportsTool
 from platform.tools.type_check_tools import TypeCheckTool

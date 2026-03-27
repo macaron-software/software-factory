@@ -45,19 +45,8 @@ _RATE_LIMIT_WINDOW = 60  # seconds
 _login_attempts: dict[str, collections.deque] = {}
 
 
-_LOOPBACK_IPS = frozenset(("127.0.0.1", "::1", "localhost", "0:0:0:0:0:0:0:1"))
-
-
 def _check_rate_limit(ip: str) -> bool:
-    """Return True if IP has exceeded the login rate limit.
-
-    Localhost is always exempt so that local E2E / CI test suites are not
-    throttled by the brute-force window (SBD-04 still applies to remote IPs).
-    Override with SF_ENFORCE_LOCALHOST_RATE_LIMIT=1 to re-enable for all IPs.
-    """
-    enforce_all = os.environ.get("SF_ENFORCE_LOCALHOST_RATE_LIMIT", "") == "1"
-    if not enforce_all and ip in _LOOPBACK_IPS:
-        return False
+    """Return True if IP has exceeded the login rate limit."""
     now = time.monotonic()
     bucket = _login_attempts.setdefault(ip, collections.deque())
     while bucket and now - bucket[0] > _RATE_LIMIT_WINDOW:
@@ -160,11 +149,7 @@ async def demo_login(request: Request):
     demo_email = os.environ.get("SF_DEMO_EMAIL", "admin@demo.local")
     demo_pass = os.environ.get("SF_DEMO_PASSWORD", "")
     if not demo_pass:
-        # Local dev: use a default password so Skip (Demo) works without config
-        if os.environ.get("SF_LOCAL"):
-            demo_pass = "local-dev-skip"
-        else:
-            return JSONResponse({"error": "Demo login not configured"}, status_code=503)
+        return JSONResponse({"error": "Demo login not configured"}, status_code=503)
     demo_name = "Demo Admin"
 
     loop = asyncio.get_event_loop()
@@ -474,167 +459,3 @@ async def remove_project_role(
     """Remove project-specific role (falls back to global role)."""
     service.remove_project_role(user_id, project_id)
     return JSONResponse({"ok": True})
-
-
-# ---------------------------------------------------------------------------
-# Password reset
-# ---------------------------------------------------------------------------
-
-
-@router.post("/api/auth/forgot-password")
-async def forgot_password(request: Request):
-    """Send password reset code to email via AWS SES."""
-    ip = request.client.host if request.client else ""
-    if _check_rate_limit(ip):
-        return JSONResponse(
-            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
-            status_code=429,
-            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
-        )
-
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
-
-    email = body.get("email", "").strip()
-    if not email:
-        return JSONResponse({"error": "Email required"}, status_code=400)
-
-    import asyncio
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, lambda: service.request_password_reset(email))
-
-    # Always return success (prevent email enumeration)
-    return JSONResponse({"ok": True, "message": "If an account exists, a reset code was sent."})
-
-
-@router.post("/api/auth/verify-reset-code")
-async def verify_reset_code(request: Request):
-    """Verify a reset code is valid (pre-check before setting new password)."""
-    ip = request.client.host if request.client else ""
-    if _check_rate_limit(ip):
-        return JSONResponse(
-            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
-            status_code=429,
-            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
-        )
-
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
-
-    email = body.get("email", "").strip()
-    code = body.get("code", "").strip()
-    if not email or not code:
-        return JSONResponse({"error": "Email and code required"}, status_code=400)
-
-    import asyncio
-    loop = asyncio.get_event_loop()
-    valid = await loop.run_in_executor(None, lambda: service.verify_reset_code(email, code))
-
-    if not valid:
-        return JSONResponse(
-            {"error": "Invalid or expired code", "code": "invalid_code"},
-            status_code=400,
-        )
-    return JSONResponse({"ok": True, "valid": True})
-
-
-@router.post("/api/auth/reset-password")
-async def reset_password(request: Request):
-    """Reset password using a valid code."""
-    ip = request.client.host if request.client else ""
-    if _check_rate_limit(ip):
-        return JSONResponse(
-            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
-            status_code=429,
-            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
-        )
-
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
-
-    email = body.get("email", "").strip()
-    code = body.get("code", "").strip()
-    new_password = body.get("new_password", "")
-
-    if not email or not code or not new_password:
-        return JSONResponse(
-            {"error": "Email, code, and new_password required"}, status_code=400
-        )
-
-    try:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, lambda: service.reset_password(email, code, new_password)
-        )
-        return JSONResponse({"ok": True, "message": "Password reset successfully."})
-    except service.AuthError as e:
-        return JSONResponse({"error": str(e), "code": e.code}, status_code=400)
-
-
-# ── GDPR Data Rights ────────────────────────────────────────────────
-
-
-@router.get("/api/me/export", dependencies=[Depends(require_auth())])
-async def export_my_data(request: Request):
-    """GDPR Art. 15+20 — Export all user data as JSON."""
-    from ...db.adapter import get_db
-
-    user = getattr(request.state, "user", None)
-    if not user:
-        return JSONResponse({"error": "Not authenticated"}, status_code=401)
-
-    db = get_db()
-    user_id = user.id
-    email = user.email
-
-    data = {"user": {"id": user_id, "email": email, "username": getattr(user, "username", "")}}
-
-    try:
-        rows = db.execute("SELECT id, started_at, status FROM sessions WHERE user_id = %s ORDER BY started_at DESC LIMIT 100", (user_id,))
-        data["sessions"] = [{"id": r[0], "started_at": str(r[1]), "status": r[2]} for r in rows]
-    except Exception:
-        data["sessions"] = []
-
-    try:
-        rows = db.execute("SELECT slug, title, updated_at FROM wiki_pages WHERE owner = %s LIMIT 100", (email,))
-        data["wiki_pages"] = [{"slug": r[0], "title": r[1], "updated_at": str(r[2])} for r in rows]
-    except Exception:
-        data["wiki_pages"] = []
-
-    return JSONResponse(data, headers={
-        "Content-Disposition": f"attachment; filename=sf_export_{user_id}.json"
-    })
-
-
-@router.delete("/api/me", dependencies=[Depends(require_auth())])
-async def delete_my_account(request: Request):
-    """GDPR Art. 17 — Right to erasure. Delete account + associated data."""
-    from ...db.adapter import get_db
-
-    user = getattr(request.state, "user", None)
-    if not user:
-        return JSONResponse({"error": "Not authenticated"}, status_code=401)
-
-    if getattr(user, "role", "") == "admin":
-        return JSONResponse({"error": "Admin accounts cannot self-delete. Contact another admin."}, status_code=403)
-
-    db = get_db()
-    user_id = user.id
-
-    try:
-        db.execute("UPDATE wiki_pages SET owner = 'deleted' WHERE owner = %s", (user.email,))
-        db.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        resp = JSONResponse({"ok": True, "message": "Account deleted."})
-        resp.delete_cookie("access_token", path="/")
-        resp.delete_cookie("refresh_token", path="/api/auth")
-        return resp
-    except Exception as e:
-        logger.error("Account deletion failed for %s: %s", user_id, e)
-        return JSONResponse({"error": "Deletion failed. Contact admin."}, status_code=500)

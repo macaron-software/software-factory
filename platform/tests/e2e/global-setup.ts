@@ -9,6 +9,13 @@ import * as path from "path";
 
 export const STORAGE_STATE = path.join(__dirname, ".auth-state.json");
 
+function cookieScope(rawBase: string, hostname: string) {
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return { url: rawBase };
+  }
+  return { domain: hostname, path: "/" };
+}
+
 /** Make a raw HTTP POST and return all Set-Cookie header values. */
 function postAndGetCookies(url: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
@@ -49,6 +56,7 @@ export default async function globalSetup(_config: FullConfig) {
   // Use 127.0.0.1 to avoid IPv6 ECONNREFUSED on Node, but store cookies for hostname
   const ipBase = rawBase.replace("localhost", "127.0.0.1");
   const hostname = new URL(rawBase).hostname;
+  const scope = cookieScope(rawBase, hostname);
 
   // ── 1. Raw HTTP POST → extract Set-Cookie headers directly ────────────────
   const setCookieHeaders = await postAndGetCookies(`${ipBase}/api/auth/demo`);
@@ -70,17 +78,16 @@ export default async function globalSetup(_config: FullConfig) {
       authCookies.map((c) => ({
         name: c.name,
         value: c.value,
-        domain: hostname,
-        path: "/",
         httpOnly: true,
         sameSite: "Lax" as const,
+        ...scope,
       }))
     );
   }
 
   // Set onboarding cookie to bypass first-run redirect
   await context.addCookies([
-    { name: "onboarding_done", value: "1", domain: hostname, path: "/" },
+    { name: "onboarding_done", value: "1", ...scope },
   ]);
 
   // ── 4. Save storage state ──────────────────────────────────────────────────

@@ -1,5 +1,4 @@
 """Web routes package — assembles all sub-routers."""
-# Ref: feat-cockpit
 
 from __future__ import annotations
 
@@ -27,6 +26,9 @@ from .tma import router as tma_router
 from .wiki import router as wiki_router
 from .workflows import router as workflows_router
 from .a2a_server import router as a2a_router
+from .ac import router as ac_router
+from .pacman import router as pacman_router
+from .traceability import router as traceability_router
 
 router = APIRouter()
 
@@ -51,6 +53,9 @@ router.include_router(marketplace_router)
 router.include_router(metrics_router)
 router.include_router(tool_builder_router)
 router.include_router(a2a_router)
+router.include_router(ac_router)
+router.include_router(pacman_router)
+router.include_router(traceability_router)
 
 # Workspace file serving (needs to be on the main router)
 router.add_api_route("/workspace/{path:path}", serve_workspace_file, methods=["GET"])

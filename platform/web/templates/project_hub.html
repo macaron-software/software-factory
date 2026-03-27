@@ -1,6 +1,4 @@
-<!-- Ref: feat-projects -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_kanban, skeleton_hub_cards, skeleton_table %}
 
 {% block content %}
 <style>
@@ -205,7 +203,6 @@
     </div>
     <button onclick="location.reload()" title="Actualiser" style="padding:.35rem .5rem;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:.3rem;font-size:.78rem"><svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg></button>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-      <a href="/projects/{{ project.id }}/product" class="btn btn-sm btn-ghost" style="color:var(--accent);border-color:var(--accent)"><svg class="icon icon-xs" style="margin-right:.25rem"><use href="#icon-package"/></svg>Vue Produit</a>
       <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost">Board</a>
       <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost">Workspace</a>
     </div>
@@ -544,7 +541,7 @@
         </select>
       </div>
       <div id="feature-board-cols" style="display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:.75rem;overflow-x:auto">
-        {{ skeleton_kanban(5, 2) }}
+        <!-- filled by JS -->
       </div>
     </div>
 

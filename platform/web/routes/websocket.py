@@ -6,7 +6,6 @@ Provides /ws/live endpoint for:
 
 Integrates with the EventStore and MessageBus for event sourcing.
 """
-# Ref: feat-live
 
 from __future__ import annotations
 

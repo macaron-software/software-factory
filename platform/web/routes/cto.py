@@ -3,7 +3,6 @@
 Onglet "CTO" dans le Portfolio : chat avec Karim Benali (strat-cto),
 agent exécutif avec accès aux outils plateforme, web, GitHub et création de ressources.
 """
-# Ref: feat-cto
 
 from __future__ import annotations
 
@@ -12,13 +11,12 @@ import json
 import logging
 
 import markdown as md_lib
-from fastapi import Depends,  APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.requests import Request
 
 from .helpers import _parse_body, _templates, _avatar_url
 from .sse_utils import sse
-from ...auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +216,7 @@ async def cto_session():
     return JSONResponse({"session_id": session.id, "status": session.status})
 
 
-@router.post("/api/cto/sessions/new", response_class=JSONResponse, dependencies=[Depends(require_auth())])
+@router.post("/api/cto/sessions/new", response_class=JSONResponse)
 async def cto_new_session():
     """Create a new CTO chat session."""
     session = _create_cto_session()
@@ -729,7 +727,7 @@ def _badge_mentions(text: str) -> str:
     return "".join(parts)
 
 
-@router.post("/api/cto/message", dependencies=[Depends(require_auth())])
+@router.post("/api/cto/message")
 async def cto_message(request: Request):
     """Send a message to the CTO agent, return SSE stream."""
     from ...sessions.store import get_session_store, MessageDef
@@ -1124,7 +1122,7 @@ _TEXT_EXTS = {
 _MAX_CHARS = 40_000  # clip to avoid exploding the context window
 
 
-@router.post("/api/cto/upload", dependencies=[Depends(require_auth())])
+@router.post("/api/cto/upload")
 async def cto_upload(file: UploadFile = File(...)):
     """Extract text from an uploaded file and return it for injection into chat."""
     import io

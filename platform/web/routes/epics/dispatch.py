@@ -17,7 +17,6 @@ Configuration (platform.yaml or env):
 
   Or via env: PLATFORM_WORKER_NODES=https://node1,https://node2
 """
-# Ref: feat-backlog
 
 from __future__ import annotations
 
@@ -27,11 +26,10 @@ import os
 from dataclasses import dataclass
 
 import httpx
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..helpers import _parse_body
-from ....auth.middleware import require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -173,7 +171,7 @@ async def maybe_dispatch(
 # ── Worker endpoint: /api/missions/dispatch ───────────────────────────────────
 
 
-@router.post("/api/missions/dispatch", dependencies=[Depends(require_auth())])
+@router.post("/api/missions/dispatch")
 async def api_missions_dispatch(request: Request):
     """
     Worker node endpoint — receives delegated mission from coordinator.

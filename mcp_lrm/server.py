@@ -22,7 +22,7 @@ Usage:
     python -m mcp_lrm.server
 
     # Or with specific project
-    FACTORY_PROJECT=ppz python -m mcp_lrm.server
+    FACTORY_PROJECT=saas python -m mcp_lrm.server
 """
 
 import asyncio

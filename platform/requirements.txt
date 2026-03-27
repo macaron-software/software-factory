@@ -1,5 +1,5 @@
 # Macaron Agent Platform - Dependencies
-fastapi>=0.104
+fastapi>=0.104,<0.115
 uvicorn[standard]>=0.24
 jinja2>=3.1
 python-multipart>=0.0.6

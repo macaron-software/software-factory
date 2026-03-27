@@ -1,7 +1,7 @@
-team_id: team-finary
+team_id: team-finapp
 technology: fintech
 phase_type: development
-description: Team team-finary — end-to-end collaboration bench
+description: Team team-finapp — end-to-end collaboration bench
 pattern:
   type: hierarchical
   agents:

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/usr/bin/git ls-files:*)",
+      "Bash(xargs /usr/bin/grep -l -i \"la.poste\\\\|laposte\\\\|LAPOSTE\")",
+      "Bash(xargs /usr/bin/grep -li \"La Poste\\\\|GITLAB_LAPOSTE\\\\|laposte\\\\|gitlab.laposte\\\\|_LAPOSTE\")",
+      "Bash(xargs /usr/bin/grep -rn \"La Poste\\\\|GITLAB_LAPOSTE\\\\|_LAPOSTE\\\\|laposte\\\\|Plateforme Agents\")",
+      "Bash(/usr/bin/grep -i \"laposte\\\\|la.poste\")",
+      "Read(//tmp/**)",
+      "Bash(/usr/bin/grep -i \"laposte\" /tmp/sf_tracked.txt)"
+    ]
+  }
+}

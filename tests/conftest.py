@@ -136,13 +136,75 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: Slow tests (>10s, LLM round-trips)"
     )
+    config.addinivalue_line(
+        "markers", "chaos: destructive chaos engineering tests"
+    )
+    config.addinivalue_line(
+        "markers", "endurance: long-running endurance tests"
+    )
+    config.addinivalue_line(
+        "markers", "stability: remote stability smoke/load tests"
+    )
+    config.addinivalue_line(
+        "markers", "legacy: tests for deprecated/legacy modules"
+    )
+    config.addinivalue_line(
+        "markers", "prompt_eval: LLM prompt regression tests"
+    )
+
+
+def pytest_addoption(parser):
+    """Suite profile flags to tame heterogeneous test suites by default."""
+    parser.addoption(
+        "--run-live",
+        action="store_true",
+        default=False,
+        help="run live/stability/chaos/endurance tests",
+    )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="run tests marked slow",
+    )
+    parser.addoption(
+        "--run-llm",
+        action="store_true",
+        default=False,
+        help="run prompt_ci/prompt_eval tests requiring LLM keys",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
     """Modify test items during collection"""
+    run_live = config.getoption("--run-live") or os.environ.get("SF_TEST_LIVE") == "1"
+    run_slow = config.getoption("--run-slow") or os.environ.get("SF_TEST_SLOW") == "1"
+    run_llm = config.getoption("--run-llm") or os.environ.get("SF_TEST_LLM") == "1"
+
+    skip_live = pytest.mark.skip(reason="live suite disabled (use --run-live or SF_TEST_LIVE=1)")
+    skip_slow = pytest.mark.skip(reason="slow suite disabled (use --run-slow or SF_TEST_SLOW=1)")
+    skip_llm = pytest.mark.skip(reason="LLM suite disabled (use --run-llm or SF_TEST_LLM=1)")
+
     for item in items:
         # Add markers based on test file
         if "test_builtins" in item.nodeid:
             item.add_marker(pytest.mark.unit)
         elif "test_phase" in item.nodeid:
             item.add_marker(pytest.mark.integration)
+
+        if not run_live and (
+            item.get_closest_marker("live")
+            or item.get_closest_marker("chaos")
+            or item.get_closest_marker("endurance")
+            or item.get_closest_marker("stability")
+        ):
+            item.add_marker(skip_live)
+
+        if not run_slow and item.get_closest_marker("slow"):
+            item.add_marker(skip_slow)
+
+        if not run_llm and (
+            item.get_closest_marker("prompt_ci")
+            or item.get_closest_marker("prompt_eval")
+        ):
+            item.add_marker(skip_llm)

@@ -1,4 +1,3 @@
-<!-- Ref: feat-mission-control -->
 {% extends "base.html" %}
 
 {% block topbar_actions %}
@@ -11,7 +10,6 @@
 {% endblock %}
 
 {% block content %}
-{% from "partials/skeleton.html" import skeleton_timeline, skeleton_feed %}
 <link rel="stylesheet" href="/static/css/mission-control.css?v=20260221">
 
 
@@ -112,8 +110,6 @@
                         <span class="mc-phase-pattern">{{ phase.pattern_id }}</span>
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
                         <button class="btn btn-sm btn-ghost" style="padding:0.1rem 0.4rem;font-size:0.7rem;margin-left:auto" onclick="event.stopPropagation();toggleDebug('{{ phase.phase_id }}')" title="Debug info">Debug</button>
-                        <button class="btn btn-sm btn-ghost mc-phase-resume-btn" style="padding:0.1rem 0.5rem;font-size:0.7rem;color:var(--warning,#f59e0b)" onclick="event.stopPropagation();resumeAtPhase('{{ mission.id }}','{{ phase.phase_id }}',false)" title="Reset this phase and resume from here">↺ Resume</button>
-                        <button class="btn btn-sm btn-ghost mc-phase-resume-btn" style="padding:0.1rem 0.5rem;font-size:0.7rem;color:var(--danger,#ef4444)" onclick="event.stopPropagation();resumeAtPhase('{{ mission.id }}','{{ phase.phase_id }}',true)" title="Reset this phase and all subsequent phases, then resume">↺↺ Reset from here</button>
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
                     <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">
@@ -153,9 +149,7 @@
                                 {% include "partials/msg_unified.html" %}
                                 {% endfor %}
                             {% else %}
-                                <div class="mc-discuss-empty">
-                                    {{ skeleton_timeline(3) }}
-                                </div>
+                                <div class="mc-discuss-empty">{{ _("en_attente_d_execution") }}</div>
                             {% endif %}
                         </div>
                     </div>
@@ -250,28 +244,6 @@
 function toggleDebug(phaseId) {
     const el = document.getElementById('debug-' + phaseId);
     if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
-}
-
-async function resumeAtPhase(runId, phaseId, resetFrom) {
-    const action = resetFrom
-        ? `Reset phase '${phaseId}' AND all subsequent phases, then resume from '${phaseId}'?`
-        : `Reset phase '${phaseId}' only and resume from it?`;
-    if (!confirm(action)) return;
-    try {
-        const res = await fetch(`/api/missions/runs/${runId}/resume-at-phase`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({phase_id: phaseId, reset_from: resetFrom}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            const msg = `✅ Run paused at '${phaseId}' — will resume on next auto_resume cycle.\nReset: ${data.reset_phases.join(', ')}`;
-            alert(msg);
-            window.location.reload();
-        } else {
-            alert('Error: ' + (data.error || JSON.stringify(data)));
-        }
-    } catch(e) { alert('Resume error: ' + e); }
 }
 
 async function replayMission() {

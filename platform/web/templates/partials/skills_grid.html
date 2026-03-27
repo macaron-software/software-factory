@@ -1,4 +1,3 @@
-<!-- Ref: feat-skills -->
 <div class="item-grid" data-view-grid data-view="card">
     {% for s in skills %}
     <div class="item-card" data-id="{{ s.id }}" hx-get="/skills/{{ s.id }}" hx-target="#skill-preview-body" hx-swap="innerHTML" style="cursor:pointer;"

@@ -1,6 +1,4 @@
-<!-- Ref: feat-agents-list -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_feed, skeleton_block %}
 
 {% block topbar_actions %}
 <div style="display:flex;align-items:center;gap:10px;">
@@ -108,9 +106,7 @@
         <div class="world-zones" id="world-zones"></div>
 
         <!-- Activity feed -->
-        <div class="world-feed" id="world-feed">
-            {{ skeleton_feed(4) }}
-        </div>
+        <div class="world-feed" id="world-feed"></div>
 
         <!-- Agent info panel -->
         <div class="world-info" id="world-info">
@@ -1474,10 +1470,8 @@ function triggerDelegation(fromId, toId) {
 // UI: FEED, ZONES, COUNTERS
 // ═══════════════════════════════════════════════════════
 const feedEl = document.getElementById('world-feed');
-let _feedSkeletonCleared = false;
 
 function addFeedItem(name, status, detail) {
-    if (!_feedSkeletonCleared) { feedEl.innerHTML = ''; _feedSkeletonCleared = true; }
     const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     const item = document.createElement('div');
     item.className = 'wf-item';

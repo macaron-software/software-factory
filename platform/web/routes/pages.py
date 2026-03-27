@@ -1,5 +1,4 @@
 """Web routes — Page renders (portfolio, backlog, workflows, etc.)."""
-# Ref: feat-cockpit, feat-portfolio, feat-design-system
 
 from __future__ import annotations
 
@@ -8,18 +7,16 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
-    PlainTextResponse,
 )
 
 from .helpers import (
     _active_mission_tasks,
     _templates,
 )
-from ...auth.middleware import require_auth
 
 # Prevent asyncio task GC — store references until tasks complete
 _bg_tasks: set[asyncio.Task] = set()
@@ -40,19 +37,6 @@ logger = logging.getLogger(__name__)
 # ── Auth pages ───────────────────────────────────────────────────
 
 
-@router.get("/robots.txt", response_class=PlainTextResponse)
-async def robots_txt(request: Request):
-    """SEO: robots.txt — allow all crawlers."""
-    base = str(request.base_url).rstrip("/")
-    return (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "Disallow: /api/\n"
-        "Disallow: /admin/\n"
-        f"Sitemap: {base}/sitemap.xml\n"
-    )
-
-
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page."""
@@ -61,15 +45,6 @@ async def login_page(request: Request):
     templates = _templates(request)
     return templates.TemplateResponse(
         "login.html", {"request": request, "demo_mode": is_demo_mode()}
-    )
-
-
-@router.get("/privacy", response_class=HTMLResponse)
-async def privacy_page(request: Request):
-    """Privacy policy — GDPR Art. 12-14."""
-    templates = _templates(request)
-    return templates.TemplateResponse(
-        "privacy.html", {"request": request, "page_title": "Privacy Policy"}
     )
 
 
@@ -109,15 +84,6 @@ async def home_page(request: Request):
     return _templates(request).TemplateResponse(
         "home.html",
         {"request": request, "page_title": "Home", "active_tab": tab},
-    )
-
-
-@router.get("/pulse", response_class=HTMLResponse)
-async def pulse_page(request: Request):
-    """Pulse — Lean UX dashboard: only useful-now data."""
-    return _templates(request).TemplateResponse(
-        "pulse.html",
-        {"request": request, "page_title": "Pulse"},
     )
 
 
@@ -1253,7 +1219,7 @@ def _ac_select_skill_variants(project_id: str) -> dict[str, str]:
         return {skill: "v1" for skill in _AC_SKILL_VARIANTS}
 
 
-@router.post("/api/improvement/start/{project_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/start/{project_id}")
 async def api_improvement_start(project_id: str):
     """Launch an AC improvement cycle to improve the SF itself, using a pilot project workspace.
 
@@ -1636,7 +1602,7 @@ async def api_improvement_start(project_id: str):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.post("/api/improvement/stop/{project_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/stop/{project_id}")
 async def api_improvement_stop(project_id: str):
     """Stop/abort a running AC cycle for a project."""
     import time
@@ -1689,7 +1655,7 @@ async def api_improvement_stop(project_id: str):
     )
 
 
-@router.post("/api/improvement/rollback/{project_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/rollback/{project_id}")
 async def api_improvement_rollback(project_id: str, request: Request):
     """
     AC Coach rollback: git revert last commit in workspace + delete current cycle from DB.
@@ -1831,7 +1797,7 @@ async def api_improvement_rollback(project_id: str, request: Request):
     return JSONResponse(result)
 
 
-@router.post("/api/improvement/experiment", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/experiment")
 async def api_improvement_experiment(request: Request):
     """
     Register an A/B experiment for the current cycle.
@@ -1881,7 +1847,7 @@ async def api_improvement_experiment(request: Request):
     )
 
 
-@router.post("/api/improvement/inject-cycle", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/inject-cycle")
 async def api_improvement_inject_cycle(request: Request):
     """Record a completed AC cycle — called by ac-cicd-agent after CI/CD."""
     import time
@@ -2306,7 +2272,7 @@ async def api_improvement_screenshot(project_id: str, cycle_num: int):
     return Response(status_code=404)
 
 
-@router.post("/api/improvement/backfill/{project_id}", dependencies=[Depends(require_auth())])
+@router.post("/api/improvement/backfill/{project_id}")
 async def api_improvement_backfill(project_id: str):
     """Force re-backfill of cycle records from mission/sprint data. Updates stubs."""
     from fastapi.responses import JSONResponse
@@ -3094,7 +3060,7 @@ async def design_system_page(request: Request):
     )
 
 
-@router.post("/api/strategic-committee/launch", dependencies=[Depends(require_auth())])
+@router.post("/api/strategic-committee/launch")
 async def launch_strategic_committee(request: Request):
     """Launch a strategic committee session from the portfolio page."""
     from ...sessions.store import MessageDef, SessionDef, get_session_store
@@ -3254,7 +3220,7 @@ async def settings_page(request: Request):
     )
 
 
-@router.post("/api/settings/orchestrator", dependencies=[Depends(require_auth())])
+@router.post("/api/settings/orchestrator")
 async def save_orchestrator_settings(request: Request):
     """Save mission concurrency + backpressure + worker_nodes settings and apply them live."""
     from ...config import get_config, save_config
@@ -3353,7 +3319,7 @@ async def get_security_settings():
     }
 
 
-@router.post("/api/settings/security", dependencies=[Depends(require_auth())])
+@router.post("/api/settings/security")
 async def save_security_settings(request: Request):
     """Toggle security settings (Landlock, etc.)."""
     from ...config import get_config, save_config
@@ -3903,13 +3869,6 @@ async def product_page(request: Request):
         blocked_by_map = {}
         for r in dep_rows:
             blocked_by_map.setdefault(r["depends_on"], []).append(r["feature_id"])
-        # Persona name lookup
-        persona_names = {}
-        try:
-            persona_rows = _db.execute("SELECT id, name FROM personas").fetchall()
-            persona_names = {r["id"]: r["name"] for r in persona_rows}
-        except Exception:
-            pass
     finally:
         _db.close()
 
@@ -3945,8 +3904,6 @@ async def product_page(request: Request):
                     "assigned_to": f.assigned_to,
                     "acceptance_criteria": f.acceptance_criteria or "",
                     "description": f.description or "",
-                    "user_story": f.user_story or "",
-                    "persona_id": persona_names.get(f.persona_id, f.persona_id) if f.persona_id else "",
                     "deps": deps_map.get(f.id, []),
                     "depended_by": blocked_by_map.get(f.id, []),
                     "stories": [

@@ -1,5 +1,4 @@
 """Guidelines API — manage domain architecture guidelines."""
-# Ref: feat-quality
 
 from __future__ import annotations
 
@@ -8,12 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 from .input_models import GuidelineSyncRequest
 from ....db.adapter import get_connection
-from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -85,7 +83,7 @@ async def get_domain_guidelines(domain: str, role: str = "dev"):
     )
 
 
-@router.delete("/api/guidelines/domain/{domain}", dependencies=[Depends(require_auth())])
+@router.delete("/api/guidelines/domain/{domain}")
 async def clear_domain_guidelines(domain: str):
     """Clear all guidelines for a domain (to re-import)."""
     project = f"domain:{domain}" if not domain.startswith("domain:") else domain
@@ -105,7 +103,7 @@ async def clear_domain_guidelines(domain: str):
     )
 
 
-@router.post("/api/guidelines/sync", dependencies=[Depends(require_auth())])
+@router.post("/api/guidelines/sync")
 async def sync_guidelines(
     body: GuidelineSyncRequest, background_tasks: BackgroundTasks
 ):

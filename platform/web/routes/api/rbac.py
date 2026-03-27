@@ -1,5 +1,4 @@
 """RBAC & permission endpoints."""
-# Ref: feat-rbac
 
 from __future__ import annotations
 

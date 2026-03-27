@@ -1,6 +1,4 @@
-<!-- Ref: feat-workflows -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_item_grid %}
 {% block content %}
 
 <div class="tabs">
@@ -8,13 +6,11 @@
     <button class="tab" hx-get="/patterns/list" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns_organisationnels") }}</button>
 
 </div>
-<div id="tab-content">{{ skeleton_item_grid(6) }}</div>
-<template id="sk-workflows">{{ skeleton_item_grid(6) }}</template>
+<div id="tab-content"></div>
 <script>
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-content').innerHTML = document.getElementById('sk-workflows').innerHTML;
 }
 </script>
 {% endblock %}

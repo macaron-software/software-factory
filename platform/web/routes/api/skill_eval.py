@@ -9,14 +9,12 @@ WHY:
   "Graduate your evals: once they hit ~100%, they become regression tests."
 """
 from __future__ import annotations
-# Ref: feat-skills, feat-evals
 
 import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -75,7 +73,7 @@ async def skill_eval_result(skill_name: str) -> dict[str, Any]:
     return result
 
 
-@router.post("/api/skills/eval/{skill_name}/run", summary="Trigger eval run for a skill", dependencies=[Depends(require_auth())])
+@router.post("/api/skills/eval/{skill_name}/run", summary="Trigger eval run for a skill")
 async def skill_eval_run(
     skill_name: str,
     background_tasks: BackgroundTasks,

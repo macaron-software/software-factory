@@ -61,7 +61,7 @@ class ProjectRLM:
         self.project_name = project_name
         # RLM uses env-configured provider (falls back to minimax for local dev)
         self.provider = os.environ.get("PLATFORM_LLM_PROVIDER", "minimax")
-        self.model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
+        self.model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.7")
         self._llm = get_llm_client()
 
     async def search(

@@ -5,6 +5,8 @@ import os
 import sys
 import pytest
 
+pytest.importorskip("aiohttp", reason="aiohttp dependency missing in current venv")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from platform.mcp_platform.server import handle_tool, TOOLS
 

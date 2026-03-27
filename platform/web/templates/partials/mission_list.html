@@ -1,4 +1,3 @@
-<!-- Ref: feat-mission-control -->
 <div class="epic-list" id="missionList" hx-get="/api/epics/list-partial" hx-trigger="every 15s" hx-swap="outerHTML">
     {% for run in runs %}
     {% set done_count = run.phases|selectattr('status.value','equalto','done')|list|length %}

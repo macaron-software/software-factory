@@ -307,7 +307,7 @@ Puis relancez : `make run` (Docker) ou `make dev` (local)
 
 | Fournisseur | Variable d'env | Modeles |
 |-------------|---------------|---------|
-| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.7 |
 | **Compatible OpenAI** | `OPENAI_API_KEY` | tout modèle compatible OpenAI |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
@@ -1020,7 +1020,7 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 
 ### Fournisseurs LLM
 - **Multi-provider** avec fallback automatique
-- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- MiniMax-M2.7, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
 - **Mode démo** pour exploration UI sans clés API
 
 ### Améliorations Plateforme

@@ -1,6 +1,6 @@
 """BM25-based tool selector for prompt-aware tool filtering.
 
-WHY: MiniMax M2.5 picks wrong tools when schema set is large (>10-15 tools).
+WHY: MiniMax-M2.7 picks wrong tools when schema set is large (>10-15 tools).
 Role-based filtering (ROLE_TOOL_MAP) reduces ~128→15-25 per role, but that's
 still too many for reliable tool calling.
 

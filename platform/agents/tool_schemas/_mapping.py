@@ -196,7 +196,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_component_gallery_ds",
     ],
     "dev": [
-        # Core coding tools — ESSENTIAL only (context-lean for MiniMax-M2.5)
+        # Core coding tools — ESSENTIAL only (context-lean for MiniMax-M2.7)
         "code_read",
         "code_write",
         "code_edit",
@@ -543,9 +543,25 @@ for _mrole in ROLE_TOOL_MAP:
 
 # Traceability tools — migration projects need full legacy↔story↔code↔test chain
 _TRACEABILITY_TOOLS_FULL = [
-    "legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate",
+    "legacy_scan",
+    "traceability_link",
+    "traceability_coverage",
+    "traceability_validate",
+    "traceability_record",
+    "traceability_chain_report",
+    "traceability_check_e2e",
+    "project_traceability_report",
+    "project_traceability_check_e2e",
+    "project_traceability_export_sqlite",
 ]
-_TRACEABILITY_TOOLS_READONLY = ["traceability_coverage", "traceability_validate"]
+_TRACEABILITY_TOOLS_READONLY = [
+    "traceability_coverage",
+    "traceability_validate",
+    "traceability_chain_report",
+    "traceability_check_e2e",
+    "project_traceability_report",
+    "project_traceability_check_e2e",
+]
 for _trole in ("cdp", "architecture", "product"):
     if _trole in ROLE_TOOL_MAP:
         ROLE_TOOL_MAP[_trole].extend(_TRACEABILITY_TOOLS_FULL)

@@ -1,4 +1,3 @@
-<!-- Ref: feat-ideation -->
 {% extends base_template|default("base.html") %}
 
 {% block topbar_actions %}
@@ -470,8 +469,9 @@ function addMsg(agent, name, content, color, avatarUrl, role, targetAgent, patte
     const targetHtml = targetAgent && !isUser
         ? `<span class="mu__arrow">→</span><span class="mu__target">@${targetAgent}</span>` : '';
 
-    // Render markdown for agent messages, plain text for user/system
-    const rendered = (!isUser && !isSystem) ? md(content) : esc(content);
+    // Highlight @mentions in content
+    const rendered = content.replace(/@(\w[\w\s]*?)(?=[\s,.:!?]|$)/g,
+        '<span style="color:var(--purple);font-weight:600">@$1</span>');
 
     div.innerHTML = `
         ${avatarHtml}
@@ -779,6 +779,8 @@ function collectFindings() {
 var originalPrompt = '';
 var lastRequestType = 'new_feature';
 var lastPoProposal = {};
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 
 // Create epic from idea — PO agent structures everything
 document.getElementById('btnCreateEpic').addEventListener('click', async () => {

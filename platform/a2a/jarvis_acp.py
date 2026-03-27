@@ -55,12 +55,19 @@ def _login() -> str:
     global _token
     if _token:
         return _token
-    resp = httpx.post(
-        f"{SF_API_URL}/api/auth/login",
-        json={"email": SF_EMAIL, "password": SF_PASSWORD},
-        timeout=20,
-    )
-    resp.raise_for_status()
+    try:
+        resp = httpx.post(
+            f"{SF_API_URL}/api/auth/login",
+            json={"email": SF_EMAIL, "password": SF_PASSWORD},
+            timeout=20,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # Local/dev often rotates demo password; fallback to demo login endpoint.
+        if exc.response.status_code != 401:
+            raise
+        resp = httpx.post(f"{SF_API_URL}/api/auth/demo", json={}, timeout=20)
+        resp.raise_for_status()
     tok = resp.cookies.get("access_token", "")
     if not tok:
         raise RuntimeError("Login failed: no access_token cookie")

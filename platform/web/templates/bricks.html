@@ -1,6 +1,4 @@
-<!-- Ref: feat-tool-builder -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_stat_cards, skeleton_table %}
 
 {% block topbar_actions %}
 <form method="get" action="/bricks" style="display:flex;gap:0.5rem;align-items:center">
@@ -50,9 +48,7 @@
             <strong style="font-size:0.9rem">Skill AC</strong>
             <span id="skill-ac-status" style="font-size:0.82rem;color:var(--text-secondary)">running...</span>
         </div>
-        <div id="skill-ac-summary" style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem;font-size:0.82rem">
-            {{ skeleton_stat_cards(4) }}
-        </div>
+        <div id="skill-ac-summary" style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem;font-size:0.82rem"></div>
         <div style="overflow-x:auto">
             <table id="skill-ac-table" style="width:100%;border-collapse:collapse;font-size:0.8rem;display:none">
                 <thead>

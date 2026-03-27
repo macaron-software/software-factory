@@ -4,7 +4,6 @@ Aggregates all SF state into a single JSON payload for the /cockpit dashboard:
 pipeline stats, environments, daemons, LLM providers, projects, activity feed,
 TMA, incidents, DORA metrics.
 """
-# Ref: feat-cockpit
 
 from __future__ import annotations
 
@@ -80,9 +79,6 @@ def _build_summary(db) -> dict[str, Any]:
     # ── DORA ────────────────────────────────────────────────────────
     dora = _safe(lambda: _get_dora(db), {})
 
-    # ── Gossip network ─────────────────────────────────────────────
-    gossip = _safe(_get_gossip_stats, {})
-
     # ── Pattern stats ────────────────────────────────────────────────
     pattern_stats = _safe(lambda: _get_pattern_stats(db), {})
 
@@ -98,7 +94,6 @@ def _build_summary(db) -> dict[str, Any]:
         "incidents": incidents,
         "dora": dora,
         "pattern_stats": pattern_stats,
-        "gossip": gossip,
     }
 
 
@@ -592,12 +587,3 @@ def _get_pattern_stats(db) -> dict:
         "total_runs": int(total["n"]) if total else 0,
         "top": top,
     }
-
-
-def _get_gossip_stats() -> dict:
-    """GossipSub network stats from gossip_ledger."""
-    try:
-        from ....ac.gossip import get_gossip_stats
-        return get_gossip_stats()
-    except Exception:
-        return {"total_broadcasts": 0, "by_type": {}, "total_adoptions": 0, "adoption_rate": 0}

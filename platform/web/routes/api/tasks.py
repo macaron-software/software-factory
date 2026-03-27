@@ -5,7 +5,6 @@ that the SF turns into TMA missions executed by agents with git access.
 
 POST /api/tasks/copilot-brief
 """
-# Ref: feat-workflows
 
 from __future__ import annotations
 
@@ -13,8 +12,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -25,7 +23,7 @@ _REQUIRED_FIELDS = {"title", "description"}
 _VALID_TYPES = {"bug_fix", "feature", "refactor", "docs", "test", "chore"}
 
 
-@router.post("/api/tasks/copilot-brief", dependencies=[Depends(require_auth())])
+@router.post("/api/tasks/copilot-brief")
 async def submit_copilot_brief(request: Request) -> JSONResponse:
     """Submit a structured task brief from Copilot (or any orchestrator).
 

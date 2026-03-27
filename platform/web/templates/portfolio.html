@@ -1,6 +1,4 @@
-<!-- Ref: feat-portfolio -->
 {% extends "base.html" %}
-{% from "partials/skeleton.html" import skeleton_item_grid, skeleton_strategic, skeleton_stat_cards, skeleton_chart, skeleton_table %}
 
 {% block topbar_actions %}
 <a href="/epics?action=new" class="btn btn-primary">
@@ -753,7 +751,6 @@ restorePortCollapse();
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-content').innerHTML = '<div style="padding:1.5rem">' + document.getElementById('sk-portfolio').innerHTML + '</div>';
 }
 /* Auto-load non-overview tabs on page load */
 (function(){
@@ -767,9 +764,4 @@ function switchTab(btn){
     }
 })();
 </script>
-<template id="sk-portfolio">
-  {{ skeleton_strategic(6) }}
-  <div style="margin-top:1.5rem">{{ skeleton_stat_cards(4) }}</div>
-  <div style="margin-top:1.5rem">{{ skeleton_chart() }}</div>
-</template>
 {% endblock %}

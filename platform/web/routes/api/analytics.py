@@ -1,17 +1,15 @@
 """DORA metrics, burndown, velocity, cycle-time, pipeline & releases endpoints."""
-# Ref: feat-metrics
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from fastapi import Depends,  APIRouter, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from ...schemas import DoraMetrics
 from ..helpers import _templates
-from ....auth.middleware import require_auth
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -76,7 +74,7 @@ async def metrics_tab_quality(request: Request):
     )
 
 
-@router.post("/api/quality/scan/{project_id}", response_class=JSONResponse, dependencies=[Depends(require_auth())])
+@router.post("/api/quality/scan/{project_id}", response_class=JSONResponse)
 async def trigger_quality_scan(request: Request, project_id: str):
     """Trigger an async quality scan for a project."""
     import asyncio

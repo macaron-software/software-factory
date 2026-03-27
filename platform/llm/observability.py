@@ -9,7 +9,7 @@ Provides:
 Usage:
     from platform.llm.observability import get_tracer
     tracer = get_tracer()
-    tracer.trace_call(provider="minimax", model="MiniMax-M2.5", ...)
+    tracer.trace_call(provider="minimax", model="MiniMax-M2.7", ...)
     stats = tracer.stats()
 """
 # Ref: feat-metrics
@@ -27,8 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Cost per 1M tokens (USD) — approximate pricing
 _COST_PER_1M = {
-    "MiniMax-M2.5": {"input": 0.40, "output": 1.20},
-    "MiniMax-M2.1": {"input": 0.30, "output": 0.90},
+    "MiniMax-M2.7": {"input": 0.40, "output": 1.20},
     "gpt-5.2": {"input": 5.00, "output": 15.00},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-5.1": {"input": 3.00, "output": 12.00},

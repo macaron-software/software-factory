@@ -96,7 +96,7 @@ async def _summarize_messages(messages: list[dict], project_name: str) -> Option
         resp = await llm.chat(
             messages=[LLMMessage(role="user", content=prompt)],
             provider="minimax",
-            model="MiniMax-M2.5",
+            model="MiniMax-M2.7",
             temperature=0.2,
             max_tokens=800,
         )

@@ -215,7 +215,7 @@ RÈGLES FONDAMENTALES :
 4. INTERDIT dans le contexte SF-Platform uniquement : list_files, code_search (cherchent dans le filesystem local, pas dans la SF)
 5. INTERDIT : créer des fichiers locaux, demander des credentials, générer du SQL
 
-POUR LES PROJETS CLIENTS (Veligo, LDP, PSY, Finary, etc.) :
+POUR LES PROJETS CLIENTS (MobilityApp, LDP, PSY, FinApp, etc.) :
 - Utilise memory_search pour lire la mémoire du projet (specs, architecture, décisions)
 - Utilise jira_search(project="VELIGO") pour consulter les tickets Jira
 - Utilise confluence_read(page_id="...") pour lire la documentation Confluence

@@ -167,15 +167,6 @@ async def _run_post_phase_hooks(
                 text=True,
                 timeout=10,
             )
-            # Push to remote so changes are visible on GitHub
-            push_res = subprocess.run(
-                ["git", "push"],
-                cwd=workspace,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            push_status = " → pushed" if push_res.returncode == 0 else " (push failed)"
             await push_sse(
                 session_id,
                 {
@@ -183,7 +174,7 @@ async def _run_post_phase_hooks(
                     "from_agent": "system",
                     "from_name": "CI/CD",
                     "from_role": "Pipeline",
-                    "content": f"Auto-commit: {file_count} fichiers ({phase_name}){push_status}",
+                    "content": f"Auto-commit: {file_count} fichiers ({phase_name})",
                     "phase_id": phase_id,
                     "msg_type": "text",
                 },
@@ -2353,9 +2344,6 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
         android_kw = ("android", "kotlin", "jetpack", "gradle")
         if any(kw in bl for kw in android_kw):
             return "android-native"
-        rust_kw = ("rust", "cargo", "macroquad", "bevy", "wgpu", "ggez", "winit")
-        if any(kw in bl for kw in rust_kw):
-            return "rust-native"
 
     # --- Priority 2: Check .stack file (written by ideation/architecture phase) ---
     if workspace_path:
@@ -2371,7 +2359,6 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
                     "ios-native",
                     "macos-native",
                     "android-native",
-                    "rust-native",
                 ):
                     return stack
             except Exception:
@@ -2398,16 +2385,10 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
     )
     has_node = (ws / "package.json").exists()
     has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
-    has_rust = (ws / "Cargo.toml").exists()
 
-    # Web indicators take priority — package.json is unambiguous,
-    # and a stray Cargo.toml from a confused agent must not override it.
+    # Web indicators take priority over Swift (prevents accidental Swift bias)
     if has_node:
         return "web-node"
-
-    # Rust detection only if no Node/web indicators
-    if has_rust:
-        return "rust-native"
 
     if has_docker:
         return "web-docker"
@@ -2569,41 +2550,9 @@ _PLATFORM_QA = {
             "PAS de Docker pour le build."
         ),
     },
-    "rust-native": {
-        "qa-campaign": (
-            "TYPE: Application Rust native (cargo/macroquad/bevy)\n"
-            "OUTILS QA — PAS de npm, PAS de Playwright :\n"
-            "1. list_files + code_read pour comprendre la structure\n"
-            "2. Créez tests/PLAN.md (code_write) — plan de test Rust\n"
-            "3. Build: build command='cargo build'\n"
-            "4. Tests: build command='cargo test'\n"
-            "5. Lint: build command='cargo clippy -- -D warnings' (si disponible)\n"
-            "6. Documentez bugs dans tests/BUGS.md, commitez\n"
-            "IMPORTANT: Utilisez UNIQUEMENT cargo. PAS de npm/node."
-        ),
-        "qa-execution": (
-            "TYPE: Application Rust native\n"
-            "1. build command='cargo test'\n"
-            "2. build command='cargo clippy' (si disponible)\n"
-            "3. tests/REPORT.md avec résultats\n"
-            "PAS de npm. PAS de Playwright. PAS de Docker."
-        ),
-        "deploy-prod": (
-            "TYPE: Application Rust native\n"
-            "1. build command='cargo build --release'\n"
-            "2. Binary dans target/release/\n"
-            "3. Documentez installation dans INSTALL.md\n"
-            "Distribution: binary natif ou cargo install."
-        ),
-        "cicd": (
-            "TYPE: Application Rust native\n"
-            "1. .github/workflows/ci.yml avec rustup + cargo\n"
-            "2. cargo build + cargo test + cargo clippy\n"
-            "3. git_commit\n"
-            "PAS de Dockerfile pour le build (sauf déploiement)."
-        ),
-    },
 }
+
+# Web fallback (docker / node / static)
 
 
 _WEB_QA = {
@@ -2773,7 +2722,6 @@ def _build_phase_prompt(
         "macos-native": "macOS native (Swift/SwiftUI)",
         "ios-native": "iOS native (Swift/SwiftUI/UIKit)",
         "android-native": "Android native (Kotlin/Java)",
-        "rust-native": "Rust native (cargo/macroquad/bevy)",
         "web-docker": "web (Docker)",
         "web-node": "web (Node.js)",
         "web-static": "web statique",
@@ -2787,18 +2735,7 @@ def _build_phase_prompt(
             "- UX Designer : parcours utilisateur, wireframes, ergonomie\n"
             "- Architecte : faisabilité technique, stack recommandée\n"
             "- Product Manager : valeur business, ROI, priorisation\n"
-            "Débattez et convergez vers une vision produit cohérente.\n\n"
-            "TRACEABILITY REQUIREMENT:\n"
-            "Every deliverable MUST have a UUID reference:\n"
-            "- Epic: EPIC-<uuid4_short> (e.g. EPIC-a1b2c3)\n"
-            "- Feature: FEAT-<uuid4_short>\n"
-            "- User Story: US-<uuid4_short>\n"
-            "- Acceptance Criteria: AC-<uuid4_short>\n"
-            "Format each user story as:\n"
-            "  [US-xxxxxx] As a <persona>, I want <action>, so that <benefit>\n"
-            "  Acceptance Criteria:\n"
-            "    [AC-yyyyyy] GIVEN <context> WHEN <action> THEN <result>\n"
-            "All IDs must be unique and traceable through the project lifecycle."
+            "Débattez et convergez vers une vision produit cohérente."
         ),
         "strategic-committee": (
             f"Comité stratégique GO/NOGO pour le projet : «{brief}».\n"
@@ -2826,17 +2763,7 @@ def _build_phase_prompt(
             "- Expert Sécurité : threat model, auth, OWASP\n"
             "- DevOps : infra, CI/CD, monitoring, environnements\n"
             "- Lead Dev : revue technique, standards code\n"
-            "Produisez le dossier d'architecture consolidé.\n\n"
-            "MANDATORY DEEP RESEARCH:\n"
-            "Before designing, EVERY agent MUST call deep_search to research:\n"
-            "- Best practices for the target stack/framework\n"
-            "- Architecture patterns relevant to this project type\n"
-            "- Known pitfalls and performance considerations\n"
-            "Do NOT design from assumptions — use deep_search first.\n\n"
-            "TRACEABILITY:\n"
-            "Reference all features with UUID: [FEAT-xxxxxx] <feature name>\n"
-            "Each feature MUST have acceptance criteria: [AC-yyyyyy] GIVEN/WHEN/THEN\n"
-            "Link architectural decisions to features they serve."
+            "Produisez le dossier d'architecture consolidé."
         ),
         "dev-sprint": (
             f"Sprint de développement TDD pour «{brief}».\n"
@@ -2846,74 +2773,30 @@ def _build_phase_prompt(
                 f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
                 f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
                 f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
-                f"{'Utilisez RUST (.rs files). NE PAS écrire de TypeScript/JavaScript/Python. Build: cargo build. Test: cargo test.' if platform == 'rust-native' else ''}\n"
                 if platform_label
                 else ""
             )
             + "VOUS DEVEZ UTILISER VOS OUTILS pour écrire du VRAI code dans le workspace.\n\n"
-            "== PHASE 0: DEEP RESEARCH (MANDATORY) ==\n"
-            "BEFORE writing ANY code, you MUST call deep_search for EACH module you will implement:\n"
-            "- Research the framework/library APIs you will use\n"
-            "- Research best practices, design patterns, and pitfalls\n"
-            "- Research similar implementations for reference\n"
-            "Examples: deep_search('macroquad sprite sheet animation tutorial'),\n"
-            "  deep_search('ECS architecture for 2D platformer in Rust'),\n"
-            "  deep_search('collision detection AABB rectangle overlap algorithm')\n"
-            "Do NOT skip this step. Shallow code without research will be REJECTED.\n\n"
-            "== PHASE 1: FEATURE DECOMPOSITION ==\n"
-            "Break the feature into atomic sub-components. Each sub-component must:\n"
-            "- Have a clear single responsibility\n"
-            "- Be independently testable\n"
-            "- Reference its parent feature: # Ref: FEAT-<uuid>\n"
-            "- Have at least one acceptance criteria: # AC: AC-<uuid> GIVEN/WHEN/THEN\n\n"
-            "== PHASE 2: TDD IMPLEMENTATION ==\n"
-            "For EACH sub-component:\n"
+            "WORKFLOW OBLIGATOIRE:\n"
             "1. LIRE LE WORKSPACE: list_files + code_read sur les fichiers existants\n"
             "2. ECRIRE LE CODE avec code_write:\n"
-            + (
-                "   - Créer Cargo.toml avec [dependencies]\n"
-                "   - Créer src/main.rs comme point d'entrée\n"
-                "   - Créer src/lib.rs et des modules src/*.rs\n"
-                "   - Créer au moins un test dans tests/ ou #[test] inline\n"
-                "   - Minimum 5 fichiers .rs pour une application fonctionnelle\n"
-                "   - NE PAS créer de package.json, tsconfig.json, ou tout fichier JS/TS\n"
-                if platform == "rust-native" else
-                "   - Créer les fichiers source (HTML, CSS, JS, package.json si Node.js)\n"
-                "   - Créer au moins un fichier de test\n"
-                "   - Minimum 5 fichiers source pour une application fonctionnelle\n"
-            )
-            + "3. BUILDER avec l'outil build:\n"
-            + (
-                "   - Appeler build(command='cargo check', cwd=WORKSPACE)\n"
-                "   - Ou build(command='cargo build', cwd=WORKSPACE)\n"
-                if platform == "rust-native" else
-                "   - Appeler build(command='npm install && npm run build', cwd=WORKSPACE)\n"
-                "   - Ou build(command='npx tsc --noEmit', cwd=WORKSPACE) pour TypeScript\n"
-                "   - Pour du HTML/JS simple: build(command='node -e \"console.log(1)\"', cwd=WORKSPACE)\n"
-            )
-            + "4. TESTER avec l'outil test:\n"
-            + (
-                "   - Appeler test(command='cargo test', cwd=WORKSPACE)\n"
-                if platform == "rust-native" else
-                "   - Appeler test(command='npm test', cwd=WORKSPACE)\n"
-                "   - Ou test(command='node tests/run.js', cwd=WORKSPACE)\n"
-            )
-            + "5. COMMITTER avec git_commit: message descriptif\n\n"
-            "== QUALITY GATES ==\n"
-            "- Every source file MUST have `# Ref: FEAT-<uuid>` or `// Ref: FEAT-<uuid>` header\n"
-            "- Every test file MUST reference the AC it validates: `// AC: AC-<uuid>`\n"
-            "- Each module MUST have >50 LOC of REAL implementation (no stubs/placeholders)\n"
-            "- At least ONE deep_search call per module before writing it\n"
+            "   - Créer les fichiers source (HTML, CSS, JS, package.json si Node.js)\n"
+            "   - Créer au moins un fichier de test\n"
+            "   - Minimum 5 fichiers source pour une application fonctionnelle\n"
+            "3. BUILDER avec l'outil build:\n"
+            "   - Appeler build(command='npm install && npm run build', cwd=WORKSPACE)\n"
+            "   - Ou build(command='npx tsc --noEmit', cwd=WORKSPACE) pour TypeScript\n"
+            "   - Pour du HTML/JS simple: build(command='node -e \"console.log(1)\"', cwd=WORKSPACE)\n"
+            "4. TESTER avec l'outil test:\n"
+            "   - Appeler test(command='npm test', cwd=WORKSPACE)\n"
+            "   - Ou test(command='node tests/run.js', cwd=WORKSPACE)\n"
+            "5. COMMITTER avec git_commit: message descriptif\n\n"
+            "REGLES STRICTES:\n"
             "- Chaque dev DOIT appeler code_write au minimum 3 fois\n"
             "- Au moins UN appel à build() ou test() est OBLIGATOIRE\n"
             "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write.\n"
             "- Pas de placeholder, pas de TODO, pas de mock — du vrai code fonctionnel\n"
-            + (
-                "- Créez un Cargo.toml avec les dependencies appropriées (macroquad, rand, etc.)\n"
-                "- Utilisez UNIQUEMENT des fichiers .rs dans src/"
-                if platform == "rust-native" else
-                "- Créez un package.json si c'est un projet Node.js"
-            )
+            "- Créez un package.json si c'est un projet Node.js"
         ),
         "cicd": _qa("cicd"),
         "qa-campaign": _qa("qa-campaign"),
@@ -2937,45 +2820,6 @@ def _build_phase_prompt(
             "5. Lancez le test — il DOIT passer\n"
             "6. Lancez TOUS les tests pour verifier zero regression\n"
             "7. Commitez avec git_commit (message: fix + test ajouté)"
-        ),
-        "story-decomposition": (
-            f"FRACTAL STORY DECOMPOSITION for «{brief}».\n"
-            "You are decomposing this project into atomic implementable stories.\n\n"
-            "MANDATORY DEEP RESEARCH:\n"
-            "Before decomposing, call deep_search for EACH major component area:\n"
-            "- The framework/engine APIs and capabilities\n"
-            "- Best practices for this type of application\n"
-            "- Reference architectures and implementations\n\n"
-            "DECOMPOSITION RULES:\n"
-            "1. Break into modules with SINGLE RESPONSIBILITY\n"
-            "2. Each leaf story must be implementable in <200 LOC\n"
-            "3. Each story MUST have a UUID: [US-xxxxxx]\n"
-            "4. Each story MUST reference its parent: [FEAT-yyyyyy]\n"
-            "5. Each story MUST have acceptance criteria: [AC-zzzzzz] GIVEN/WHEN/THEN\n"
-            "6. Stories should be independently testable\n\n"
-            "OUTPUT FORMAT per story:\n"
-            "  [US-xxxxxx] <story title> (parent: FEAT-yyyyyy)\n"
-            "  Description: <what this module does>\n"
-            "  Files: <list of files to create/modify>\n"
-            "  Dependencies: <other stories this depends on>\n"
-            "  AC:\n"
-            "    [AC-aaaaaa] GIVEN <context> WHEN <action> THEN <result>\n"
-            "    [AC-bbbbbb] GIVEN <edge case> WHEN <trigger> THEN <handling>\n"
-        ),
-        "qa-decomposition": (
-            f"FRACTAL QA DECOMPOSITION for «{brief}».\n"
-            "Decompose each user story from the previous phase into atomic BDD test scenarios.\n\n"
-            "For each [US-xxxxxx] story, generate Gherkin scenarios:\n"
-            "  [AC-yyyyyy] Scenario: <descriptive name>\n"
-            "    Given <initial state/context>\n"
-            "    When <user action or system event>\n"
-            "    Then <expected outcome>\n\n"
-            "RULES:\n"
-            "- Each scenario tests ONE behavior (single assertion)\n"
-            "- Cover: happy path, boundary conditions, error handling\n"
-            "- Reference the story UUID: [AC-yyyyyy] validates [US-xxxxxx]\n"
-            "- Scenarios must be independently executable\n"
-            "- At least 2 scenarios per story (happy + edge case)\n"
         ),
     }
     # Match by phase key first, then by alias mappings, then by index

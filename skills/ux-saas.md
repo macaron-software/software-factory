@@ -1,49 +1,49 @@
 ---
-name: ux-ppz-patterns
+name: ux-saas-patterns
 description: >
-  Guides the agent through UX patterns specific to the Popinz (PPZ) platform. Use this
+  Guides the agent through UX patterns specific to the SaasApp (SAAS) platform. Use this
   skill when implementing user experience flows, interaction patterns, and feedback
-  mechanisms within the PPZ ecosystem. Covers PPZ-specific navigation, modals (popins),
-  form flows, notification patterns, and the PPZ interaction language.
+  mechanisms within the SAAS ecosystem. Covers SAAS-specific navigation, modals (popins),
+  form flows, notification patterns, and the SAAS interaction language.
 metadata:
   category: design
   triggers:
-    - "when implementing UX patterns for the PPZ platform"
-    - "when working with PPZ modals/popins"
-    - "when designing PPZ navigation flows"
-    - "when implementing PPZ notification patterns"
-    - "when user asks about PPZ user experience"
+    - "when implementing UX patterns for the SAAS platform"
+    - "when working with SAAS modals/popins"
+    - "when designing SAAS navigation flows"
+    - "when implementing SAAS notification patterns"
+    - "when user asks about SAAS user experience"
 ---
 
-# PPZ UX Patterns (Popinz)
+# SAAS UX Patterns (SaasApp)
 
-This skill enables the agent to implement UX patterns specific to the Popinz platform,
+This skill enables the agent to implement UX patterns specific to the SaasApp platform,
 including its modal/popin system, navigation flows, form patterns, and feedback mechanisms.
 
 ## Use this skill when
 
-- Implementing user flows in the PPZ platform
-- Working with PPZ popin (modal) system
-- Building PPZ form workflows
-- Implementing PPZ notification/toast patterns
-- Designing PPZ navigation and routing
+- Implementing user flows in the SAAS platform
+- Working with SAAS popin (modal) system
+- Building SAAS form workflows
+- Implementing SAAS notification/toast patterns
+- Designing SAAS navigation and routing
 
 ## Do not use this skill when
 
-- Working on non-PPZ projects (use ux-best-practices)
-- Building PPZ visual components (use ui-ppz-design-system)
+- Working on non-SAAS projects (use ux-best-practices)
+- Building SAAS visual components (use ui-saas-design-system)
 - Doing general accessibility audits (use accessibility-audit)
 
 ## Instructions
 
-### PPZ Popin (Modal) System
+### SAAS Popin (Modal) System
 
-The PPZ platform centers around "popins" — modal-like components that are the primary
-interaction pattern. The name "Popinz" comes from this core concept.
+The SAAS platform centers around "popins" — modal-like components that are the primary
+interaction pattern. The name "SaasApp" comes from this core concept.
 
 ```php
 <?php
-function ppz_popin(array $props): string {
+function saas_popin(array $props): string {
     $id = htmlspecialchars($props['id']);
     $title = htmlspecialchars($props['title'] ?? '');
     $size = $props['size'] ?? 'md'; // sm, md, lg, xl, full
@@ -51,21 +51,21 @@ function ppz_popin(array $props): string {
     $closable = $props['closable'] ?? true;
 
     $closeBtn = $closable ? <<<HTML
-    <button class="ppz-popin__close" aria-label="Close" data-ppz-close>
+    <button class="saas-popin__close" aria-label="Close" data-saas-close>
         <span aria-hidden="true">&times;</span>
     </button>
     HTML : '';
 
     return <<<HTML
-    <dialog class="ppz-popin ppz-popin--{$size}" id="{$id}" aria-labelledby="{$id}-title">
-        <div class="ppz-popin__header">
-            <h2 class="ppz-popin__title" id="{$id}-title">{$title}</h2>
+    <dialog class="saas-popin saas-popin--{$size}" id="{$id}" aria-labelledby="{$id}-title">
+        <div class="saas-popin__header">
+            <h2 class="saas-popin__title" id="{$id}-title">{$title}</h2>
             {$closeBtn}
         </div>
-        <div class="ppz-popin__body">
+        <div class="saas-popin__body">
             {$content}
         </div>
-        <div class="ppz-popin__footer" id="{$id}-footer">
+        <div class="saas-popin__footer" id="{$id}-footer">
         </div>
     </dialog>
     HTML;
@@ -74,55 +74,55 @@ function ppz_popin(array $props): string {
 ```
 
 ```css
-.ppz-popin {
+.saas-popin {
   border: none;
-  border-radius: var(--ppz-radius-lg);
-  box-shadow: var(--ppz-shadow-lg);
+  border-radius: var(--saas-radius-lg);
+  box-shadow: var(--saas-shadow-lg);
   padding: 0;
   max-height: 90vh;
   overflow: hidden;
 }
 
-.ppz-popin--sm {
+.saas-popin--sm {
   width: min(400px, 90vw);
 }
-.ppz-popin--md {
+.saas-popin--md {
   width: min(560px, 90vw);
 }
-.ppz-popin--lg {
+.saas-popin--lg {
   width: min(720px, 90vw);
 }
-.ppz-popin--xl {
+.saas-popin--xl {
   width: min(960px, 90vw);
 }
-.ppz-popin--full {
+.saas-popin--full {
   width: 90vw;
   height: 90vh;
 }
 
-.ppz-popin__header {
+.saas-popin__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--ppz-space-4) var(--ppz-space-6);
-  border-bottom: 1px solid var(--ppz-color-border);
+  padding: var(--saas-space-4) var(--saas-space-6);
+  border-bottom: 1px solid var(--saas-color-border);
 }
 
-.ppz-popin__body {
-  padding: var(--ppz-space-6);
+.saas-popin__body {
+  padding: var(--saas-space-6);
   overflow-y: auto;
   max-height: 60vh;
 }
 
-.ppz-popin__footer {
+.saas-popin__footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--ppz-space-3);
-  padding: var(--ppz-space-4) var(--ppz-space-6);
-  border-top: 1px solid var(--ppz-color-border);
+  gap: var(--saas-space-3);
+  padding: var(--saas-space-4) var(--saas-space-6);
+  border-top: 1px solid var(--saas-color-border);
 }
 
-.ppz-popin::backdrop {
+.saas-popin::backdrop {
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
 }
@@ -147,7 +147,7 @@ class PpzPopin {
     });
 
     // Close button
-    this.dialog.querySelector("[data-ppz-close]")?.addEventListener("click", () => {
+    this.dialog.querySelector("[data-saas-close]")?.addEventListener("click", () => {
       this.close();
     });
   }
@@ -169,14 +169,14 @@ class PpzPopin {
 }
 ```
 
-### PPZ Navigation Patterns
+### SAAS Navigation Patterns
 
 #### Breadcrumb Trail
 
 ```php
 <?php
-function ppz_breadcrumbs(array $items): string {
-    $html = '<nav class="ppz-breadcrumbs" aria-label="Breadcrumb"><ol class="ppz-breadcrumbs__list">';
+function saas_breadcrumbs(array $items): string {
+    $html = '<nav class="saas-breadcrumbs" aria-label="Breadcrumb"><ol class="saas-breadcrumbs__list">';
     $lastIndex = count($items) - 1;
 
     foreach ($items as $i => $item) {
@@ -184,10 +184,10 @@ function ppz_breadcrumbs(array $items): string {
         $name = htmlspecialchars($item['name']);
 
         if ($isLast) {
-            $html .= "<li class=\"ppz-breadcrumbs__item\" aria-current=\"page\">{$name}</li>";
+            $html .= "<li class=\"saas-breadcrumbs__item\" aria-current=\"page\">{$name}</li>";
         } else {
             $href = htmlspecialchars($item['href']);
-            $html .= "<li class=\"ppz-breadcrumbs__item\"><a href=\"{$href}\" class=\"ppz-breadcrumbs__link\">{$name}</a></li>";
+            $html .= "<li class=\"saas-breadcrumbs__item\"><a href=\"{$href}\" class=\"saas-breadcrumbs__link\">{$name}</a></li>";
         }
     }
 
@@ -197,22 +197,22 @@ function ppz_breadcrumbs(array $items): string {
 ?>
 ```
 
-### PPZ Toast/Notification System
+### SAAS Toast/Notification System
 
 ```php
 <?php
-function ppz_toast(array $props): string {
+function saas_toast(array $props): string {
     $type = $props['type'] ?? 'info'; // success, warning, error, info
     $message = htmlspecialchars($props['message']);
     $dismissable = $props['dismissable'] ?? true;
     $duration = $props['duration'] ?? 5000;
 
-    $dismissBtn = $dismissable ? '<button class="ppz-toast__dismiss" aria-label="Dismiss">&times;</button>' : '';
+    $dismissBtn = $dismissable ? '<button class="saas-toast__dismiss" aria-label="Dismiss">&times;</button>' : '';
 
     return <<<HTML
-    <div class="ppz-toast ppz-toast--{$type}" role="status" aria-live="polite" data-ppz-duration="{$duration}">
-        <span class="ppz-toast__icon" aria-hidden="true"></span>
-        <p class="ppz-toast__message">{$message}</p>
+    <div class="saas-toast saas-toast--{$type}" role="status" aria-live="polite" data-saas-duration="{$duration}">
+        <span class="saas-toast__icon" aria-hidden="true"></span>
+        <p class="saas-toast__message">{$message}</p>
         {$dismissBtn}
     </div>
     HTML;
@@ -220,35 +220,35 @@ function ppz_toast(array $props): string {
 ?>
 ```
 
-### PPZ Form Flows
+### SAAS Form Flows
 
 #### Multi-Step Form (Wizard)
 
 ```php
 <?php
-function ppz_wizard(array $props): string {
+function saas_wizard(array $props): string {
     $steps = $props['steps'] ?? [];
     $currentStep = $props['current'] ?? 0;
 
-    $progressHtml = '<div class="ppz-wizard__progress" role="progressbar" aria-valuenow="' . ($currentStep + 1) . '" aria-valuemin="1" aria-valuemax="' . count($steps) . '">';
+    $progressHtml = '<div class="saas-wizard__progress" role="progressbar" aria-valuenow="' . ($currentStep + 1) . '" aria-valuemin="1" aria-valuemax="' . count($steps) . '">';
     foreach ($steps as $i => $step) {
         $state = $i < $currentStep ? 'completed' : ($i === $currentStep ? 'active' : 'pending');
         $name = htmlspecialchars($step['name']);
-        $progressHtml .= "<div class=\"ppz-wizard__step ppz-wizard__step--{$state}\">{$name}</div>";
+        $progressHtml .= "<div class=\"saas-wizard__step saas-wizard__step--{$state}\">{$name}</div>";
     }
     $progressHtml .= '</div>';
 
     return <<<HTML
-    <div class="ppz-wizard">
+    <div class="saas-wizard">
         {$progressHtml}
-        <div class="ppz-wizard__content">
+        <div class="saas-wizard__content">
             {$steps[$currentStep]['content']}
         </div>
-        <div class="ppz-wizard__actions">
-            {$currentStep > 0 ? ppz_button(['text' => 'Previous', 'variant' => 'secondary']) : ''}
+        <div class="saas-wizard__actions">
+            {$currentStep > 0 ? saas_button(['text' => 'Previous', 'variant' => 'secondary']) : ''}
             {$currentStep < count($steps) - 1
-                ? ppz_button(['text' => 'Next', 'variant' => 'primary'])
-                : ppz_button(['text' => 'Submit', 'variant' => 'primary'])}
+                ? saas_button(['text' => 'Next', 'variant' => 'primary'])
+                : saas_button(['text' => 'Submit', 'variant' => 'primary'])}
         </div>
     </div>
     HTML;
@@ -256,9 +256,9 @@ function ppz_wizard(array $props): string {
 ?>
 ```
 
-### PPZ Interaction Patterns
+### SAAS Interaction Patterns
 
-| Pattern      | PPZ Implementation                                   | Trigger                   |
+| Pattern      | SAAS Implementation                                   | Trigger                   |
 | ------------ | ---------------------------------------------------- | ------------------------- |
 | Create item  | Open popin with form                                 | Click "+" or "New" button |
 | Edit item    | Open popin with pre-filled form                      | Click edit icon or row    |
@@ -268,19 +268,19 @@ function ppz_wizard(array $props): string {
 | Search       | Instant filter (debounced) or search popin           | Type in search bar        |
 | Notify       | Toast (auto-dismiss) for info, persistent for errors | After action              |
 
-### PPZ Loading Patterns
+### SAAS Loading Patterns
 
 ```php
 <?php
-// Skeleton loader for PPZ cards
-function ppz_card_skeleton(): string {
+// Skeleton loader for SAAS cards
+function saas_card_skeleton(): string {
     return <<<HTML
-    <div class="ppz-card ppz-card--skeleton" aria-busy="true" aria-label="Loading">
-        <div class="ppz-skeleton ppz-skeleton--rect" style="height: 200px"></div>
-        <div class="ppz-card__body">
-            <div class="ppz-skeleton ppz-skeleton--text" style="width: 70%"></div>
-            <div class="ppz-skeleton ppz-skeleton--text" style="width: 90%"></div>
-            <div class="ppz-skeleton ppz-skeleton--text" style="width: 50%"></div>
+    <div class="saas-card saas-card--skeleton" aria-busy="true" aria-label="Loading">
+        <div class="saas-skeleton saas-skeleton--rect" style="height: 200px"></div>
+        <div class="saas-card__body">
+            <div class="saas-skeleton saas-skeleton--text" style="width: 70%"></div>
+            <div class="saas-skeleton saas-skeleton--text" style="width: 90%"></div>
+            <div class="saas-skeleton saas-skeleton--text" style="width: 50%"></div>
         </div>
     </div>
     HTML;
@@ -291,7 +291,7 @@ function ppz_card_skeleton(): string {
 ## Output Format
 
 ```
-## PPZ UX Pattern: [Pattern Name]
+## SAAS UX Pattern: [Pattern Name]
 - Type: [popin/form/navigation/notification/loading]
 - Trigger: [What initiates this pattern]
 - Flow: [Step by step user flow]
@@ -302,11 +302,11 @@ function ppz_card_skeleton(): string {
 
 ## Anti-patterns
 
-- **NEVER** use browser `alert()`, `confirm()`, or `prompt()` — use PPZ popins and toasts
+- **NEVER** use browser `alert()`, `confirm()`, or `prompt()` — use SAAS popins and toasts
 - **NEVER** open multiple popins stacked — close current before opening another
 - **NEVER** forget to return focus after closing a popin
 - **NEVER** auto-dismiss error toasts — errors must be manually dismissed
 - **NEVER** use page reloads for form submissions — use AJAX + toast feedback
 - **NEVER** skip the loading state between action and result
-- **NEVER** forget keyboard support in PPZ interactive components
+- **NEVER** forget keyboard support in SAAS interactive components
 - **NEVER** use generic "Error" messages — be specific about what went wrong

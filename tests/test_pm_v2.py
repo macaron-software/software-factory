@@ -4,7 +4,6 @@ Unit tests: pure functions (_build_dynamic_phase, _build_evidence)
 Integration tests: mock LLM → _pm_checkpoint → verify phase decisions
 """
 # Ref: feat-backlog
-import json
 import os
 import sys
 import pytest
@@ -18,6 +17,7 @@ from platform.workflows.store import (
     _build_dynamic_phase,
     _build_evidence,
     _build_agent_catalog,
+    _pm_decision_to_xml,
     _PATTERN_CATALOG,
     _PHASE_TEMPLATES,
     _FEEDBACK_TYPES,
@@ -238,7 +238,7 @@ class TestPMCheckpointIntegration:
 
     def _make_llm_response(self, decision_json: dict) -> MagicMock:
         resp = MagicMock()
-        resp.content = json.dumps(decision_json)
+        resp.content = _pm_decision_to_xml(decision_json)
         return resp
 
     @pytest.mark.asyncio
@@ -308,7 +308,13 @@ class TestPMCheckpointIntegration:
         from platform.workflows.store import _pm_checkpoint
 
         raw_resp = MagicMock()
-        raw_resp.content = '```json\n{"decision": "loop", "phase_id": "dev", "reason": "fix"}\n```'
+        raw_resp.content = """```xml
+<pm_decision>
+  <decision>loop</decision>
+  <phase_id>dev</phase_id>
+  <reason>fix</reason>
+</pm_decision>
+```"""
         mock_llm = AsyncMock()
         mock_llm.chat = AsyncMock(return_value=raw_resp)
 
@@ -319,6 +325,61 @@ class TestPMCheckpointIntegration:
             )
         assert result["decision"] == "loop"
         assert result["phase_id"] == "dev"
+
+    @pytest.mark.asyncio
+    async def test_pm_accepts_xml_decision(self, mock_agent_store):
+        from platform.workflows.store import _pm_checkpoint
+
+        raw_resp = MagicMock()
+        raw_resp.content = (
+            "<pm_decision>"
+            "<decision>loop</decision>"
+            "<phase_id>dev</phase_id>"
+            "<reason>fix</reason>"
+            "</pm_decision>"
+        )
+        mock_llm = AsyncMock()
+        mock_llm.chat = AsyncMock(return_value=raw_resp)
+
+        with patch("platform.agents.store.get_agent_store", return_value=mock_agent_store), \
+             patch("platform.llm.client.get_llm_client", return_value=mock_llm):
+            result = await _pm_checkpoint(
+                MagicMock(), "s", "p", "qa", "fail", [], [], "goal"
+            )
+        assert result["decision"] == "loop"
+        assert result["phase_id"] == "dev"
+
+    @pytest.mark.asyncio
+    async def test_pm_accepts_xml_fenced_phase(self, mock_agent_store):
+        from platform.workflows.store import _pm_checkpoint
+
+        raw_resp = MagicMock()
+        raw_resp.content = """```xml
+<pm_decision>
+  <decision>phase</decision>
+  <reason>Need dedicated QA</reason>
+  <phase>
+    <name>QA Acceptance</name>
+    <pattern>loop</pattern>
+    <team><agent_id>qa-lead</agent_id></team>
+    <gate>all_approved</gate>
+    <feedback><type>adversarial</type></feedback>
+    <max_iterations>3</max_iterations>
+    <task>Validate all AC</task>
+  </phase>
+</pm_decision>
+```"""
+        mock_llm = AsyncMock()
+        mock_llm.chat = AsyncMock(return_value=raw_resp)
+
+        with patch("platform.agents.store.get_agent_store", return_value=mock_agent_store), \
+             patch("platform.llm.client.get_llm_client", return_value=mock_llm):
+            result = await _pm_checkpoint(
+                MagicMock(), "s", "p", "qa", "fail", [], [], "goal"
+            )
+        assert result["decision"] == "phase"
+        assert result["phase"]["name"] == "QA Acceptance"
+        assert result["phase"]["pattern"] == "loop"
 
     @pytest.mark.asyncio
     async def test_pm_error_defaults_to_next(self, mock_agent_store):

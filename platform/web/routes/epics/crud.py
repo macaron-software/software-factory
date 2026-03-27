@@ -1,12 +1,10 @@
 """Mission CRUD routes."""
-# Ref: feat-backlog, feat-portfolio
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
-from ....auth.middleware import require_auth
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ....i18n import t
@@ -25,28 +23,61 @@ logger = logging.getLogger(__name__)
 @router.get("/epics", response_class=HTMLResponse)
 @router.get("/missions", response_class=HTMLResponse)
 async def missions_page(request: Request):
-    """List all missions — shell with skeleton; grid loaded via HTMX."""
+    """List all missions with filters."""
+    from ....epics.store import get_epic_store
     from ....projects.manager import get_project_store
 
+    epic_store = get_epic_store()
     project_store = get_project_store()
 
     filter_status = request.query_params.get("status")
     filter_project = request.query_params.get("project")
     show_new = request.query_params.get("action") == "new"
 
+    all_missions = epic_store.list_missions()
     all_projects = project_store.list_all()
     project_ids = [p.id for p in all_projects]
+    project_names = {p.id: p.name for p in all_projects}
+
+    # Apply filters
+    filtered = all_missions
+    if filter_status:
+        filtered = [m for m in filtered if m.status == filter_status]
+    if filter_project:
+        filtered = [m for m in filtered if m.project_id == filter_project]
+
+    # Enrich with stats
+    mission_cards = []
+    for m in filtered:
+        stats = epic_store.mission_stats(m.id)
+        sprints = epic_store.list_sprints(m.id)
+        current = next(
+            (s.number for s in sprints if s.status == "active"), len(sprints)
+        )
+        total_t = stats.get("total", 0)
+        done_t = stats.get("done", 0)
+        mission_cards.append(
+            {
+                "mission": m,
+                "project_name": project_names.get(m.project_id, m.project_id),
+                "sprint_count": len(sprints),
+                "current_sprint": current,
+                "total_tasks": total_t,
+                "done_tasks": done_t,
+                "progress_pct": round(done_t / total_t * 100) if total_t > 0 else 0,
+            }
+        )
 
     from ....workflows.store import get_workflow_store
 
     all_workflows = get_workflow_store().list_all()
 
-    # Grid loaded via HTMX deferred skeleton
     return _templates(request).TemplateResponse(
         "missions.html",
         {
             "request": request,
             "page_title": "PI Board",
+            "epics": mission_cards,
             "project_ids": project_ids,
             "filter_status": filter_status,
             "filter_project": filter_project,
@@ -146,7 +177,7 @@ async def mission_detail_page(request: Request, epic_id: str):
     )
 
 
-@router.post("/api/missions", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("developer"))])
+@router.post("/api/missions", responses={200: {"model": OkResponse}})
 async def create_mission(request: Request):
     """Create a new mission."""
     from fastapi import HTTPException
@@ -200,7 +231,7 @@ async def list_missions_api(request: Request):
 
     epic_store = get_epic_store()
     run_store = get_epic_run_store()
-    missions = epic_store.list_missions(limit=1000)
+    missions = epic_store.list_missions(limit=200)
     runs = run_store.list_runs(limit=200)
     runs_by_parent = {}
     for r in runs:
@@ -223,7 +254,6 @@ async def list_missions_api(request: Request):
         result.append(
             {
                 "id": m.id,
-                "run_id": run.id if run else None,
                 "name": m.name,
                 "status": m.status,
                 "type": m.type,
@@ -237,8 +267,8 @@ async def list_missions_api(request: Request):
     return JSONResponse({"epics": result, "total": len(result)})
 
 
-@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("admin"))])
-@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}}, dependencies=[Depends(require_auth("admin"))])
+@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}})
+@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}})
 async def delete_mission(epic_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ....db.migrations import get_db

@@ -29,7 +29,7 @@ Beta(wins+1, losses+1) per (agent_id, pattern_id, technology, phase_type, llm_mo
 
 | Provider | Models | Use Case |
 |----------|--------|----------|
-| MiniMax | MiniMax-M2.5 | Default (local dev) |
+| MiniMax | MiniMax-M2.7 | Default (local dev) |
 | Azure OpenAI | gpt-5-mini | Production lightweight |
 | Azure AI Foundry | gpt-5.2, gpt-5.1-codex, gpt-5.1-mini | Production advanced |
 | Demo | Mock | Testing (no API key) |
@@ -45,7 +45,7 @@ Cooldown: 90s on HTTP 429 (rate limit)
 
 ```bash
 PLATFORM_LLM_PROVIDER=minimax          # or azure-openai, azure-ai, demo
-PLATFORM_LLM_MODEL=MiniMax-M2.5       # or gpt-5-mini
+PLATFORM_LLM_MODEL=MiniMax-M2.7       # or gpt-5-mini
 LLM_RATE_LIMIT_RPM=50                 # requests per minute
 
 # Azure AI Foundry (for gpt-5.2 / gpt-5.1-codex)

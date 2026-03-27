@@ -4,7 +4,6 @@ Endpoints:
   GET /api/workflows/<id>/dag   — returns {nodes: [...], edges: [...]} for rendering
   GET /api/workflows/<id>/dag/svg — returns SVG text representation
 """
-# Ref: feat-workflows
 
 from __future__ import annotations
 
